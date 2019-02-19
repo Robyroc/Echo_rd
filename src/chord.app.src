@@ -1,5 +1,5 @@
 {application, chord,
- [{description, "An OTP library"},
+ [{description, "A chord implementation"},
   {vsn, "0.1.0"},
   {registered, []},
   {applications,
