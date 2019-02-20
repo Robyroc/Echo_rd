@@ -7,8 +7,8 @@
 %%====================================================================
 
 justCreated(PID) ->
-  CMANAGER = spawn(cmanager, init, [self()]),
-  noNetwork(PID, CMANAGER).
+  CManager = spawn(cmanager, init, [self()]),
+  noNetwork(PID, CManager).
 
 init(PID) ->
   spawn(?MODULE, justCreated, [PID]).
@@ -17,46 +17,46 @@ init(PID) ->
 %% Internal functions
 %%====================================================================
 
-noNetwork(CREATOR, CMANAGER) ->
+noNetwork(Creator, CManager) ->
   receive
-    {CREATOR, create} ->
-      CMANAGER ! {self(), create},
-      notifyResult(CREATOR, CMANAGER);
-    {CREATOR, join, NODE} ->
-      CMANAGER ! {self(), join, NODE},
-      notifyResult(CREATOR, CMANAGER);
-    {CREATOR, exit} ->
-      CMANAGER ! {self(), exit},
+    {Creator, create} ->
+      CManager ! {self(), create},
+      notifyResult(Creator, CManager);
+    {Creator, join, NODE} ->
+      CManager ! {self(), join, NODE},
+      notifyResult(Creator, CManager);
+    {Creator, exit} ->
+      CManager ! {self(), exit},
       ok;
-    _ -> noNetwork(CREATOR, CMANAGER)
+    _ -> noNetwork(Creator, CManager)
   end.
 
-notifyResult(CREATOR, CMANAGER) ->
+notifyResult(Creator, CManager) ->
   receive
-    {CMANAGER, creationResult, {success, INFO}} ->
-      CREATOR ! {self(), {success, INFO}},
-      settingUp(CREATOR, CMANAGER, noRouter, noBManager);
-    {CMANAGER, creationResult, {fail, INFO}} ->
-      CREATOR ! {self(), {fail, INFO}},
-      noNetwork(CREATOR, CMANAGER)
+    {CManager, creationResult, {success, INFO}} ->
+      Creator ! {self(), {success, INFO}},
+      settingUp(Creator, CManager, noRouter, noBManager);
+    {CManager, creationResult, {fail, INFO}} ->
+      Creator ! {self(), {fail, INFO}},
+      noNetwork(Creator, CManager)
   end.
 
-settingUp(C, CMANAGER, noRouter, noBManager) ->
+settingUp(C, CManager, noRouter, noBManager) ->
   receive
-    {CMANAGER, notifyRouter, R} -> settingUp(C, CMANAGER, R, noBManager);
-    {CMANAGER, notifyBMananger, B} -> settingUp(C, CMANAGER, noRouter, B)
+    {CManager, notifyRouter, R} -> settingUp(C, CManager, R, noBManager);
+    {CManager, notifyBMananger, B} -> settingUp(C, CManager, noRouter, B)
   end;
 
-settingUp(C, CMANAGER, R, noBManager) ->
+settingUp(C, CManager, R, noBManager) ->
   receive
-    {CMANAGER, notifyBMananger, B} -> started(C, CMANAGER, R, B)
+    {CManager, notifyBMananger, B} -> started(C, CManager, R, B)
   end;
 
-settingUp(C, CMANAGER, noRouter, B) ->
+settingUp(C, CManager, noRouter, B) ->
   receive
-    {CMANAGER, notifyRouter, R} -> started(C, CMANAGER, R, B)
+    {CManager, notifyRouter, R} -> started(C, CManager, R, B)
   end.
 
-started(CREATOR, CMANAGER, ROUTER, BMANAGER) ->
+started(Creator, CManager, Router, BManager) ->
   ok.   %%TODO: to be filled
 
