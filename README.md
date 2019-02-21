@@ -53,13 +53,14 @@ Messages
 | predFind      | Stabilizer | Checker(s) | Asks for the predecessor of the successor       | Sender                  |
 | predTell      | Checker(s) | Stabilizer | Answers the above message                       | Sender, predecessor     |
 | localAdd      | 2          | B. Manager | Adds the data to the storage                    | Sender, data            |
-| localAdded    | B. Manager | many       | Returns the index of the added item             | Sender, data, index     |
+| localAdded    | B. Manager | many       | Returns the index of the added item             | Sender, index     |
 | localGet      | 2          | B. Manager | Asks for an item in the given position          | Sender, index           |
-| localObtained | B. Manager | many       | Answers the above message                       | Sender, index, data     |
+| localObtained | B. Manager | many       | Answers the above message                       | Sender, data     |
 | localDelete   | 2          | B. Manager | Ask for the deletion of the item of that index  | Sender, index           |
-| localDeleted  | B. Manager | many       | Answers the above message                       | Sender, outcome         |
+| localDeleted  | B. Manager | many       | Answers the above message                       | Sender, index         |
 | getAll        | Api        | B. Manager | Asks for all the blocks stored                  | Sender                  |
 | obtainedAll   | B. Manager | API        | Answers the above message                       | Sender, data            |
+| join          | C.M.(any)  | C.M.       | Ask for the successor in order to join          | Sender                  |
 | leave         | Api        | C.M.       | Tells the CM to stop all incoming conversations | Sender                  |
 
 - 1 is Api (l), Router, Fixer(l)
