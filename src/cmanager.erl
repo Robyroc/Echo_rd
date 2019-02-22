@@ -11,7 +11,7 @@ init(API) ->
     {API, exit} -> ok
   end,
   Rout = spawn(?MODULE, init, [self(), API]),         %TODO change init
-  BManager = spawn(?MODULE, init, [self(), API]),
+  BManager = spawn(?MODULE, init, [self(), API]),     %TODO change init
   API ! {self(), notifyRouterCreation, Rout},
   API ! {self(), notifyBMCreation, BManager},
   connected(API, Rout, BManager, noStabilizer, noFixer, noChecker, 3).

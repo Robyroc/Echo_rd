@@ -11,7 +11,7 @@ justCreated(PID) ->
   noNetwork(PID, CManager).
 
 init(PID) ->
-  spawn(?MODULE, justCreated, [PID]).
+  spawn(fun() -> justCreated(PID) end).
 
 %%====================================================================
 %% Internal functions
