@@ -1,62 +1,49 @@
 -module(chord).
 
 %% API exports
--export([init/1, justCreated/1]).
+-export([init/2]).
 %%====================================================================
 %% API functions
 %%====================================================================
 
-justCreated(PID) ->
-  CManager = spawn(cmanager, init, [self()]),
-  noNetwork(PID, CManager).
-
-init(PID) ->
-  spawn(fun() -> justCreated(PID) end).
+init(PID, BlockManagerPID) ->
+  spawn(fun() -> just_created(PID, BlockManagerPID) end).
 
 %%====================================================================
 %% Internal functions
 %%====================================================================
 
-noNetwork(Creator, CManager) ->
+just_created(PID, BlockManagerPID) ->
+  CManager = spawn(cmanager, init, [self()]),
+  no_network(PID, CManager, BlockManagerPID).
+
+no_network(Creator, CManager, BlockManagerPID) ->
   receive
-    {Creator, create} ->
-      CManager ! {self(), create},
-      notifyResult(Creator, CManager);
-    {Creator, join, NODE} ->
-      CManager ! {self(), join, NODE},
-      notifyResult(Creator, CManager);
+    {Creator, create, Nbits} ->
+      CManager ! {self(), create_info, Nbits},
+      notify_result(Creator, CManager, BlockManagerPID);
+    {Creator, join, Address} ->
+      CManager ! {self(), join, Address},
+      notify_result(Creator, CManager, BlockManagerPID);
     {Creator, exit} ->
       CManager ! {self(), exit},
       ok;
-    _ -> noNetwork(Creator, CManager)
+    {Creator, service_command, _, _} ->
+      Creator ! {self(), network_not_ready},
+      no_network(Creator, CManager, BlockManagerPID);
+    _ -> no_network(Creator, CManager, BlockManagerPID)
   end.
 
-notifyResult(Creator, CManager) ->
+notify_result(Creator, CManager, BlockManagerPid) ->
   receive
-    {CManager, creationResult, {success, INFO}} ->
+    {CManager, creation_result, {success, INFO}} ->
       Creator ! {self(), {success, INFO}},
-      settingUp(Creator, CManager, noRouter, noBManager);
-    {CManager, creationResult, {fail, INFO}} ->
+      started(Creator, CManager, BlockManagerPid);
+    {CManager, creation_result, {fail, INFO}} ->
       Creator ! {self(), {fail, INFO}},
-      noNetwork(Creator, CManager)
+      no_network(Creator, CManager, BlockManagerPid)
   end.
 
-settingUp(C, CManager, noRouter, noBManager) ->
-  receive
-    {CManager, notifyRouter, R} -> settingUp(C, CManager, R, noBManager);
-    {CManager, notifyBMananger, B} -> settingUp(C, CManager, noRouter, B)
-  end;
-
-settingUp(C, CManager, R, noBManager) ->
-  receive
-    {CManager, notifyBMananger, B} -> started(C, CManager, R, B)
-  end;
-
-settingUp(C, CManager, noRouter, B) ->
-  receive
-    {CManager, notifyRouter, R} -> started(C, CManager, R, B)
-  end.
-
-started(Creator, CManager, Router, BManager) ->
+started(Creator, CManager, BManager) ->
   ok.   %%TODO: to be filled
 

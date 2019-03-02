@@ -5,4 +5,4 @@
 -compile(export_all).
 
 startup() ->
-  chord:init(self()).
+  chord:init(self(), self()).

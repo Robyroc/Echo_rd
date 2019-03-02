@@ -6,40 +6,49 @@
 
 init(API) ->
   receive
-    {API, create} -> API ! {self(), creationResult, {success, API}};        %TODO: create new network and notify it accordingly
-    {API, join, NODE} -> API ! {self(), creationResult, {success, API}};     %TODO: join the network
+    {API, create_info, Nbits} -> handle_create(Nbits, API);
+    {API, join, NodeAddress} -> handle_join(NodeAddress, API);     %TODO: join the network
     {API, exit} -> ok
-  end,
-  Rout = spawn(?MODULE, init, [self(), API]),         %TODO change init
-  BManager = spawn(?MODULE, init, [self(), API]),     %TODO change init
-  API ! {self(), notifyRouterCreation, Rout},
-  API ! {self(), notifyBMCreation, BManager},
-  connected(API, Rout, BManager, noStabilizer, noFixer, noChecker, 3).
-
-connected(A,R,B,S,F,C,0) -> operating(A,R,B,S,F,C);
-
-connected(API, Router, BManager, Stabilizer, Fixer, Checker, Remaining) ->
-  receive
-    {Router, notifyStabilizerCreation, S} ->
-      connected(API, Router, BManager, S, Fixer, Checker,
-        case(Stabilizer) of
-          noStabilizer -> Remaining - 1;
-          _ -> Remaining
-        end);
-    {Router, notifyFixerCreation, F} ->
-      connected(API, Router, BManager, Stabilizer, F, Checker,
-        case(Fixer) of
-          noFixer -> Remaining - 1;
-          _ -> Remaining
-        end);
-    {Router, notifyCheckerCreation, C} ->
-      connected(API, Router, BManager, Stabilizer, Fixer, C,
-        case(Checker) of
-          noChecker -> Remaining - 1;
-          _ -> Remaining
-        end);
-    _ -> connected(API, Router, BManager, Stabilizer, Fixer, Checker, Remaining)
   end.
 
-operating(API, Router, BManager, Stabilizer, Fixer, Checker) ->
-  ok.           %TODO fill this method
+handle_create(Nbits, API) ->
+  LM = spawn(fun() -> tcp_manager:init(self()) end),
+  RM = spawn(fun() -> router_manager:init(self(), Nbits, no_pred, [tcp_manager:get_own_address()]) end),
+  API ! {self(), creation_result, {success, "Successfully created network"}},
+  operating(API, LM, RM, Nbits).
+
+handle_join(NodeAddress, API) ->
+  LM = spawn(fun() -> tcp_manager:init(self()) end),
+  RM = spawn(fun() -> router_manager:init(self(), no_nbits, no_pred, wait_for_succ) end),
+  LM ! {self(), connect_to, NodeAddress},
+  OwnPID = self(),
+  receive
+    {OwnPID, link, PID} ->
+      PID ! {self(), join, no_alias, [no_index, tcp_manager:get_own_address()]}
+  end,
+  wait_for_join_data(LM, RM, API).
+
+wait_for_join_data(LM, RM, API) ->
+  receive
+    {_PID, Method, Address, Params} ->
+      Parsed = parse_method(Method),
+      case Parsed of
+        join_data ->
+          [Nbits, Resources, SuccList] = Params,
+          RM ! {self(), send_info, Nbits, Resources, [Address | SuccList]},
+          API ! {self(), creation_result, {success, "Successfully joined network"}},
+          operating(API, LM, RM, Nbits);
+        _ -> wait_for_join_data(LM, RM, API)
+      end
+  after
+    20000 ->
+      API ! {self(), creation_result, {fail, "Timeout on join network"}},
+      LM ! {self(), kill},
+      RM ! {self(), kill},
+      init(API)
+  end.
+
+operating(ApplicationManager, LinkManager, RouterManager, Nbits) -> ok.         %TODO implement main operating loop
+
+
+parse_method(Method) -> ok.                    %TODO implement this method

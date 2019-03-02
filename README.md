@@ -12,33 +12,27 @@ Build
 Interface
 -----
 
-- add(data), will include the data provided into the network. It will return the index of the added item
-- get(n), will get the data at index n
-- delete(n), will remove the data at index n from the network.
-- create(), will create a new Chord network
-- join(node), will enter the network whose node is part
-- leave(), will leave (softly) the network
+The library allows to abstract the location of a service and distribute it. All the commands of the service are not changed by Echo_rd, it just routes them to the node handling it correctly.
+
+The application can send messages to the library with the following atoms: 
+- create, will create a new Chord network. Needs also a parameter to specify the number of bits of the indexes of the network.
+- join, will enter a network. Needs also an address of a node part of the interested network.
+- leave, will leave (softly) the network.
+- service_command, will perform a command on a resource. Needs the index of the resource and the complete command that can be handled by the service. 
 
 
-Actors
+Modules
 -----
 
-- API: it will handle the communication with the application.
-- Block Manager: it will handle the data stored within the node.
-- Router: it will handle the lookups operations and the finger table management.
-- Communication Manager: it will handle all the message received from the network.
-- Stabilizer: verifies immediate successor, and tells the successor about itself. Periodically.
-- Fixer: refreshes finger table entries. Periodically.
-- Checker: checks if the predecessor failed. Periodically.
+- ApplicationManager/API/chord: it will handle the communication with the upper level (application and service manager).
+- RouterManager: it will handle all the routing operations and all the other tasks needed to keep routing consistently.
+- CommunicationManager: it will handle all the messages received from the network.
+- LinkManager: it will handle the communication with the lower level (typically tcp). It's strictly dependent on the 4th level protocol used. In this version we'll use TCP.
 
-Initialize procedure
------
-chord:init() will create the Api and the Communication Manager will be created from it. After a join/create, Communication Manager will create Router and block manager, notifying API about it. Router will then proceed creating the other 3 services.
-
-Closure procedure
+Main status
 -----
 
-Leave command will proceed to pass all the blocks stored to the successor. Then will kill all the services except Api and Communication Manager, returning in a post chordInit state. Exit will then close the package completely.
+State diagram on notes 
 
 Messages
 -----
@@ -65,3 +59,5 @@ Messages
 
 - 1 is Api (l), Router, Fixer(l)
 - 2 is Api (any) 
+
+TO BE REVISITED HEAVILY
