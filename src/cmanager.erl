@@ -7,7 +7,7 @@
 init(API) ->
   receive
     {API, create_info, Nbits} -> handle_create(Nbits, API);
-    {API, join, NodeAddress} -> handle_join(NodeAddress, API);     %TODO: join the network
+    {API, join, NodeAddress} -> handle_join(NodeAddress, API);
     {API, exit} -> ok
   end.
 

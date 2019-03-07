@@ -2,7 +2,7 @@
 -author("robyroc").
 
 %% API
--export([init/1, get_own_address/0]).
+-export([init/1, get_own_address/0, marshall/3, parse_message/1]).
 -define(PORT, 6543).
 
 %TODO handle tcp failures in whole file
@@ -66,12 +66,14 @@ handler(CManager, Socket) ->
 
 parse_message(Bin) ->
   String = binary_to_list(Bin),
-  [Address, Rest] = string:split(String, 31),
-  [Method, Params] = string:split(Rest, 31),
-  {parse_address(Address), list_to_atom(Method), parse_params(Params)}.
+  SplittedList = string:tokens(String, [31, 31]),
+  [Port, IpA, IpB, IpC, IpD, Method | Params] = lists:map(
+    fun(X) -> lists:flatten(string:replace(X, [31, 0], [31], all)) end, SplittedList),
+  {{list_to_integer(Port), {list_to_integer(IpA), list_to_integer(IpB), list_to_integer(IpC), list_to_integer(IpD)}},
+    Method, Params}.
 
-parse_address(Address) -> ok.      %TODO parse address correctly
 
+%% tcp_manager:parse_message(tcp_manager:marshall({1234, {192, 1, 2, 3}}, add, ["1","kaka"])).
 handle_incoming(CManager, Bin) ->
   {Address, Method, Params} = parse_message(Bin),
   CManager ! {self(), Method, Address, Params}.
@@ -81,6 +83,19 @@ get_own_address() ->
   IP = hd([Addr || {Addr, _,_} <- Addrs, size(Addr) == 4, Addr =/= {127,0,0,1}]),
   {?PORT, IP}.
 
-marshall(Address, Method, Params) -> ok.        %TODO marshall outgoing messages
+marshall(Address, Method, Params) ->
+  {Port, {IpA, IpB, IpC, IpD}} = Address,
+  MethodList = atom_to_list(Method),
+  PortParsed = lists:flatten(string:replace(integer_to_list(Port), [31], [31,0], all)),
+  IpAParsed = lists:flatten(string:replace(integer_to_list(IpA), [31], [31,0], all)),
+  IpBParsed = lists:flatten(string:replace(integer_to_list(IpB), [31], [31,0], all)),
+  IpCParsed = lists:flatten(string:replace(integer_to_list(IpC), [31], [31,0], all)),
+  IpDParsed = lists:flatten(string:replace(integer_to_list(IpD), [31], [31,0], all)),
+  MethodParsed = lists:flatten(string:replace(MethodList, [31], [31,0], all)),
+  ParamsParsed = [lists:flatten(string:replace(X, [31], [31,0], all)) || X <- Params],
 
-parse_params(Params) -> ok.                %TODO parse params received
+  Out = lists:flatten([31, 31 | [unicode:characters_to_list([X, [31, 31]]) || X <- [PortParsed, IpAParsed, IpBParsed, IpCParsed,
+    IpDParsed, MethodParsed | ParamsParsed]]]),
+
+  list_to_binary(Out).
+
