@@ -4,6 +4,7 @@
 %% API
 -export([init/1, get_own_address/0, marshall/3, parse_message/1]).
 -define(PORT, 6543).
+-define(SEP, 33).
 
 %TODO handle tcp failures in whole file
 
@@ -66,9 +67,9 @@ handler(CManager, Socket) ->
 
 parse_message(Bin) ->
   String = binary_to_list(Bin),
-  SplittedList = string:tokens(String, [31, 31]),
+  SplittedList = [X || X <- string:split(String, [?SEP, ?SEP], all), X =/= [] ],
   [Port, IpA, IpB, IpC, IpD, Method | Params] = lists:map(
-    fun(X) -> lists:flatten(string:replace(X, [31, 0], [31], all)) end, SplittedList),
+    fun(X) -> lists:flatten(string:replace(X, [?SEP, 0], [?SEP], all)) end, SplittedList),
   {{list_to_integer(Port), {list_to_integer(IpA), list_to_integer(IpB), list_to_integer(IpC), list_to_integer(IpD)}},
     Method, Params}.
 
@@ -86,15 +87,15 @@ get_own_address() ->
 marshall(Address, Method, Params) ->
   {Port, {IpA, IpB, IpC, IpD}} = Address,
   MethodList = atom_to_list(Method),
-  PortParsed = lists:flatten(string:replace(integer_to_list(Port), [31], [31,0], all)),
-  IpAParsed = lists:flatten(string:replace(integer_to_list(IpA), [31], [31,0], all)),
-  IpBParsed = lists:flatten(string:replace(integer_to_list(IpB), [31], [31,0], all)),
-  IpCParsed = lists:flatten(string:replace(integer_to_list(IpC), [31], [31,0], all)),
-  IpDParsed = lists:flatten(string:replace(integer_to_list(IpD), [31], [31,0], all)),
-  MethodParsed = lists:flatten(string:replace(MethodList, [31], [31,0], all)),
-  ParamsParsed = [lists:flatten(string:replace(X, [31], [31,0], all)) || X <- Params],
+  PortParsed = lists:flatten(string:replace(integer_to_list(Port), [?SEP], [?SEP,0], all)),
+  IpAParsed = lists:flatten(string:replace(integer_to_list(IpA), [?SEP], [?SEP,0], all)),
+  IpBParsed = lists:flatten(string:replace(integer_to_list(IpB), [?SEP], [?SEP,0], all)),
+  IpCParsed = lists:flatten(string:replace(integer_to_list(IpC), [?SEP], [?SEP,0], all)),
+  IpDParsed = lists:flatten(string:replace(integer_to_list(IpD), [?SEP], [?SEP,0], all)),
+  MethodParsed = lists:flatten(string:replace(MethodList, [?SEP], [?SEP,0], all)),
+  ParamsParsed = [lists:flatten(string:replace(X, [?SEP], [?SEP,0], all)) || X <- Params],
 
-  Out = lists:flatten([31, 31 | [unicode:characters_to_list([X, [31, 31]]) || X <- [PortParsed, IpAParsed, IpBParsed, IpCParsed,
+  Out = lists:flatten([?SEP, ?SEP | [unicode:characters_to_list([X, [?SEP, ?SEP]]) || X <- [PortParsed, IpAParsed, IpBParsed, IpCParsed,
     IpDParsed, MethodParsed | ParamsParsed]]]),
 
   list_to_binary(Out).
