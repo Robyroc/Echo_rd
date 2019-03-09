@@ -5,6 +5,7 @@
 -export([init/1, get_own_address/0, marshall/3, parse_message/1]).
 -define(PORT, 6543).
 -define(SEP, 33).
+%TODO set sep to 31 before release
 
 %TODO handle tcp failures in whole file
 
@@ -73,8 +74,10 @@ parse_message(Bin) ->
   {{list_to_integer(Port), {list_to_integer(IpA), list_to_integer(IpB), list_to_integer(IpC), list_to_integer(IpD)}},
     Method, Params}.
 
-
+%% To test if parse message and marshall works, run the following command
+%% TODO remove both methods from exported list
 %% tcp_manager:parse_message(tcp_manager:marshall({1234, {192, 1, 2, 3}}, add, ["1","kaka"])).
+
 handle_incoming(CManager, Bin) ->
   {Address, Method, Params} = parse_message(Bin),
   CManager ! {self(), Method, Address, Params}.
@@ -84,9 +87,8 @@ get_own_address() ->
   IP = hd([Addr || {Addr, _,_} <- Addrs, size(Addr) == 4, Addr =/= {127,0,0,1}]),
   {?PORT, IP}.
 
-marshall(Address, Method, Params) ->
+marshall(Address, MethodList, Params) ->
   {Port, {IpA, IpB, IpC, IpD}} = Address,
-  MethodList = atom_to_list(Method),
   PortParsed = lists:flatten(string:replace(integer_to_list(Port), [?SEP], [?SEP,0], all)),
   IpAParsed = lists:flatten(string:replace(integer_to_list(IpA), [?SEP], [?SEP,0], all)),
   IpBParsed = lists:flatten(string:replace(integer_to_list(IpB), [?SEP], [?SEP,0], all)),
@@ -95,8 +97,8 @@ marshall(Address, Method, Params) ->
   MethodParsed = lists:flatten(string:replace(MethodList, [?SEP], [?SEP,0], all)),
   ParamsParsed = [lists:flatten(string:replace(X, [?SEP], [?SEP,0], all)) || X <- Params],
 
-  Out = lists:flatten([?SEP, ?SEP | [unicode:characters_to_list([X, [?SEP, ?SEP]]) || X <- [PortParsed, IpAParsed, IpBParsed, IpCParsed,
-    IpDParsed, MethodParsed | ParamsParsed]]]),
+  Out = lists:flatten([?SEP, ?SEP | [unicode:characters_to_list([X, [?SEP, ?SEP]]) ||
+    X <- [PortParsed, IpAParsed, IpBParsed, IpCParsed,IpDParsed, MethodParsed | ParamsParsed]]]),
 
   list_to_binary(Out).
 

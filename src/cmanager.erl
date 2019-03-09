@@ -2,7 +2,7 @@
 -author("robyroc").
 
 %% API
--export([init/1]).
+-export([init/1, prepareMessage/3]).
 
 init(API) ->
   receive
@@ -25,6 +25,11 @@ handle_join(NodeAddress, API) ->
   receive
     {OwnPID, link, PID} ->
       PID ! {self(), join, no_alias, [no_index, tcp_manager:get_own_address()]}
+  after 20000 ->
+    API ! {self(), creation_result, {fail, "Timeout on join network"}},
+    LM ! {self(), kill},
+    RM ! {self(), kill},
+    init(API)
   end,
   wait_for_join_data(LM, RM, API).
 
@@ -50,5 +55,6 @@ wait_for_join_data(LM, RM, API) ->
 
 operating(ApplicationManager, LinkManager, RouterManager, Nbits) -> ok.         %TODO implement main operating loop
 
+prepareMessage(Address, Method, Params) -> ok.          %TODO implement this method that will allow to prepare msg for link manager
 
 parse_method(Method) -> ok.                    %TODO implement this method
