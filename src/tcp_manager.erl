@@ -40,7 +40,12 @@ tcp_manager(CManager, Listener, Connections) ->
           NewConnections = Connections
       end,
       PID ! {CManager, link, Pid},
-      tcp_manager(CManager, Listener, NewConnections)
+      tcp_manager(CManager, Listener, NewConnections);
+    {PID, compact_address, Address} ->
+      {Port, {IPA, IPB, IPC, IPD}} = Address,
+      Compacted = lists:flatten([integer_to_list(IPA), ".", integer_to_list(IPB), ".", integer_to_list(IPC), ".",
+        integer_to_list(IPD), ":", integer_to_list(Port)]),
+      PID ! {CManager, compacted_address, Compacted}
   end.
 
 listener(TcpManager, Socket) ->
