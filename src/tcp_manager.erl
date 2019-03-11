@@ -81,7 +81,7 @@ parse_message(Bin) ->
 
 %% To test if parse message and marshall works, run the following command
 %% TODO remove both methods from exported list
-%% tcp_manager:parse_message(tcp_manager:marshall({1234, {192, 1, 2, 3}}, add, ["1","kaka"])).
+%% tcp_manager:parse_message(tcp_manager:marshall({1234, {192, 1, 2, 3}}, "add", ["1","kaka"])).
 
 handle_incoming(CManager, Bin) ->
   {Address, Method, Params} = parse_message(Bin),
