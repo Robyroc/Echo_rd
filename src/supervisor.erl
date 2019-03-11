@@ -1,5 +1,5 @@
 -module(supervisor).
--author("mrbo9").
+-author("robyroc").
 
 %% API
 -export([create_static/1]).
