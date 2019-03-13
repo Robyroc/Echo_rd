@@ -42,13 +42,13 @@ hash_func(CManager, Nbits) ->               %TODO move to CManager
       CManager ! {self(), compact_address, Address},
       receive
         {CManager, compacted_address, Compacted} ->
-          Digest = crypto:hash(sha, Compacted),
-          Index = Digest rem math:pow(2, Nbits), %TODO check binary to integer
+          Digest = crypto:bytes_to_integer(crypto:hash(sha, Compacted)),
+          Index = Digest rem round(math:pow(2, Nbits)),
           PID ! {self(), code, Index}
       end;
     {PID, r_code, Resource} ->
-      Digest = crypto:hash(sha, Resource),
-      Index = Digest rem math:pow(2, Nbits),
+      Digest = crypto:bytes_to_integer(crypto:hash(sha, Resource)),
+      Index = Digest rem round(math:pow(2, Nbits)),
       PID ! {self(), code, Index}
   end,
   hash_func(CManager, Nbits).
