@@ -19,5 +19,4 @@ launch() ->
   Z = lists:map(fun(Y) -> crypto:hash(sha, Y) end, X),
   I = lists:map(fun(K) -> crypto:bytes_to_integer(K) end, Z),
   M = lists:map(fun(F) -> F rem 128 end, I),
-  Res = [{I, length([A || A <- M, A =:= I])} || I <- lists:seq(0, 127)],
-  Res = [io:format("~p      ~p~n",[I, length([A || A <- M, A =:= I])]) || I <- lists:seq(0, 127)].
+  [io:format("~p      ~p~n",[I, length([A || A <- M, A =:= I])]) || I <- lists:seq(0, 127)].

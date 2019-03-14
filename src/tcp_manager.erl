@@ -60,12 +60,12 @@ handler(CManager, Socket) ->
       handler(CManager, Socket);
     {tcp_closed, Socket} ->
       gen_tcp:close(Socket);
-    {_Pid, Method, noAlias, Params} ->
-      Message = marshall(get_own_address(), Method, Params),
+    {_Pid, Method, no_alias, Params} ->
+      Message = marshall(get_own_address(), atom_to_list(Method), Params),  %TODO in communication manager handle conversion back
       gen_tcp:send(Socket, Message),
       handler(CManager, Socket);
     {_Pid, Method, Alias, Params} ->
-      Message = marshall(Alias, Method, Params),
+      Message = marshall(Alias, atom_to_list(Method), Params),
       gen_tcp:send(Socket, Message),
       handler(CManager, Socket);
     _ -> handler(CManager, Socket)
