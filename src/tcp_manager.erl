@@ -71,7 +71,9 @@ handler(CManager, Socket) ->
     _ -> handler(CManager, Socket)
   end.
 
-parse_message(Bin) ->
+
+%%TODO deprecated
+parse_message_no(Bin) ->
   String = binary_to_list(Bin),
   SplittedList = [X || X <- string:split(String, [?SEP, ?SEP], all), X =/= [] ],
   [Port, IpA, IpB, IpC, IpD, Method | Params] = lists:map(
@@ -81,7 +83,7 @@ parse_message(Bin) ->
 
 %% To test if parse message and marshall works, run the following command
 %% TODO remove both methods from exported list
-%% tcp_manager:parse_message(tcp_manager:marshall({1234, {192, 1, 2, 3}}, "add", ["1","kaka"])).
+%% tcp_manager:parse_message(tcp_manager:marshall({1234, {192, 1, 2, 3}}, 17, [<<"1">>,<<"kaka">>,<<"ab3">>])).
 
 handle_incoming(CManager, Bin) ->
   {Address, Method, Params} = parse_message(Bin),
@@ -92,7 +94,44 @@ get_own_address() ->
   IP = hd([Addr || {Addr, _,_} <- Addrs, size(Addr) == 4, Addr =/= {127,0,0,1}]),
   {?PORT, IP}.
 
-marshall(Address, MethodList, Params) ->
+
+marshall(Address, Method, Params) ->
+  {Port, {IpA, IpB, IpC, IpD}} = Address,
+  Length = length(Params),
+  case Length of
+    0 -> <<Port:16, IpA:8, IpB:8, IpC:8, IpD:8, Method:8, Length:8>>;
+    _ ->
+      Sizes = list_to_binary(lists:map(fun(X) ->       %%TODO communication manager send Params in list of binary
+        byte_size(X) end, lists:reverse(tl(lists:reverse(Params))))),
+      ParamsList = list_to_binary(Params),
+      <<Port:16, IpA:8, IpB:8, IpC:8, IpD:8, Method:8, Length:8, Sizes:(Length-1)/binary, ParamsList/binary>>
+  end.
+
+parse_cleaner({Address, Method, [<<>>]}) ->
+  {Address, Method, []};
+parse_cleaner(A) -> A.
+
+
+parse_message(Bin) ->
+  <<Port:16/integer, IpA:8/integer, IpB:8/integer, IpC:8/integer, IpD:8/integer, Method:8/integer,
+    Length:8/integer, Rest/binary>> = Bin,
+  case Length of
+    0 -> ActualLength = 0;
+    _ -> ActualLength = (Length-1)
+  end,
+  <<SizeBin:ActualLength/binary, Params/binary>> = Rest,
+  Size = binary_to_list(SizeBin),
+  ParamsParsed = lists:foldl(fun(Elem, Acc) ->
+    {Res, RestBin} = Acc,
+    <<First:Elem/binary, Tail/binary>> = RestBin,
+    {[First | Res], Tail} end,
+    {[], Params}, Size),
+  {ListParams, LastParam} = ParamsParsed,
+  Parameters = lists:reverse([LastParam | ListParams]),
+  parse_cleaner({{Port, {IpA, IpB, IpC, IpD}}, Method, Parameters}).
+
+%%TODO deprecated
+marshall_no(Address, MethodList, Params) ->
   {Port, {IpA, IpB, IpC, IpD}} = Address,
   PortParsed = lists:flatten(string:replace(integer_to_list(Port), [?SEP], [?SEP,0], all)),
   IpAParsed = lists:flatten(string:replace(integer_to_list(IpA), [?SEP], [?SEP,0], all)),

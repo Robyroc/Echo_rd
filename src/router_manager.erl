@@ -100,7 +100,7 @@ stabilizer(running, SuccessorList, Router, ID, NBits, PID) ->
       Router ! {self(), successor_list, SuccessorList}
   end.
 
-handle_pred_tell(Index, ID, HeadIndex, SuccessorList, Address, NBits) when Index > ID and Index < HeadIndex ->
+handle_pred_tell(Index, ID, HeadIndex, SuccessorList, Address, NBits) when Index > ID and not(Index >= HeadIndex) ->
   update_successor_list(SuccessorList, {Index, Address}, NBits);
 
 handle_pred_tell(Index, ID, _HeadIndex, SuccessorList, _Address, _NBits) when Index =:= ID ->
