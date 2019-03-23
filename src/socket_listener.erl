@@ -1,10 +1,18 @@
--module(fixer).
--author("robyroc").
-
+%%%-------------------------------------------------------------------
+%%% @author mrbo9
+%%% @copyright (C) 2019, <COMPANY>
+%%% @doc
+%%%
+%%% @end
+%%% Created : 23. Mar 2019 17:36
+%%%-------------------------------------------------------------------
+-module(socket_listener).
+-author("mrbo9").
+-define(PORT, 6543).
 -behaviour(gen_server).
 
 %% API
--export([start_link/2]).
+-export([start_link/0]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -16,7 +24,7 @@
 
 -define(SERVER, ?MODULE).
 
--record(state, {id, nbits, index}).
+-record(state, {socket}).
 
 %%%===================================================================
 %%% API
@@ -28,8 +36,10 @@
 %%
 %% @end
 %%--------------------------------------------------------------------
-start_link(ID, NBits) ->
-  gen_server:start_link({local, ?SERVER}, ?MODULE, [ID, NBits], []).
+-spec(start_link() ->
+  {ok, Pid :: pid()} | ignore | {error, Reason :: term()}).
+start_link() ->
+  gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -46,13 +56,11 @@ start_link(ID, NBits) ->
 %%                     {stop, Reason}
 %% @end
 %%--------------------------------------------------------------------
-init([ID, NBits]) ->
-  naming_service:notify_identity(self(), fixer),
-  erlang:send_after(20000, self(), fix),                    %TODO tune parameters accordingly
-  {ok, #state{id = ID, nbits = NBits, index = 0}};
-
-init(_) ->
-  {stop, incorrect_params}.
+init([]) ->
+  {ok, Listen} = gen_tcp:listen(?PORT, [binary, {packet, 0}, {reuseaddr, true}, {active, true}]),
+  io:format("Listening at port ~p~n", [?PORT]),
+  erlang:send_after(10, self(), loop),
+  {ok, #state{socket = Listen}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -62,7 +70,7 @@ init(_) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_call(Request, _From, State) ->
-  io:format("FIX: Unexpected call message: ~p~n", Request),
+  io:format("Listen: Unexpected call message: ~p~n", Request),
   {reply, ok, State}.
 
 %%--------------------------------------------------------------------
@@ -73,7 +81,7 @@ handle_call(Request, _From, State) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_cast(Request, State) ->
-  io:format("FIX: Unexpected cast message: ~p~n", Request),
+  io:format("Listen: Unexpected cast message: ~p~n", Request),
   {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -86,14 +94,15 @@ handle_cast(Request, State) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_info(fix, State) ->
-  %TODO make it ask for a lookup
-  %TODO After receipt of response tell router to update finger table
-  erlang:send_after(20000, self(), fix),
-  {noreply, iterate_state(State)};
+handle_info(loop, State) ->
+  {ok, Socket} = gen_tcp:accept(State#state.socket),
+  PID = naming_service:get_identity(link_manager),
+  link_manager:incoming_connection(PID, Socket),
+  erlang:send_after(10, self(), loop),
+  {noreply, State};
 
 handle_info(Info, State) ->
-  io:format("FIX: Unexpected ! message: ~p~n", Info),
+  io:format("Listen: Unexpected ! message: ~p~n", Info),
   {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -107,7 +116,8 @@ handle_info(Info, State) ->
 %% @spec terminate(Reason, State) -> void()
 %% @end
 %%--------------------------------------------------------------------
-terminate(_Reason, _State) ->
+terminate(_Reason, State) ->
+  gen_tcp:close(State#state.socket),
   ok.
 
 %%--------------------------------------------------------------------
@@ -124,10 +134,3 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
-
-iterate_state(State) ->
-  #state{id = ID, nbits = NBits, index = Index} = State,
-  case Index of
-    NBits -> #state{id = ID, nbits = NBits, index = 0};
-    _ -> #state{id = ID, nbits = NBits, index = Index + 1}
-  end.

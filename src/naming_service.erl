@@ -4,7 +4,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, notify_identity/2]).
+-export([start_link/0, notify_identity/2, get_identity/1]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -24,6 +24,11 @@
 
 notify_identity(PID, Identity) ->
   gen_server:cast(name_service, {notify, Identity, PID}).           %TODO check if timeout is needed
+
+get_identity(Identity) ->
+  Results = ets:lookup(naming_db, Identity),
+  {Identity, PID} = hd(Results),
+  PID.
 
 %%--------------------------------------------------------------------
 %% @doc

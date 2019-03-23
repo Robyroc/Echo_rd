@@ -1,10 +1,10 @@
--module(fixer).
+-module(link_manager).
 -author("robyroc").
 
 -behaviour(gen_server).
 
 %% API
--export([start_link/2]).
+-export([start_link/0, incoming_connection/2, get_own_address/0, notify_incoming_message/2, send_message/3, compact_address/1]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -15,8 +15,8 @@
   code_change/3]).
 
 -define(SERVER, ?MODULE).
-
--record(state, {id, nbits, index}).
+-define(PORT, 6543).      %TODO merge this def with the one on socket_listener
+-record(state, {connections}).
 
 %%%===================================================================
 %%% API
@@ -28,8 +28,27 @@
 %%
 %% @end
 %%--------------------------------------------------------------------
-start_link(ID, NBits) ->
-  gen_server:start_link({local, ?SERVER}, ?MODULE, [ID, NBits], []).
+start_link() ->
+  gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
+
+incoming_connection(PID, Socket) ->
+  gen_server:cast(PID, {new_connection, Socket}).
+
+notify_incoming_message(PID, Message) ->
+  gen_server:cast(PID, {received, Message}).
+
+send_message(PID, {Port, IP}, Message) ->
+  gen_server:call(PID, {send, {Port, IP}, Message}).
+
+compact_address(Address) ->
+  {Port, {IPA, IPB, IPC, IPD}} = Address,
+  lists:flatten([integer_to_list(IPA), ".", integer_to_list(IPB), ".", integer_to_list(IPC), ".",
+    integer_to_list(IPD), ":", integer_to_list(Port)]).
+
+get_own_address() ->
+  {ok, Addrs} = inet:getif(),
+  IP = hd([Addr || {Addr, _,_} <- Addrs, size(Addr) == 4, Addr =/= {127,0,0,1}]),
+  {?PORT, IP}.
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -46,13 +65,9 @@ start_link(ID, NBits) ->
 %%                     {stop, Reason}
 %% @end
 %%--------------------------------------------------------------------
-init([ID, NBits]) ->
-  naming_service:notify_identity(self(), fixer),
-  erlang:send_after(20000, self(), fix),                    %TODO tune parameters accordingly
-  {ok, #state{id = ID, nbits = NBits, index = 0}};
-
-init(_) ->
-  {stop, incorrect_params}.
+init([]) ->
+  naming_service:notify_identity(self(), link_manager),
+  {ok, #state{connections = []}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -61,8 +76,31 @@ init(_) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
+handle_call({send, {Port, IP}, Message}, _From, State) ->
+  Present = [X || {X, Addr} <- State#state.connections, Addr == {Port, IP}],
+  case Present of
+    [] ->
+      case gen_tcp:connect(IP, Port, [binary, {packet, 0}]) of
+        {ok, RequestSocket} ->
+          Sup = naming_service:get_identity(handler_supervisor),
+          Ret = supervisor:start_child(Sup, [RequestSocket]),
+          case Ret of
+            {ok, PID} ->
+              socket_handler:send_message(PID, Message),
+              {reply, ok, #state{connections = [{PID, {Port, IP}} | State#state.connections]}};
+            {ok, PID, _} ->
+              socket_handler:send_message(PID, Message),
+              {reply, ok, #state{connections = [{PID, {Port, IP}} | State#state.connections]}}
+          end;
+        {error, Reason} ->
+          {reply, {error, Reason}, State}
+      end;
+    [H|_] ->
+      socket_handler:send_message(H, Message)
+  end;
+
 handle_call(Request, _From, State) ->
-  io:format("FIX: Unexpected call message: ~p~n", Request),
+  io:format("LM: Unexpected call message: ~p~n", Request),
   {reply, ok, State}.
 
 %%--------------------------------------------------------------------
@@ -72,9 +110,24 @@ handle_call(Request, _From, State) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
+handle_cast({received, Message}, State) ->
+  %TODO foward message to communication manager
+  {noreply, State};
+
+handle_cast({new_connection, Socket}, State) ->
+  Sup = naming_service:get_identity(handler_supervisor),
+  Ret = supervisor:start_child(Sup, [Socket]),
+  case Ret of
+    {ok, PID} ->
+      {reply, ok, #state{connections = [{PID, incoming} | State#state.connections]}};
+    {ok, PID, _} ->
+      {reply, ok, #state{connections = [{PID, incoming} | State#state.connections]}}
+  end;
+
 handle_cast(Request, State) ->
-  io:format("FIX: Unexpected cast message: ~p~n", Request),
+  io:format("LM: Unexpected cast message: ~p~n", Request),
   {noreply, State}.
+
 
 %%--------------------------------------------------------------------
 %% @private
@@ -86,14 +139,8 @@ handle_cast(Request, State) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_info(fix, State) ->
-  %TODO make it ask for a lookup
-  %TODO After receipt of response tell router to update finger table
-  erlang:send_after(20000, self(), fix),
-  {noreply, iterate_state(State)};
-
 handle_info(Info, State) ->
-  io:format("FIX: Unexpected ! message: ~p~n", Info),
+  io:format("LM: Unexpected ! message: ~p~n", Info),
   {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -124,10 +171,3 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
-
-iterate_state(State) ->
-  #state{id = ID, nbits = NBits, index = Index} = State,
-  case Index of
-    NBits -> #state{id = ID, nbits = NBits, index = 0};
-    _ -> #state{id = ID, nbits = NBits, index = Index + 1}
-  end.
