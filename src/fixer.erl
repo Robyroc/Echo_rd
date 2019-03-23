@@ -95,6 +95,7 @@ handle_info(fix, State) ->
 
 handle_info(notify, State) ->
   naming_service:notify_identity(self(), fixer),
+  erlang:send_after(120000, self(), notify),
   {noreply, State};
 
 handle_info(Info, State) ->

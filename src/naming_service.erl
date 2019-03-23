@@ -4,7 +4,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, notify_identity/2, get_identity/1]).
+-export([start_link/0, notify_identity/2]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -23,10 +23,7 @@
 %%%===================================================================
 
 notify_identity(PID, Identity) ->
-  gen_server:cast(name_service, {notify, Identity, PID}).
-
-get_identity(Identity) ->
-  gen_server:call(name_service, {check_id, Identity}).          %TODO check if timeout is needed
+  gen_server:cast(name_service, {notify, Identity, PID}).           %TODO check if timeout is needed
 
 %%--------------------------------------------------------------------
 %% @doc
