@@ -77,7 +77,7 @@ init([]) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_call({send, {Port, IP}, Message}, _From, State) ->
-  Present = [X || {X, Addr} <- State#state.connections, Addr == {Port, IP}],
+  Present = [X || {X, Addr, _} <- State#state.connections, Addr == {Port, IP}],
   case Present of
     [] ->
       case gen_tcp:connect(IP, Port, [binary, {packet, 0}]) of
@@ -86,11 +86,13 @@ handle_call({send, {Port, IP}, Message}, _From, State) ->
           Ret = supervisor:start_child(Sup, [RequestSocket]),
           case Ret of
             {ok, PID} ->
+              Monitor = erlang:monitor(process, PID),
               socket_handler:send_message(PID, Message),
-              {reply, ok, #state{connections = [{PID, {Port, IP}} | State#state.connections]}};
+              {reply, ok, #state{connections = [{PID, {Port, IP}, Monitor} | State#state.connections]}};
             {ok, PID, _} ->
+              Monitor = erlang:monitor(process, PID),
               socket_handler:send_message(PID, Message),
-              {reply, ok, #state{connections = [{PID, {Port, IP}} | State#state.connections]}}
+              {reply, ok, #state{connections = [{PID, {Port, IP}, Monitor} | State#state.connections]}}
           end;
         {error, Reason} ->
           {reply, {error, Reason}, State}
@@ -100,7 +102,7 @@ handle_call({send, {Port, IP}, Message}, _From, State) ->
   end;
 
 handle_call(Request, _From, State) ->
-  io:format("LM: Unexpected call message: ~p~n", Request),
+  io:format("LM: Unexpected call message: ~p~n", [Request]),
   {reply, ok, State}.
 
 %%--------------------------------------------------------------------
@@ -119,13 +121,13 @@ handle_cast({new_connection, Socket}, State) ->
   Ret = supervisor:start_child(Sup, [Socket]),
   case Ret of
     {ok, PID} ->
-      {reply, ok, #state{connections = [{PID, incoming} | State#state.connections]}};
+      {reply, ok, #state{connections = [{PID, incoming, no_monitor} | State#state.connections]}};
     {ok, PID, _} ->
-      {reply, ok, #state{connections = [{PID, incoming} | State#state.connections]}}
+      {reply, ok, #state{connections = [{PID, incoming, no_monitor} | State#state.connections]}}
   end;
 
 handle_cast(Request, State) ->
-  io:format("LM: Unexpected cast message: ~p~n", Request),
+  io:format("LM: Unexpected cast message: ~p~n", [Request]),
   {noreply, State}.
 
 
@@ -139,8 +141,13 @@ handle_cast(Request, State) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
+handle_info({'DOWN', Monitor, process, _PID, Reason}, State) ->
+  Present = [X || {_, X, M} <- State#state.connections, M =:= Monitor],
+  io:format("LM: A handler failed: Address: ~p~nReason: ~p~n", [hd(Present), Reason]),
+  {noreply, #state{connections = [{P, A, M} || {P, A, M} <- State#state.connections, M =/= Monitor]}};
+
 handle_info(Info, State) ->
-  io:format("LM: Unexpected ! message: ~p~n", Info),
+  io:format("LM: Unexpected ! message: ~p~n", [Info]),
   {noreply, State}.
 
 %%--------------------------------------------------------------------

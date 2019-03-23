@@ -70,7 +70,7 @@ init([]) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_call(Request, _From, State) ->
-  io:format("Listen: Unexpected call message: ~p~n", Request),
+  io:format("Listen: Unexpected call message: ~p~n", [Request]),
   {reply, ok, State}.
 
 %%--------------------------------------------------------------------
@@ -81,7 +81,7 @@ handle_call(Request, _From, State) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_cast(Request, State) ->
-  io:format("Listen: Unexpected cast message: ~p~n", Request),
+  io:format("Listen: Unexpected cast message: ~p~n", [Request]),
   {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -102,7 +102,7 @@ handle_info(loop, State) ->
   {noreply, State};
 
 handle_info(Info, State) ->
-  io:format("Listen: Unexpected ! message: ~p~n", Info),
+  io:format("Listen: Unexpected ! message: ~p~n", [Info]),
   {noreply, State}.
 
 %%--------------------------------------------------------------------

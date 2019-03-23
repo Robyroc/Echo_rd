@@ -77,7 +77,7 @@ handle_call({check_id, Identity}, From, State) ->
   end;
 
 handle_call(Request, _From, State) ->
-  io:format("NS: Unexpected call message: ~p~n", Request),
+  io:format("NS: Unexpected call message: ~p~n", [Request]),
   {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -95,7 +95,7 @@ handle_cast({notify, Identity, PID}, State) ->
   {noreply, NewState};
 
 handle_cast(Request, State) ->
-  io:format("NS: Unexpected cast message: ~p~n", Request),
+  io:format("NS: Unexpected cast message: ~p~n", [Request]),
   {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -109,7 +109,7 @@ handle_cast(Request, State) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_info(Info, State) ->
-  io:format("NS: Unexpected ! message: ~p~n", Info),
+  io:format("NS: Unexpected ! message: ~p~n", [Info]),
   {noreply, State}.
 
 %%--------------------------------------------------------------------

@@ -62,7 +62,7 @@ init(_) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_call(Request, _From, State) ->
-  io:format("FIX: Unexpected call message: ~p~n", Request),
+  io:format("FIX: Unexpected call message: ~p~n", [Request]),
   {reply, ok, State}.
 
 %%--------------------------------------------------------------------
@@ -73,7 +73,7 @@ handle_call(Request, _From, State) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_cast(Request, State) ->
-  io:format("FIX: Unexpected cast message: ~p~n", Request),
+  io:format("FIX: Unexpected cast message: ~p~n", [Request]),
   {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -93,7 +93,7 @@ handle_info(fix, State) ->
   {noreply, iterate_state(State)};
 
 handle_info(Info, State) ->
-  io:format("FIX: Unexpected ! message: ~p~n", Info),
+  io:format("FIX: Unexpected ! message: ~p~n", [Info]),
   {noreply, State}.
 
 %%--------------------------------------------------------------------
