@@ -89,7 +89,7 @@ handle_call(Request, _From, State) ->
 %%--------------------------------------------------------------------
 handle_cast({notify, Identity, PID}, State) ->
   ets:insert(State#state.table, {Identity, PID}),
-  [gen_server:reply(A, {Identity, PID}) || {A, Identity} <- State#state.pending_requests],
+  [gen_server:reply(A, {Id, PID}) || {A, Id} <- State#state.pending_requests, Id =:= Identity],
   NewState = #state{table = State#state.table,
     pending_requests = [{A, Id} || {A, Id} <- State#state.pending_requests, Id =/= Identity]},
   {noreply, NewState};

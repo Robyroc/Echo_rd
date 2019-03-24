@@ -1,13 +1,5 @@
-%%%-------------------------------------------------------------------
-%%% @author mrbo9
-%%% @copyright (C) 2019, <COMPANY>
-%%% @doc
-%%%
-%%% @end
-%%% Created : 23. Mar 2019 17:35
-%%%-------------------------------------------------------------------
 -module(socket_handler).
--author("mrbo9").
+-author("robyroc").
 
 -behaviour(gen_server).
 

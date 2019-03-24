@@ -1,4 +1,4 @@
--module(handler_supervisor).
+-module(internal_link_supervisor).
 -author("robyroc").
 
 -behaviour(supervisor).
@@ -22,7 +22,7 @@
 %% @end
 %%--------------------------------------------------------------------
 start_link() ->
-  supervisor:start_link({local, ?SERVER}, ?MODULE, []).
+  supervisor:start_link(?MODULE, []).
 
 %%%===================================================================
 %%% Supervisor callbacks
@@ -39,21 +39,20 @@ start_link() ->
 %% @end
 %%--------------------------------------------------------------------
 init([]) ->
-  naming_service:notify_identity(self(), handler_supervisor),
-  RestartStrategy = simple_one_for_one,
-  MaxRestarts = 1,
+  RestartStrategy = one_for_one,
+  MaxRestarts = 1000,
   MaxSecondsBetweenRestarts = 3600,
 
   SupFlags = {RestartStrategy, MaxRestarts, MaxSecondsBetweenRestarts},
-
   Restart = permanent,
   Shutdown = 2000,
-  Type = worker,
 
-  AChild = {handler, {socket_handler, start_link, []},
-    Restart, Shutdown, Type, [socket_handler]},
+  Son1 = {listener, {socket_listener, start_link, []},
+    Restart, Shutdown, worker, [socket_listener]},
+  Son2 = {h_sup, {handler_supervisor, start_link, []},
+    Restart, Shutdown, supervisor, [handler_supervisor]},
 
-  {ok, {SupFlags, [AChild]}}.
+  {ok, {SupFlags, [Son1, Son2]}}.
 
 %%%===================================================================
 %%% Internal functions

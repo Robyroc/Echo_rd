@@ -1,7 +1,7 @@
--module(handler_supervisor).
+-module(link_supervisor).
 -author("robyroc").
 
--behaviour(supervisor).
+-behavior(supervisor).
 
 %% API
 -export([start_link/0]).
@@ -39,21 +39,20 @@ start_link() ->
 %% @end
 %%--------------------------------------------------------------------
 init([]) ->
-  naming_service:notify_identity(self(), handler_supervisor),
-  RestartStrategy = simple_one_for_one,
-  MaxRestarts = 1,
+  RestartStrategy = rest_for_one,
+  MaxRestarts = 1000,
   MaxSecondsBetweenRestarts = 3600,
 
   SupFlags = {RestartStrategy, MaxRestarts, MaxSecondsBetweenRestarts},
-
   Restart = permanent,
   Shutdown = 2000,
-  Type = worker,
 
-  AChild = {handler, {socket_handler, start_link, []},
-    Restart, Shutdown, Type, [socket_handler]},
+  Son1 = {lmanager, {link_manager, start_link, []},
+    Restart, Shutdown, worker, [link_manager]},
+  Son2 = {link_sup, {internal_link_supervisor, start_link, []},
+    Restart, Shutdown, supervisor, [internal_link_supervisor]},
 
-  {ok, {SupFlags, [AChild]}}.
+  {ok, {SupFlags, [Son1, Son2]}}.
 
 %%%===================================================================
 %%% Internal functions

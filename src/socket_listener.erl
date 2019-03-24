@@ -1,13 +1,5 @@
-%%%-------------------------------------------------------------------
-%%% @author mrbo9
-%%% @copyright (C) 2019, <COMPANY>
-%%% @doc
-%%%
-%%% @end
-%%% Created : 23. Mar 2019 17:36
-%%%-------------------------------------------------------------------
 -module(socket_listener).
--author("mrbo9").
+-author("robyroc").
 -define(PORT, 6543).
 -behaviour(gen_server).
 

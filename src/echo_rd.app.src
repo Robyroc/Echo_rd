@@ -1,7 +1,8 @@
-{application, chord,
+{application, echo_rd,
  [{description, "A chord implementation"},
   {vsn, "0.1.0"},
   {registered, []},
+  {mod, {echo_rd_app, []}},
   {applications,
    [kernel,
     stdlib
