@@ -1,10 +1,10 @@
--module(checker).
+-module(stabilizer).
 -author("Giacomo").
 
 -behaviour(gen_server).
 
 %% API
--export([start_link/4, get_pred/2]).
+-export([start_link/4, get_successor/1, get_successor_list/1]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -15,9 +15,9 @@
   code_change/3]).
 
 -define(SERVER, ?MODULE).
--define(INTERVAL, 30000).
+-define(INTERVAL, 20000).
 
--record(state, {pred, pred_id, own_id, n_bits}).
+-record(state, {succ_list, id, nbits, successor}).
 
 %%%===================================================================
 %%% API
@@ -29,11 +29,14 @@
 %%
 %% @end
 %%--------------------------------------------------------------------
-start_link(Predecessor, PredID, OwnID, NBits) ->            %%TODO decide how to pass these parameters
-  gen_server:start_link({local, ?SERVER}, ?MODULE, [Predecessor, PredID, OwnID, NBits], []).
+start_link(SuccessorList, ID, NBits, Successor) ->                    %%TODO decide how to pass these parameters
+  gen_server:start_link({local, ?SERVER}, ?MODULE, [SuccessorList, ID, NBits, Successor], []).
 
-get_pred(PID, Address) ->
-  gen_server:call(PID, {pred_find, Address}).
+get_successor(PID) ->
+  gen_server:call(PID, {get_succ}).
+
+get_successor_list(PID) ->
+  gen_server:call(PID, {get_succ_list}).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -50,12 +53,15 @@ get_pred(PID, Address) ->
 %%                     {stop, Reason}
 %% @end
 %%--------------------------------------------------------------------
-init([Predecessor, PredID, OwnID, NBits]) ->
-  naming_service:notify_identity(self(), checker),
-  {ok, #state{pred = Predecessor, pred_id = PredID, own_id = OwnID, n_bits = NBits}};
-
-init(_) ->
-  {stop, incorrect_params}.
+init([SuccessorList, ID, NBits, Successor]) ->
+  naming_service:notify_identity(self(), stabilizer),
+  CutList = cut_last_element(SuccessorList, NBits),
+  Smaller = [{I + round(math:pow(2, NBits)), A} || {I, A} <- CutList, I =< ID],
+  Corrected = [{I, A} || {I, A} <- CutList, I > ID] ++ Smaller,
+  {_, Addr} = hd(Corrected),
+  %%TODO make a call to open a connection for the successor and initialize Successor
+  erlang:send_after(?INTERVAL, self(), stabilize),
+  {ok, #state{succ_list = lists:sort(Corrected), id = ID, nbits = NBits, successor = Successor}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -64,39 +70,15 @@ init(_) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
-handle_call({pred_find, local_address}, _From, State) ->
-  {reply, State#state.pred , State, ?INTERVAL};
+handle_call(get_succ, _From, State) ->
+  {Index, Address} = hd(State#state.succ_list),
+  {reply, {Index, Address}, State};
 
-handle_call({pred_find, Address}, _From, State) ->
-  case State#state.pred of
-    nil ->
-      PID = naming_service:get_identity(hash_f),
-      Index = hash_f:get_hashed_addr(PID, Address),
-      case Index of
-        _ when Index =< State#state.own_id ->
-          {reply, Address, #state{pred = Address, pred_id = Index}, ?INTERVAL};
-        _ when Index > State#state.own_id ->
-          CorrectIndex = Index - round(math:pow(2, State#state.n_bits)),
-          {reply, Address, #state{pred = Address, pred_id = CorrectIndex}, ?INTERVAL}
-      end,
-      {reply, Address, #state{pred = Address, pred_id = no_ID}, ?INTERVAL};
-    Predecessor ->
-      PID = naming_service:get_identity(hash_f),
-      Index = hash_f:get_hashed_addr(PID, Address),
-      #state{pred = Predecessor, pred_id = PredID, own_id = OwnID, n_bits = NBits} = State,
-      case Index of
-        _ when Index =< OwnID ->
-          {Addr, PredecessorID} = predecessor_chooser(Address, Index, Predecessor, PredID),
-          {reply, Addr, #state{pred = Addr, pred_id = PredecessorID}, ?INTERVAL};
-        _ when Index > OwnID ->
-          CorrectIndex = Index - round(math:pow(2, NBits)),
-          {Addr, PredecessorID} = predecessor_chooser(Address, CorrectIndex, Predecessor, PredID),
-          {reply, Addr, #state{pred = Addr, pred_id = PredecessorID}, ?INTERVAL}
-      end
-  end;
+handle_call(get_succ_list, _From, State) ->
+  {reply, State#state.succ_list, State};
 
 handle_call(Request, _From, State) ->
-  io:format("CHECKER: Unexpected call message: ~p~n", [Request]),
+  io:format("STABILIZER: Unexpected call message: ~p~n", [Request]),
   {reply, ok, State}.
 
 %%--------------------------------------------------------------------
@@ -107,7 +89,7 @@ handle_call(Request, _From, State) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_cast(Request, State) ->
-  io:format("CHECKER: Unexpected cast message: ~p~n", [Request]),
+  io:format("STABILIZER: Unexpected cast message: ~p~n", [Request]),
   {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -120,11 +102,19 @@ handle_cast(Request, State) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_info(timeout, _State) ->
-  {noreply, #state{pred = nil, pred_id = nil}};
+handle_info(stabilize, State) ->
+  %%TODO ask to the successor who is his predecessor and substitute Address with the right command
+  Address = call_to_successor_for_predecessor,
+  PID = naming_service:get_identity(hash_f),
+  Index = hash_f:get_hashed_addr(PID, Address),
+  HeadIndex = hd([I || {I, _} <- State#state.succ_list]),
+  #state{succ_list = SuccessorList, id = ID, nbits = NBits} = State,
+  NewSuccessorList = handle_pred_tell(Index, ID, HeadIndex, SuccessorList, Address, NBits),
+  erlang:send_after(?INTERVAL, self(), stabilize),
+  {noreply, #state{succ_list = NewSuccessorList}};
 
 handle_info(Info, State) ->
-  io:format("CHECKER: Unexpected ! message: ~p~n", [Info]),
+  io:format("STABILIZER: Unexpected ! message: ~p~n", [Info]),
   {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -156,10 +146,25 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
-predecessor_chooser(Address, AddressID, Predecessor, PredecessorID) ->
-  case AddressID of
-    _ when AddressID > PredecessorID ->
-      {Address, AddressID};
-    _ when AddressID =< PredecessorID ->
-      {Predecessor, PredecessorID}
+cut_last_element(SuccessorList, NBits) ->
+  Length = length(SuccessorList),
+  case Length of
+    Length when Length > NBits ->
+      [_ | T] = lists:reverse(SuccessorList),
+      lists:reverse(T);
+    Length when Length =< NBits ->
+      SuccessorList
   end.
+
+handle_pred_tell(Index, ID, HeadIndex, SuccessorList, Address, NBits) when Index > ID and not(Index >= HeadIndex) ->
+  update_successor_list(SuccessorList, {Index, Address}, NBits);
+
+handle_pred_tell(Index, ID, _HeadIndex, SuccessorList, _Address, _NBits) when Index =:= ID ->
+  SuccessorList;                        %TODO get succ_list from successor
+
+handle_pred_tell(Index, ID, HeadIndex, SuccessorList, Address, NBits) when Index < ID ->
+  handle_pred_tell(Index + round(math:pow(2, NBits)), ID, HeadIndex, SuccessorList, Address, NBits).
+
+update_successor_list(SuccessorList, NewElem, NBits) ->
+  Cut = cut_last_element(SuccessorList, NBits),
+  [NewElem | Cut].
