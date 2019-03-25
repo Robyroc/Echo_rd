@@ -73,12 +73,11 @@ handle_call({pred_find, Address}, _From, State) ->
       Index = hash_f:get_hashed_addr(Address),
       case Index of
         _ when Index =< State#state.own_id ->
-          {reply, Address, #state{pred = Address, pred_id = Index}, ?INTERVAL};               %TODO check warning here: constructed but never used
+          {reply, Address, #state{pred = Address, pred_id = Index}, ?INTERVAL};
         _ when Index > State#state.own_id ->
           CorrectIndex = Index - round(math:pow(2, State#state.n_bits)),
-          {reply, Address, #state{pred = Address, pred_id = CorrectIndex}, ?INTERVAL}         %TODO check warning here: constructed but never used
-      end,
-      {reply, Address, #state{pred = Address, pred_id = no_ID}, ?INTERVAL};                   %TODO the problem is here!
+          {reply, Address, #state{pred = Address, pred_id = CorrectIndex}, ?INTERVAL}
+      end;
     Predecessor ->
       Index = hash_f:get_hashed_addr(Address),
       #state{pred = Predecessor, pred_id = PredID, own_id = OwnID, n_bits = NBits} = State,
