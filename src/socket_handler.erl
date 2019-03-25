@@ -29,7 +29,7 @@
 %% @end
 %%--------------------------------------------------------------------
 start_link(Socket) ->
-  gen_server:start_link({local, ?SERVER}, ?MODULE, [Socket], []).
+  gen_server:start_link(?MODULE, [Socket], []).
 
 send_message(PID, Message) ->
   gen_server:call(PID, {send, Message})   .        %TODO timeout?
