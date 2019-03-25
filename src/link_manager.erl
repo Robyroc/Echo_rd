@@ -107,7 +107,8 @@ handle_call({send, {Port, IP}, Message}, _From, State) ->
           {reply, {error, Reason}, State}
       end;
     [H|_] ->
-      socket_handler:send_message(H, Message)
+      socket_handler:send_message(H, Message),
+      {reply, ok, State}
   end;
 
 handle_call(Request, _From, State) ->
