@@ -1,7 +1,15 @@
--module(link_supervisor).
--author("robyroc").
+%%%-------------------------------------------------------------------
+%%% @author mrbo9
+%%% @copyright (C) 2019, <COMPANY>
+%%% @doc
+%%%
+%%% @end
+%%% Created : 25. Mar 2019 16:39
+%%%-------------------------------------------------------------------
+-module(test).
+-author("mrbo9").
 
--behavior(supervisor).
+-behaviour(supervisor).
 
 %% API
 -export([start_link/0]).
@@ -21,6 +29,8 @@
 %%
 %% @end
 %%--------------------------------------------------------------------
+-spec(start_link() ->
+  {ok, Pid :: pid()} | ignore | {error, Reason :: term()}).
 start_link() ->
   supervisor:start_link({local, ?SERVER}, ?MODULE, []).
 
@@ -38,31 +48,30 @@ start_link() ->
 %%
 %% @end
 %%--------------------------------------------------------------------
+-spec(init(Args :: term()) ->
+  {ok, {SupFlags :: {RestartStrategy :: supervisor:strategy(),
+    MaxR :: non_neg_integer(), MaxT :: non_neg_integer()},
+    [ChildSpec :: supervisor:child_spec()]
+  }} |
+  ignore |
+  {error, Reason :: term()}).
 init([]) ->
-  wait_for_srv(),           %TODO move to sibiling of name server
-  RestartStrategy = rest_for_one,
+  RestartStrategy = one_for_one,
   MaxRestarts = 1000,
   MaxSecondsBetweenRestarts = 3600,
 
   SupFlags = {RestartStrategy, MaxRestarts, MaxSecondsBetweenRestarts},
+
   Restart = permanent,
   Shutdown = 2000,
 
-  Son1 = {lmanager, {link_manager, start_link, []},
-    Restart, Shutdown, worker, [link_manager]},
-  Son2 = {link_sup, {internal_link_supervisor, start_link, []},
-    Restart, Shutdown, supervisor, [internal_link_supervisor]},
+  Son1 = {naming_service, {naming_service, start_link, []},
+    Restart, Shutdown, worker, [naming_service]},
+  Son2 = {link_s, {link_supervisor, start_link, []},
+    Restart, Shutdown, supervisor, [link_supervisor]},
 
   {ok, {SupFlags, [Son1, Son2]}}.
 
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
-
-wait_for_srv() ->
-  case whereis(naming_service) of
-    undefined ->
-      timer:sleep(1),
-      wait_for_srv();
-    _ -> ok
-  end.

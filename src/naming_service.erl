@@ -16,19 +16,22 @@
 
 -define(SERVER, ?MODULE).
 
--record(state, {table, pending_requests}).
+-record(state, {pending_requests}).
 
 %%%===================================================================
 %%% API
 %%%===================================================================
 
 notify_identity(PID, Identity) ->
-  gen_server:cast(name_service, {notify, Identity, PID}).           %TODO check if timeout is needed
+  gen_server:call(naming_service, {notify, Identity, PID}).           %TODO check if timeout is needed
 
 get_identity(Identity) ->
   Results = ets:lookup(naming_db, Identity),
   {Identity, PID} = hd(Results),
   PID.
+
+%TODO communication message, remove it
+% link_manager:send_message({6543, {192, 168, 43, 209}}, {no_alias, 17, []}).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -55,9 +58,9 @@ start_link() ->
 %% @end
 %%--------------------------------------------------------------------
 init([]) ->
-  register(self(), name_service),
-  Table = ets:new(naming_db, [read_concurrency, true]),
-  {ok, #state{table = Table, pending_requests = []}}.
+  %register(self(), naming_service),
+  ets:new(naming_db, [set, public, named_table]),
+  {ok, #state{pending_requests = []}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -67,14 +70,19 @@ init([]) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_call({check_id, Identity}, From, State) ->
-  Result = ets:lookup(State#state.table, Identity),
+  Result = ets:lookup(naming_db, Identity),
   case Result of
     [] ->
-      {noreply, #state{table = State#state.table,
-        pending_requests = [{From, Identity} | State#state.pending_requests]}};
+      {noreply, #state{pending_requests = [{From, Identity} | State#state.pending_requests]}};
     [A] ->
       {reply, A, State}
   end;
+
+handle_call({notify, Identity, PID}, _From, State) ->
+  ets:insert(naming_db, {Identity, PID}),
+  [gen_server:reply(A, {Id, PID}) || {A, Id} <- State#state.pending_requests, Id =:= Identity],
+  NewState = #state{pending_requests = [{A, Id} || {A, Id} <- State#state.pending_requests, Id =/= Identity]},
+  {reply, ok, NewState};
 
 handle_call(Request, _From, State) ->
   io:format("NS: Unexpected call message: ~p~n", [Request]),
@@ -87,12 +95,6 @@ handle_call(Request, _From, State) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
-handle_cast({notify, Identity, PID}, State) ->
-  ets:insert(State#state.table, {Identity, PID}),
-  [gen_server:reply(A, {Id, PID}) || {A, Id} <- State#state.pending_requests, Id =:= Identity],
-  NewState = #state{table = State#state.table,
-    pending_requests = [{A, Id} || {A, Id} <- State#state.pending_requests, Id =/= Identity]},
-  {noreply, NewState};
 
 handle_cast(Request, State) ->
   io:format("NS: Unexpected cast message: ~p~n", [Request]),
@@ -124,7 +126,7 @@ handle_info(Info, State) ->
 %% @end
 %%--------------------------------------------------------------------
 terminate(_Reason, State) ->
-  ets:delete(State#state.table),
+  ets:delete(naming_db),
   [gen_server:reply(A, {error, terminated}) || {A, _} <- State#state.pending_requests],
   ok.
 

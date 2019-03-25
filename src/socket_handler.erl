@@ -61,12 +61,12 @@ init([Socket]) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_call({send, {no_alias, Method, Params}}, _From, State) ->
-  Message = marshall(link_manager:get_own_address(), atom_to_list(Method), Params),
+  Message = marshall(link_manager:get_own_address(), Method, Params),       %TODO call cm to get method id
   ok = gen_tcp:send(State#state.socket, Message),
   {reply, ok, State};
 
 handle_call({send, {Alias, Method, Params}}, _From, State) ->
-  Message = marshall(Alias, atom_to_list(Method), Params),
+  Message = marshall(Alias, Method, Params),              %TODO call cm to get method id
   ok = gen_tcp:send(State#state.socket, Message),
   {reply, ok, State};
 
