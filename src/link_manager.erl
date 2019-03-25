@@ -133,10 +133,10 @@ handle_cast({new_connection, Socket}, State) ->
   case Ret of
     {ok, PID} ->
       gen_tcp:controlling_process(Socket, PID),
-      {reply, ok, #state{connections = [{PID, incoming, no_monitor} | State#state.connections]}};
+      {noreply, #state{connections = [{PID, incoming, no_monitor} | State#state.connections]}};
     {ok, PID, _} ->
       gen_tcp:controlling_process(Socket, PID),
-      {reply, ok, #state{connections = [{PID, incoming, no_monitor} | State#state.connections]}}
+      {noreply, #state{connections = [{PID, incoming, no_monitor} | State#state.connections]}}
   end;
 
 handle_cast(Request, State) ->
