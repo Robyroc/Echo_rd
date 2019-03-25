@@ -88,6 +88,7 @@ handle_cast(Request, State) ->
 %%--------------------------------------------------------------------
 handle_info(loop, State) ->
   {ok, Socket} = gen_tcp:accept(State#state.socket),
+  link_manager:move_socket(Socket),
   link_manager:incoming_connection(Socket),
   erlang:send_after(10, self(), loop),
   {noreply, State};

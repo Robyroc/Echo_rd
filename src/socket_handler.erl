@@ -50,7 +50,6 @@ send_message(PID, Message) ->
 %% @end
 %%--------------------------------------------------------------------
 init([Socket]) ->
-  gen_tcp:controlling_process(Socket, self()),
   {ok, #state{socket = Socket}}.
 
 %%--------------------------------------------------------------------

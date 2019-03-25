@@ -4,7 +4,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, incoming_connection/1, get_own_address/0, notify_incoming_message/1, send_message/2, compact_address/1]).
+-export([start_link/0, incoming_connection/1, get_own_address/0, notify_incoming_message/1, send_message/2, compact_address/1, move_socket/1]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -53,6 +53,10 @@ get_own_address() ->
   IP = hd([Addr || {Addr, _,_} <- Addrs, size(Addr) == 4, Addr =/= {127,0,0,1}]),
   {?PORT, IP}.
 
+move_socket(Socket) ->
+  PID = naming_service:get_identity(link_manager),
+  gen_tcp:controlling_process(Socket, PID).
+
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
@@ -89,10 +93,12 @@ handle_call({send, {Port, IP}, Message}, _From, State) ->
           Ret = supervisor:start_child(Sup, [RequestSocket]),
           case Ret of
             {ok, PID} ->
+              gen_tcp:controlling_process(RequestSocket, PID),
               Monitor = erlang:monitor(process, PID),
               socket_handler:send_message(PID, Message),
               {reply, ok, #state{connections = [{PID, {Port, IP}, Monitor} | State#state.connections]}};
             {ok, PID, _} ->
+              gen_tcp:controlling_process(RequestSocket, PID),
               Monitor = erlang:monitor(process, PID),
               socket_handler:send_message(PID, Message),
               {reply, ok, #state{connections = [{PID, {Port, IP}, Monitor} | State#state.connections]}}
@@ -126,8 +132,10 @@ handle_cast({new_connection, Socket}, State) ->
   Ret = supervisor:start_child(Sup, [Socket]),
   case Ret of
     {ok, PID} ->
+      gen_tcp:controlling_process(Socket, PID),
       {reply, ok, #state{connections = [{PID, incoming, no_monitor} | State#state.connections]}};
     {ok, PID, _} ->
+      gen_tcp:controlling_process(Socket, PID),
       {reply, ok, #state{connections = [{PID, incoming, no_monitor} | State#state.connections]}}
   end;
 
