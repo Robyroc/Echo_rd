@@ -4,7 +4,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/1, get_hashed_addr/2, get_hashed_res/2]).
+-export([start_link/1, get_hashed_addr/1, get_hashed_res/1]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -31,10 +31,12 @@
 start_link(NBits) ->
   gen_server:start_link({local, ?SERVER}, ?MODULE, [NBits], []).
 
-get_hashed_addr(PID, Address) ->
+get_hashed_addr(Address) ->
+  PID = naming_service:get_identity(hash_f),
   gen_server:call(PID, {a_code, Address}).
 
-get_hashed_res(PID, Resource) ->
+get_hashed_res(Resource) ->
+  PID = naming_service:get_identity(hash_f),
   gen_server:call(PID, {r_code, Resource}).
 
 %%%===================================================================

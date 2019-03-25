@@ -70,19 +70,17 @@ handle_call({pred_find, local_address}, _From, State) ->
 handle_call({pred_find, Address}, _From, State) ->
   case State#state.pred of
     nil ->
-      PID = naming_service:get_identity(hash_f),
-      Index = hash_f:get_hashed_addr(PID, Address),
+      Index = hash_f:get_hashed_addr(Address),
       case Index of
         _ when Index =< State#state.own_id ->
-          {reply, Address, #state{pred = Address, pred_id = Index}, ?INTERVAL};
+          {reply, Address, #state{pred = Address, pred_id = Index}, ?INTERVAL};               %TODO check warning here: constructed but never used
         _ when Index > State#state.own_id ->
           CorrectIndex = Index - round(math:pow(2, State#state.n_bits)),
-          {reply, Address, #state{pred = Address, pred_id = CorrectIndex}, ?INTERVAL}
+          {reply, Address, #state{pred = Address, pred_id = CorrectIndex}, ?INTERVAL}         %TODO check warning here: constructed but never used
       end,
-      {reply, Address, #state{pred = Address, pred_id = no_ID}, ?INTERVAL};
+      {reply, Address, #state{pred = Address, pred_id = no_ID}, ?INTERVAL};                   %TODO the problem is here!
     Predecessor ->
-      PID = naming_service:get_identity(hash_f),
-      Index = hash_f:get_hashed_addr(PID, Address),
+      Index = hash_f:get_hashed_addr(Address),
       #state{pred = Predecessor, pred_id = PredID, own_id = OwnID, n_bits = NBits} = State,
       case Index of
         _ when Index =< OwnID ->

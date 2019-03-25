@@ -4,7 +4,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, incoming_connection/2, get_own_address/0, notify_incoming_message/2, send_message/3, compact_address/1]).
+-export([start_link/0, incoming_connection/1, get_own_address/0, notify_incoming_message/1, send_message/2, compact_address/1]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -31,13 +31,16 @@
 start_link() ->
   gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
-incoming_connection(PID, Socket) ->
+incoming_connection(Socket) ->
+  PID = naming_service:get_identity(link_manager),
   gen_server:cast(PID, {new_connection, Socket}).
 
-notify_incoming_message(PID, Message) ->
+notify_incoming_message(Message) ->
+  PID = naming_service:get_identity(link_manager),
   gen_server:cast(PID, {received, Message}).
 
-send_message(PID, {Port, IP}, Message) ->
+send_message({Port, IP}, Message) ->
+  PID = naming_service:get_identity(link_manager),
   gen_server:call(PID, {send, {Port, IP}, Message}).
 
 compact_address(Address) ->

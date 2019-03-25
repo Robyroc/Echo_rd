@@ -98,8 +98,7 @@ handle_cast(Request, State) ->
 
 handle_info({tcp, Socket , Bin}, State) when Socket =:= State#state.socket ->
   {Address, Method, Params} = parse_message(Bin),
-  PID = naming_service:get_identity(link_manager),
-  link_manager:notify_incoming_message(PID, {Method, Address, Params}),
+  link_manager:notify_incoming_message({Method, Address, Params}),
   {noreply, State};
 
 handle_info({tcp_closed, Socket}, State) when Socket =:= State#state.socket ->

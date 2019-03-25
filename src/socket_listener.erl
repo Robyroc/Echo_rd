@@ -88,8 +88,7 @@ handle_cast(Request, State) ->
 %%--------------------------------------------------------------------
 handle_info(loop, State) ->
   {ok, Socket} = gen_tcp:accept(State#state.socket),
-  PID = naming_service:get_identity(link_manager),
-  link_manager:incoming_connection(PID, Socket),
+  link_manager:incoming_connection(Socket),
   erlang:send_after(10, self(), loop),
   {noreply, State};
 

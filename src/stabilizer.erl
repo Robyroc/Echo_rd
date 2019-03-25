@@ -4,7 +4,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/4, get_successor/1, get_successor_list/1]).
+-export([start_link/4, get_successor/0, get_successor_list/0]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -32,10 +32,12 @@
 start_link(SuccessorList, ID, NBits, Successor) ->                    %%TODO decide how to pass these parameters
   gen_server:start_link({local, ?SERVER}, ?MODULE, [SuccessorList, ID, NBits, Successor], []).
 
-get_successor(PID) ->
+get_successor() ->
+  PID = naming_service:get_identity(stabilizer),
   gen_server:call(PID, {get_succ}).
 
-get_successor_list(PID) ->
+get_successor_list() ->
+  PID = naming_service:get_identity(stabilizer),
   gen_server:call(PID, {get_succ_list}).
 
 %%%===================================================================
@@ -105,8 +107,7 @@ handle_cast(Request, State) ->
 handle_info(stabilize, State) ->
   %%TODO ask to the successor who is his predecessor and substitute Address with the right command
   Address = call_to_successor_for_predecessor,
-  PID = naming_service:get_identity(hash_f),
-  Index = hash_f:get_hashed_addr(PID, Address),
+  Index = hash_f:get_hashed_addr(Address),
   HeadIndex = hd([I || {I, _} <- State#state.succ_list]),
   #state{succ_list = SuccessorList, id = ID, nbits = NBits} = State,
   NewSuccessorList = handle_pred_tell(Index, ID, HeadIndex, SuccessorList, Address, NBits),
