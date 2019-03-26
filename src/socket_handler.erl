@@ -102,6 +102,7 @@ handle_info({tcp, Socket , Bin}, State) when Socket =:= State#state.socket ->
 
 handle_info({tcp_closed, Socket}, State) when Socket =:= State#state.socket ->
   gen_tcp:close(Socket),
+  exit(self(), tcp_closed),
   {stop, closed_connection, State};
 
 handle_info(Info, State) ->

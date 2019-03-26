@@ -14,6 +14,7 @@
   terminate/2,
   code_change/3]).
 
+-define(INTERVAL, 5000).
 -define(SERVER, ?MODULE).
 -define(PORT, 6543).      %TODO merge this def with the one on socket_listener
 -record(state, {connections}).
@@ -41,7 +42,7 @@ notify_incoming_message(Message) ->
 
 send_message({Port, IP}, Message) ->
   PID = naming_service:get_identity(link_manager),
-  gen_server:call(PID, {send, {Port, IP}, Message}).
+  gen_server:call(PID, {send, {Port, IP}, Message}, 10000).
 
 compact_address(Address) ->
   {Port, {IPA, IPB, IPC, IPD}} = Address,
@@ -49,9 +50,8 @@ compact_address(Address) ->
     integer_to_list(IPD), ":", integer_to_list(Port)]).
 
 get_own_address() ->
-  {ok, Addrs} = inet:getif(),
-  IP = hd([Addr || {Addr, _,_} <- Addrs, size(Addr) == 4, Addr =/= {127,0,0,1}]),
-  {?PORT, IP}.
+  local_address().
+% {?PORT, public_ip:get_public_ip()}.
 
 move_socket(Socket) ->
   PID = naming_service:get_identity(link_manager),
@@ -87,7 +87,7 @@ handle_call({send, {Port, IP}, Message}, _From, State) ->
   Present = [X || {X, Addr, _} <- State#state.connections, Addr == {Port, IP}],
   case Present of
     [] ->
-      case gen_tcp:connect(IP, Port, [binary, {packet, 0}]) of
+      case gen_tcp:connect(IP, Port, [binary, {packet, 0}], ?INTERVAL) of
         {ok, RequestSocket} ->
           Sup = naming_service:get_identity(handler_supervisor),
           Ret = supervisor:start_child(Sup, [RequestSocket]),
@@ -134,10 +134,10 @@ handle_cast({new_connection, Socket}, State) ->
   case Ret of
     {ok, PID} ->
       gen_tcp:controlling_process(Socket, PID),
-      {noreply, #state{connections = [{PID, incoming, no_monitor} | State#state.connections]}};
+      {noreply, State};
     {ok, PID, _} ->
       gen_tcp:controlling_process(Socket, PID),
-      {noreply, #state{connections = [{PID, incoming, no_monitor} | State#state.connections]}}
+      {noreply, State}
   end;
 
 handle_cast(Request, State) ->
@@ -192,3 +192,9 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+
+
+local_address() ->
+  {ok, Addrs} = inet:getif(),
+  IP = hd([Addr || {Addr, _,_} <- Addrs, size(Addr) == 4, Addr =/= {127,0,0,1}]),
+  {?PORT, IP}.
