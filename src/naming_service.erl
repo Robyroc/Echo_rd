@@ -4,7 +4,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, notify_identity/2, get_identity/1]).
+-export([start_link/0, notify_identity/2, get_identity/1, wait_service/1, get_maybe_identity/1]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -29,6 +29,9 @@ get_identity(Identity) ->
   Results = ets:lookup(naming_db, Identity),
   {Identity, PID} = hd(Results),
   PID.
+
+wait_service(Name) ->
+  wait_for_srv(Name).
 
 %TODO communication message, remove it
 % link_manager:send_message({6543, {192, 168, 43, 209}}, {no_alias, 17, []}).
@@ -144,3 +147,18 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+
+wait_for_srv(Name) ->
+  case get_maybe_identity(Name) of
+    no_name_registered ->
+      timer:sleep(100),
+      wait_for_srv(Name);
+    _ -> ok
+  end.
+
+get_maybe_identity(Identity) ->
+  try get_identity(Identity) of
+    PID -> PID
+  catch
+      error:badarg -> no_name_registered
+  end.
