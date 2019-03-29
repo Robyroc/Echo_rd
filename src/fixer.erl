@@ -4,7 +4,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/2]).
+-export([start_link/1]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -28,8 +28,8 @@
 %%
 %% @end
 %%--------------------------------------------------------------------
-start_link(ID, NBits) ->
-  gen_server:start_link({local, ?SERVER}, ?MODULE, [ID, NBits], []).
+start_link(NBits) ->
+  gen_server:start_link({local, ?SERVER}, ?MODULE, [NBits], []).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -46,13 +46,15 @@ start_link(ID, NBits) ->
 %%                     {stop, Reason}
 %% @end
 %%--------------------------------------------------------------------
-init([ID, NBits]) ->
+init([NBits]) ->
+  naming_service:wait_service(router),
+  ID = hash_f:get_hashed_addr(link_manager:get_own_address()),
   naming_service:notify_identity(self(), fixer),
   erlang:send_after(20000, self(), fix),                    %TODO tune parameters accordingly
   {ok, #state{id = ID, nbits = NBits, index = 0}};
 
 init(_) ->
-  {stop, incorrect_params}.
+  {stop, badarg}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -87,8 +89,10 @@ handle_cast(Request, State) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_info(fix, State) ->
-  %TODO make it ask for a lookup
-  %TODO After receipt of response tell router to update finger table
+  Theo = (State#state.id + round(math:pow(2, State#state.index)))
+    rem math:pow(2, State#state.nbits),
+  {found, A} = router:local_lookup(Theo),
+  router:update_finger_table(Theo, A),
   erlang:send_after(20000, self(), fix),
   {noreply, iterate_state(State)};
 

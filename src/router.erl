@@ -4,7 +4,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0]).
+-export([start_link/1, show_table/0, local_lookup/1, update_finger_table/2, remote_lookup/2, lookup_for_join/1]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -28,16 +28,23 @@
 %%
 %% @end
 %%--------------------------------------------------------------------
-start_link() ->
-  gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
+start_link(Nbits) ->
+  gen_server:start_link({local, ?SERVER}, ?MODULE, [Nbits], []).
 
-local_lookup(ID) -> ok.
+local_lookup(ID) ->
+  PID = naming_service:get_identity(router),
+  gen_server:call(PID, {lookup, ID}).
 
-update_finger_table(Address, Theoretical) -> ok.
+update_finger_table(Address, Theoretical) ->
+  PID = naming_service:get_identity(router),
+  gen_server:cast(PID, {update, Address, Theoretical}).
 
-remote_lookup(Alias, ID) -> ok.
+remote_lookup(Alias, Requested) ->
+  PID = naming_service:get_identity(router),
+  gen_server:cast(PID, {lookup, Alias, Requested}).
 
-remote_join(Address) -> ok.
+lookup_for_join(Address) ->
+  remote_lookup(Address, hash_f:get_hashed_addr(Address)).
 
 show_table() ->
   PID = naming_service:get_identity(router),
@@ -58,11 +65,14 @@ show_table() ->
 %%                     {stop, Reason}
 %% @end
 %%--------------------------------------------------------------------
--spec(init(Args :: term()) ->
-  {ok, State :: #state{}} | {ok, State :: #state{}, timeout() | hibernate} |
-  {stop, Reason :: term()} | ignore).
-init([]) ->
-  {ok, #state{}}.
+init([Nbits]) ->
+  naming_service:wait_service(stabilizer),
+  naming_service:notify_identity(self(), router),
+  {SuccId, Succ} = stabilizer:get_successor(),
+  ID = hash_f:get_hashed_addr(link_manager:get_own_address()),
+  TailRoutingTable = [{ID + round(math:pow(2, Exp)), no_real, no_address} || Exp <- lists:seq(1, Nbits - 1)],
+  HeadRoutingTable = {ID + 1, SuccId, Succ},
+  {ok, #state{finger_table = [HeadRoutingTable | TailRoutingTable], nbits = Nbits, id = ID}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -75,7 +85,19 @@ handle_call(show_table, _From, State) ->
   show_finger_table(State),
   {reply, ok, State};
 
-handle_call(_Request, _From, State) ->
+handle_call({lookup, Requested}, From, State) ->
+  {_, SuccID, Succ} = hd(State#state.finger_table),
+  Next = check_if_next(Requested, State#state.id, SuccID, State#state.nbits),
+  case Next of
+    next -> {reply, {found, Succ}, State};
+    _ ->
+      List = lookup(Requested, State#state.id, State#state.finger_table, State#state.nbits),
+      request_gateway:add_request(Requested, From, List),
+      {noreply, State}
+  end;
+
+handle_call(Request, _From, State) ->
+  io:format("Router: Unexpected call message: ~p~n", [Request]),
   {reply, ok, State}.
 
 %%--------------------------------------------------------------------
@@ -85,11 +107,29 @@ handle_call(_Request, _From, State) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec(handle_cast(Request :: term(), State :: #state{}) ->
-  {noreply, NewState :: #state{}} |
-  {noreply, NewState :: #state{}, timeout() | hibernate} |
-  {stop, Reason :: term(), NewState :: #state{}}).
-handle_cast(_Request, State) ->
+
+handle_cast({update, Address, Theoretical}, State) ->
+  Table = State#state.finger_table,
+  Less = [{Theo, R, A} || {Theo, R, A} <- Table, Theo < Theoretical],
+  Greater = [{Theo, R, A} || {Theo, R, A} <- Table, Theo > Theoretical],
+  NewTable = [lists:reverse([{Theoretical, hash_f:get_hashed_addr(Address), Address} | lists:reverse(Less)]) | Greater],
+  {noreply, #state{finger_table = NewTable, nbits = State#state.nbits, id = State#state.id}};
+
+handle_cast({lookup, Alias, Requested}, State) ->
+  {_, SuccID, Succ} = hd(State#state.finger_table),
+  Next = check_if_next(Requested, State#state.id, SuccID, State#state.nbits),
+  case Next of
+    next ->
+      communication_manager:send_message(lookup_response, [Succ], Alias, no_alias),
+      {noreply, State};
+    _ ->
+      {_, _, Destination} = hd(lookup(Requested, State#state.id, State#state.finger_table, State#state.nbits)),
+      communication_manager:send_message(lookup, [Requested], Destination, Alias),
+      {noreply, State}
+  end;
+
+handle_cast(Request, State) ->
+  io:format("Router: Unexpected cast message: ~p~n", [Request]),
   {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -102,13 +142,9 @@ handle_cast(_Request, State) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
--spec(handle_info(Info :: timeout() | term(), State :: #state{}) ->
-  {noreply, NewState :: #state{}} |
-  {noreply, NewState :: #state{}, timeout() | hibernate} |
-  {stop, Reason :: term(), NewState :: #state{}}).
-handle_info(_Info, State) ->
+handle_info(Info, State) ->
+  io:format("Router: Unexpected ! message: ~p~n", [Info]),
   {noreply, State}.
-
 %%--------------------------------------------------------------------
 %% @private
 %% @doc
@@ -120,8 +156,6 @@ handle_info(_Info, State) ->
 %% @spec terminate(Reason, State) -> void()
 %% @end
 %%--------------------------------------------------------------------
--spec(terminate(Reason :: (normal | shutdown | {shutdown, term()} | term()),
-    State :: #state{}) -> term()).
 terminate(_Reason, _State) ->
   ok.
 
@@ -133,9 +167,6 @@ terminate(_Reason, _State) ->
 %% @spec code_change(OldVsn, State, Extra) -> {ok, NewState}
 %% @end
 %%--------------------------------------------------------------------
--spec(code_change(OldVsn :: term() | {down, term()}, State :: #state{},
-    Extra :: term()) ->
-  {ok, NewState :: #state{}} | {error, Reason :: term()}).
 code_change(_OldVsn, State, _Extra) ->
   {ok, State}.
 
@@ -148,3 +179,19 @@ show_finger_table(State) ->
   Theo | Real | Address~n"),
   [io:format("~p|~p|~p", [T, R, A]) || {T, R, A} <- State#state.finger_table],  %TODO: handle formatting
   ok.
+
+lookup(Searched, ID, Table, NBits) when Searched < ID ->
+  lookup(Searched + round(math:pow(2, NBits)), ID, Table, NBits);
+
+lookup(Searched, _ID, Table, _NBits) ->
+  RevTable = lists:reverse(Table),
+  [Address || {_, ID, Address} <- lists:filter(fun({_, Id, _}) -> Id =/= no_real end, RevTable), ID =< Searched].
+
+check_if_next(Requested, ID, SuccId, NBits) when Requested =< ID ->
+  check_if_next(Requested + round(math:pow(2, NBits)), SuccId, ID, NBits);
+
+check_if_next(Requested, ID, SuccId, _NBits) when (Requested > ID and not (Requested > SuccId)) ->
+  next;
+
+check_if_next(_, _, _, _) ->
+  not_next.

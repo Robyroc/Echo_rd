@@ -4,7 +4,7 @@
 -behaviour(gen_fsm).
 
 %% API
--export([start_link/0]).
+-export([start_link/0, send_message/4]).
 
 %% gen_fsm callbacks
 -export([init/1,

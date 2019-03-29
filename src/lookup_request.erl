@@ -1,10 +1,10 @@
--module(checker).
--author("Giacomo").
+-module(lookup_request).
+-author("robyroc").
 
 -behaviour(gen_server).
 
 %% API
--export([start_link/4, get_pred/1, clear_pred/0]).
+-export([start_link/4, respond/2]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -15,9 +15,8 @@
   code_change/3]).
 
 -define(SERVER, ?MODULE).
--define(INTERVAL, 30000).
 
--record(state, {pred, pred_id, own_id, n_bits}).
+-record(state, {requested, from, list, type}).
 
 %%%===================================================================
 %%% API
@@ -29,16 +28,11 @@
 %%
 %% @end
 %%--------------------------------------------------------------------
-start_link(Predecessor, PredID, OwnID, NBits) ->            %%TODO decide how to pass these parameters
-  gen_server:start_link({local, ?SERVER}, ?MODULE, [Predecessor, PredID, OwnID, NBits], []).
+start_link(Requested, From, List, ListType) ->
+  gen_server:start_link(?MODULE, [Requested, From, List, ListType], []).
 
-get_pred(Address) ->
-  PID = naming_service:get_identity(checker),
-  gen_server:call(PID, {pred_find, Address}).
-
-clear_pred() ->
-  PID = naming_service:get_identity(checker),
-  PID ! timeout.
+respond(PID, Address) ->
+  gen_server:cast(PID, {response, Address}).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -55,12 +49,12 @@ clear_pred() ->
 %%                     {stop, Reason}
 %% @end
 %%--------------------------------------------------------------------
-init([Predecessor, PredID, OwnID, NBits]) ->
-  naming_service:notify_identity(self(), checker),
-  {ok, #state{pred = Predecessor, pred_id = PredID, own_id = OwnID, n_bits = NBits}};
+init([Requested, From, List, ListType]) ->
+  erlang:send_after(10, self(), next),
+  {ok, #state{requested = Requested, from = From, list = List, type = ListType}};
 
 init(_) ->
-  {stop, incorrect_params}.
+  {stop, badarg}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -69,36 +63,8 @@ init(_) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
-handle_call({pred_find, local_address}, _From, State) ->
-  {reply, State#state.pred , State, ?INTERVAL};
-
-handle_call({pred_find, Address}, _From, State) ->
-  case State#state.pred of
-    nil ->
-      Index = hash_f:get_hashed_addr(Address),
-      case Index of
-        _ when Index =< State#state.own_id ->
-          {reply, Address, #state{pred = Address, pred_id = Index}, ?INTERVAL};
-        _ when Index > State#state.own_id ->
-          CorrectIndex = Index - round(math:pow(2, State#state.n_bits)),
-          {reply, Address, #state{pred = Address, pred_id = CorrectIndex}, ?INTERVAL}
-      end;
-    Predecessor ->
-      Index = hash_f:get_hashed_addr(Address),
-      #state{pred = Predecessor, pred_id = PredID, own_id = OwnID, n_bits = NBits} = State,
-      case Index of
-        _ when Index =< OwnID ->
-          {Addr, PredecessorID} = predecessor_chooser(Address, Index, Predecessor, PredID),
-          {reply, Addr, #state{pred = Addr, pred_id = PredecessorID}, ?INTERVAL};
-        _ when Index > OwnID ->
-          CorrectIndex = Index - round(math:pow(2, NBits)),
-          {Addr, PredecessorID} = predecessor_chooser(Address, CorrectIndex, Predecessor, PredID),
-          {reply, Addr, #state{pred = Addr, pred_id = PredecessorID}, ?INTERVAL}
-      end
-  end;
-
 handle_call(Request, _From, State) ->
-  io:format("CHECKER: Unexpected call message: ~p~n", [Request]),
+  io:format("Request: Unexpected call message: ~p~n", [Request]),
   {reply, ok, State}.
 
 %%--------------------------------------------------------------------
@@ -108,8 +74,12 @@ handle_call(Request, _From, State) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
+handle_cast({response, Address}, State) ->
+  gen_server:reply(State#state.from, {found, Address}),
+  {stop, found, State};
+
 handle_cast(Request, State) ->
-  io:format("CHECKER: Unexpected cast message: ~p~n", [Request]),
+  io:format("Request: Unexpected cast message: ~p~n", [Request]),
   {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -122,11 +92,18 @@ handle_cast(Request, State) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_info(timeout, _State) ->
-  {noreply, #state{pred = nil, pred_id = nil}};
+handle_info(next, State) ->
+  NewState = next_message(State),
+  case NewState of
+    terminate ->
+      {stop, not_reachable};
+    _ ->
+      erlang:send_after(5000, self(), next),
+      {noreply, NewState}
+  end;
 
 handle_info(Info, State) ->
-  io:format("CHECKER: Unexpected ! message: ~p~n", [Info]),
+  io:format("Request: Unexpected ! message: ~p~n", [Info]),
   {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -158,10 +135,20 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
-predecessor_chooser(Address, AddressID, Predecessor, PredecessorID) ->
-  case AddressID of
-    _ when AddressID > PredecessorID ->
-      {Address, AddressID};
-    _ when AddressID =< PredecessorID ->
-      {Predecessor, PredecessorID}
-  end.
+
+next_message(State) ->
+  next_message(State#state.requested, State#state.list, State#state.type, State#state.from).
+
+
+next_message(_Requested, [], succ, _From) ->
+  terminate;
+
+next_message(Requested, [], finger, From) ->
+  List = stabilizer:get_successor_list(),
+  AList = [X || {_, X} <- List],
+  next_message(Requested, AList, succ, From);
+
+next_message(Requested, List, Type, From) ->
+  Address = hd(List),
+  communication_manager:send_message(lookup, [Requested], Address, link_manager:get_own_address()),
+  #state{requested = Requested, list = tl(List), type = Type, from = From}.

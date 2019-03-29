@@ -1,10 +1,10 @@
--module(checker).
--author("Giacomo").
+-module(request_gateway).
+-author("robyroc").
 
 -behaviour(gen_server).
 
 %% API
--export([start_link/4, get_pred/1, clear_pred/0]).
+-export([start_link/0, add_request/3, lookup_response/2]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -15,9 +15,8 @@
   code_change/3]).
 
 -define(SERVER, ?MODULE).
--define(INTERVAL, 30000).
 
--record(state, {pred, pred_id, own_id, n_bits}).
+-record(state, {requests}).
 
 %%%===================================================================
 %%% API
@@ -29,16 +28,16 @@
 %%
 %% @end
 %%--------------------------------------------------------------------
-start_link(Predecessor, PredID, OwnID, NBits) ->            %%TODO decide how to pass these parameters
-  gen_server:start_link({local, ?SERVER}, ?MODULE, [Predecessor, PredID, OwnID, NBits], []).
+start_link() ->
+  gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
-get_pred(Address) ->
-  PID = naming_service:get_identity(checker),
-  gen_server:call(PID, {pred_find, Address}).
+add_request(Requested, From, List) ->
+  PID = naming_service:get_identity(request_gateway),
+  gen_server:call(PID, {add, Requested, From, List}).
 
-clear_pred() ->
-  PID = naming_service:get_identity(checker),
-  PID ! timeout.
+lookup_response(Requested, Address) ->
+  PID = naming_service:get_identity(request_gateway),
+  gen_server:cast(PID, {response, Requested, Address}).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -55,12 +54,10 @@ clear_pred() ->
 %%                     {stop, Reason}
 %% @end
 %%--------------------------------------------------------------------
-init([Predecessor, PredID, OwnID, NBits]) ->
-  naming_service:notify_identity(self(), checker),
-  {ok, #state{pred = Predecessor, pred_id = PredID, own_id = OwnID, n_bits = NBits}};
-
-init(_) ->
-  {stop, incorrect_params}.
+init([]) ->
+  naming_service:wait_service(router),
+  naming_service:notify_identity(self(), request_gateway),
+  {ok, #state{requests = []}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -69,36 +66,20 @@ init(_) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
-handle_call({pred_find, local_address}, _From, State) ->
-  {reply, State#state.pred , State, ?INTERVAL};
-
-handle_call({pred_find, Address}, _From, State) ->
-  case State#state.pred of
-    nil ->
-      Index = hash_f:get_hashed_addr(Address),
-      case Index of
-        _ when Index =< State#state.own_id ->
-          {reply, Address, #state{pred = Address, pred_id = Index}, ?INTERVAL};
-        _ when Index > State#state.own_id ->
-          CorrectIndex = Index - round(math:pow(2, State#state.n_bits)),
-          {reply, Address, #state{pred = Address, pred_id = CorrectIndex}, ?INTERVAL}
-      end;
-    Predecessor ->
-      Index = hash_f:get_hashed_addr(Address),
-      #state{pred = Predecessor, pred_id = PredID, own_id = OwnID, n_bits = NBits} = State,
-      case Index of
-        _ when Index =< OwnID ->
-          {Addr, PredecessorID} = predecessor_chooser(Address, Index, Predecessor, PredID),
-          {reply, Addr, #state{pred = Addr, pred_id = PredecessorID}, ?INTERVAL};
-        _ when Index > OwnID ->
-          CorrectIndex = Index - round(math:pow(2, NBits)),
-          {Addr, PredecessorID} = predecessor_chooser(Address, CorrectIndex, Predecessor, PredID),
-          {reply, Addr, #state{pred = Addr, pred_id = PredecessorID}, ?INTERVAL}
-      end
+handle_call({add, Requested, From, List}, _From, State) ->
+  Sup = naming_service:get_identity(request_supervisor),
+  Ret = supervisor:start_child(Sup, [Requested, From, List, finger]),
+  case Ret of
+    {ok, PID} ->
+      Monitor = erlang:monitor(process, PID),
+      {reply, ok, #state{requests = [{PID, Requested, Monitor} | State#state.requests]}};
+    {ok, PID, _} ->
+      Monitor = erlang:monitor(process, PID),
+      {reply, ok, #state{requests = [{PID, Requested, Monitor} | State#state.requests]}}
   end;
 
 handle_call(Request, _From, State) ->
-  io:format("CHECKER: Unexpected call message: ~p~n", [Request]),
+  io:format("R. Gateway: Unexpected call message: ~p~n", [Request]),
   {reply, ok, State}.
 
 %%--------------------------------------------------------------------
@@ -108,8 +89,12 @@ handle_call(Request, _From, State) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
+handle_cast({response, Requested, Address}, State) ->
+  [lookup_request:respond(PID, Address) || {PID, R, _} <- State#state.requests, R =:= Requested],
+  {noreply, State};
+
 handle_cast(Request, State) ->
-  io:format("CHECKER: Unexpected cast message: ~p~n", [Request]),
+  io:format("R. Gateway: Unexpected cast message: ~p~n", [Request]),
   {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -122,11 +107,13 @@ handle_cast(Request, State) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_info(timeout, _State) ->
-  {noreply, #state{pred = nil, pred_id = nil}};
+handle_info({'DOWN', Monitor, process, _PID, Reason}, State) ->
+  Present = [X || {_, X, M} <- State#state.requests, M =:= Monitor],
+  io:format("R. Gateway: A request failed: Requested: ~p~nReason: ~p~n", [hd(Present), Reason]),
+  {noreply, #state{requests = [{P, R, M} || {P, R, M} <- State#state.requests, M =/= Monitor]}};
 
 handle_info(Info, State) ->
-  io:format("CHECKER: Unexpected ! message: ~p~n", [Info]),
+  io:format("R. Gateway: Unexpected ! message: ~p~n", [Info]),
   {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -157,11 +144,3 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
-
-predecessor_chooser(Address, AddressID, Predecessor, PredecessorID) ->
-  case AddressID of
-    _ when AddressID > PredecessorID ->
-      {Address, AddressID};
-    _ when AddressID =< PredecessorID ->
-      {Predecessor, PredecessorID}
-  end.

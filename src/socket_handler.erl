@@ -50,7 +50,10 @@ send_message(PID, Message) ->
 %% @end
 %%--------------------------------------------------------------------
 init([Socket]) ->
-  {ok, #state{socket = Socket}}.
+  {ok, #state{socket = Socket}};
+
+init(_) ->
+  {stop, badarg}.
 
 %%--------------------------------------------------------------------
 %% @private
