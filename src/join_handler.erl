@@ -12,7 +12,7 @@
 -behaviour(gen_statem).
 
 %% API
--export([start_link/0]).
+-export([start_link/1, join/1]).
 
 %% gen_statem callbacks
 -export([
@@ -27,7 +27,7 @@
 
 -define(SERVER, ?MODULE).
 
--record(state, {}).
+-record(state, {address, id}).
 
 %%%===================================================================
 %%% API
@@ -42,8 +42,21 @@
 %% @spec start_link() -> {ok, Pid} | ignore | {error, Error}
 %% @end
 %%--------------------------------------------------------------------
-start_link() ->
-  gen_statem:start_link({local, ?SERVER}, ?MODULE, [], []).
+start_link(ProviderAddress) ->
+  gen_statem:start_link({local, ?SERVER}, ?MODULE, [ProviderAddress], []).
+
+join(Address) ->
+  PID = naming_service:get_identity(join_handler),
+  gen_statem:call(PID, {join,Address}).
+
+look_for_join() ->
+  gen_statem:call().
+
+abort() ->
+  gen_statem:call().
+
+lookup_resp() ->
+  gen_statem:call().
 
 %%%===================================================================
 %%% gen_statem callbacks
@@ -62,8 +75,9 @@ start_link() ->
 %%                     {stop, StopReason}
 %% @end
 %%--------------------------------------------------------------------
-init([]) ->
-  {ok, state_name, #state{}}.
+init([ProvideAddress]) ->
+  naming_service:notify_identity(self(), join_handler),
+  {ok, joiner_init, #state{address = ProvideAddress, id = not_used}}.
 
 
 %%--------------------------------------------------------------------
@@ -76,7 +90,8 @@ init([]) ->
 %% @end
 %%--------------------------------------------------------------------
 callback_mode() ->
-  handle_event_function.
+  %state_functions.
+  handle_event_function.       %TODO decide callback_mode
 
 %%--------------------------------------------------------------------
 %% @private

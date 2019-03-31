@@ -150,5 +150,5 @@ next_message(Requested, [], finger, From) ->
 
 next_message(Requested, List, Type, From) ->
   Address = hd(List),
-  com_manager_fsm:send_message(lookup, [Requested], Address, link_manager:get_own_address()),     %TODO module name of CM
+  communication_manager:send_message(lookup, [Requested], Address, link_manager:get_own_address()),
   #state{requested = Requested, list = tl(List), type = Type, from = From}.

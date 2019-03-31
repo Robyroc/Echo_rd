@@ -120,11 +120,11 @@ handle_cast({lookup, Alias, Requested}, State) ->
   Next = check_if_next(Requested, State#state.id, SuccID, State#state.nbits),
   case Next of
     next ->
-      com_manager_fsm:send_message(lookup_response, [Succ], Alias, no_alias),     %TODO module name of CM
+      communication_manager:send_message(lookup_response, [Succ], Alias, no_alias),
       {noreply, State};
     _ ->
       {_, _, Destination} = hd(lookup(Requested, State#state.id, State#state.finger_table, State#state.nbits)),
-      com_manager_fsm:send_message(lookup, [Requested], Destination, Alias),      %TODO module name of CM
+      communication_manager:send_message(lookup, [Requested], Destination, Alias),
       {noreply, State}
   end;
 

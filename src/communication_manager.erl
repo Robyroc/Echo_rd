@@ -1,18 +1,10 @@
-%%%-------------------------------------------------------------------
-%%% @author Antonio
-%%% @copyright (C) 2019, <COMPANY>
-%%% @doc
-%%%
-%%% @end
-%%% Created : 30. mar 2019 13:11
-%%%-------------------------------------------------------------------
 -module(communication_manager).
 -author("Antonio").
 
 -behaviour(gen_server).
 
 %% API
--export([start_link/0]).
+-export([start_link/0, send_message/4, receive_message/1, create/1, check_params/2]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -36,10 +28,27 @@
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec(start_link() ->
-  {ok, Pid :: pid()} | ignore | {error, Reason :: term()}).
+
+
 start_link() ->
   gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
+
+%TODO remove comment, it is just for testing
+%communication_manager:send_message(lookup,["K20"],{6543,{192,168,1,98}},no_alias).
+send_message(Method, Params, Address, Alias) ->
+  PID = naming_service:get_identity(communication_manager),
+  gen_server:call(PID, {send_msg, Method, Params, Address, Alias}).
+
+
+receive_message({Method, Address, Params}) ->
+  PID = naming_service:get_identity(communication_manager),
+  gen_server:call(PID, {rcv_msg, Method, Address, Params}).
+
+%TODO check if create and join have to be here
+create(NBits) ->
+  ok.
+join(Address) -> ok.
+
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -56,10 +65,11 @@ start_link() ->
 %%                     {stop, Reason}
 %% @end
 %%--------------------------------------------------------------------
--spec(init(Args :: term()) ->
-  {ok, State :: #state{}} | {ok, State :: #state{}, timeout() | hibernate} |
-  {stop, Reason :: term()} | ignore).
+
+
 init([]) ->
+  %naming_service:wait_service(),           %TODO check if the CM has to wait for some service
+  naming_service:notify_identity(self(), communication_manager),
   {ok, #state{}}.
 
 %%--------------------------------------------------------------------
@@ -69,15 +79,18 @@ init([]) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec(handle_call(Request :: term(), From :: {pid(), Tag :: term()},
-    State :: #state{}) ->
-  {reply, Reply :: term(), NewState :: #state{}} |
-  {reply, Reply :: term(), NewState :: #state{}, timeout() | hibernate} |
-  {noreply, NewState :: #state{}} |
-  {noreply, NewState :: #state{}, timeout() | hibernate} |
-  {stop, Reason :: term(), Reply :: term(), NewState :: #state{}} |
-  {stop, Reason :: term(), NewState :: #state{}}).
-handle_call(_Request, _From, State) ->
+
+handle_call({send_msg, Method, Params, Address, Alias}, _From, State) ->
+  case check_params(Method,Params) of
+    ok ->  {reply,{translate(Method), Address, [list_to_binary(Params)], Alias},State};
+    _ -> fail             %TODO check
+  end;
+
+handle_call({rcv_msg, Method, Address, Params}, _From, State) ->
+  {reply,{back_translate(Method), Address, binary_to_list(list_to_binary(Params))},State};
+
+handle_call(Request, _From, State) ->
+  io:format("CM: Unexpected call message: ~p~n", [Request]),
   {reply, ok, State}.
 
 %%--------------------------------------------------------------------
@@ -87,11 +100,9 @@ handle_call(_Request, _From, State) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec(handle_cast(Request :: term(), State :: #state{}) ->
-  {noreply, NewState :: #state{}} |
-  {noreply, NewState :: #state{}, timeout() | hibernate} |
-  {stop, Reason :: term(), NewState :: #state{}}).
-handle_cast(_Request, State) ->
+
+handle_cast(Request, State) ->
+  io:format("CM: Unexpected cast message: ~p~n", [Request]),
   {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -104,10 +115,8 @@ handle_cast(_Request, State) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
--spec(handle_info(Info :: timeout() | term(), State :: #state{}) ->
-  {noreply, NewState :: #state{}} |
-  {noreply, NewState :: #state{}, timeout() | hibernate} |
-  {stop, Reason :: term(), NewState :: #state{}}).
+
+%TODO has to be developed?
 handle_info(_Info, State) ->
   {noreply, State}.
 
@@ -122,8 +131,7 @@ handle_info(_Info, State) ->
 %% @spec terminate(Reason, State) -> void()
 %% @end
 %%--------------------------------------------------------------------
--spec(terminate(Reason :: (normal | shutdown | {shutdown, term()} | term()),
-    State :: #state{}) -> term()).
+
 terminate(_Reason, _State) ->
   ok.
 
@@ -135,12 +143,62 @@ terminate(_Reason, _State) ->
 %% @spec code_change(OldVsn, State, Extra) -> {ok, NewState}
 %% @end
 %%--------------------------------------------------------------------
--spec(code_change(OldVsn :: term() | {down, term()}, State :: #state{},
-    Extra :: term()) ->
-  {ok, NewState :: #state{}} | {error, Reason :: term()}).
+
 code_change(_OldVsn, State, _Extra) ->
   {ok, State}.
 
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+
+
+translate(join) ->
+  1;
+translate(lookup) ->
+  2;
+translate(lookup_response) ->
+  3;
+translate(leave) ->
+  4;
+translate(_) ->
+  method_not_exists.
+
+
+back_translate(1) ->
+  join;
+back_translate(2) ->
+  lookup;
+back_translate(3) ->
+  lookup_response;
+back_translate(4) ->
+  leave;
+back_translate(_) ->
+  error_method_code.
+
+
+check_params(join, Params) ->
+  case length(Params) of
+    1 -> ok;                 %Address
+    _-> unexpected_params
+  end;
+
+check_params(lookup, Params) ->
+  case length(Params) of
+    1 -> ok;                %Requested
+    _-> unexpected_params
+  end;
+
+check_params(lookup_response, Params) ->
+  case length(Params) of
+    1 -> ok;                %Successor
+    _-> unexpected_params
+  end;
+
+check_params(leave, Params) ->
+  case length(Params) of
+    0 -> ok;
+    _-> unexpected_params
+  end;
+
+check_params(_, Params) ->
+  unexpected_params.          %TODO maybe it can be eliminated
