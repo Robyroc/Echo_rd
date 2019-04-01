@@ -4,7 +4,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/4, get_successor/0, get_successor_list/0]).
+-export([start_link/4, get_successor/0, get_successor_list/0, notify_successor/1]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -39,6 +39,10 @@ get_successor() ->
 get_successor_list() ->
   PID = naming_service:get_identity(stabilizer),
   gen_server:call(PID, {get_succ_list}).
+
+notify_successor(SuccessorList) ->
+  PID = naming_service:get_identity(stabilizer),
+  gen_server:cast(PID, {stabilize_response, SuccessorList}).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -90,6 +94,14 @@ handle_call(Request, _From, State) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
+handle_cast({stabilize_response, SuccessorList}, State) ->
+  Address = call_to_successor_for_predecessor,
+  Index = hash_f:get_hashed_addr(Address),
+  HeadIndex = hd([I || {I, _} <- State#state.succ_list]),
+  #state{succ_list = SuccessorList, id = ID, nbits = NBits} = State,
+  NewSuccessorList = handle_pred_tell(Index, ID, HeadIndex, SuccessorList, Address, NBits),
+  {noreply, State#state{succ_list = NewSuccessorList}};
+
 handle_cast(Request, State) ->
   io:format("STABILIZER: Unexpected cast message: ~p~n", [Request]),
   {noreply, State}.
@@ -105,14 +117,9 @@ handle_cast(Request, State) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_info(stabilize, State) ->
-  %%TODO ask to the successor who is his predecessor and substitute Address with the right command
-  Address = call_to_successor_for_predecessor,
-  Index = hash_f:get_hashed_addr(Address),
-  HeadIndex = hd([I || {I, _} <- State#state.succ_list]),
-  #state{succ_list = SuccessorList, id = ID, nbits = NBits} = State,
-  NewSuccessorList = handle_pred_tell(Index, ID, HeadIndex, SuccessorList, Address, NBits),
+  %%TODO ask to the successor who is his predecessor through Communication Manager
   erlang:send_after(?INTERVAL, self(), stabilize),
-  {noreply, #state{succ_list = NewSuccessorList}};
+  {noreply, State};
 
 handle_info(Info, State) ->
   io:format("STABILIZER: Unexpected ! message: ~p~n", [Info]),

@@ -16,15 +16,23 @@
 
 -define(SERVER, ?MODULE).
 
--record(state, {table_id, pending_requests}).
+-record(state, {}).
 
 %%%===================================================================
 %%% API
 %%%===================================================================
 
 notify_identity(PID, Identity) ->
-  Naming = get_identity(naming_handler),
-  gen_server:call(Naming, {notify, Identity, PID}).           %TODO check if timeout is needed
+  try
+    Naming = get_identity(naming_handler),
+    gen_server:call(Naming, {notify, Identity, PID})          %TODO check if timeout is needed
+  of
+    A -> A
+  catch
+    _:_ ->
+      timer:sleep(100),
+      notify_identity(PID, Identity)
+  end.
 
 get_identity(Identity) ->
   Results = ets:lookup(naming_db, Identity),
@@ -71,23 +79,12 @@ init([]) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
-handle_call({check_id, Identity}, From, State) ->
-  Result = ets:lookup(naming_db, Identity),
-  case Result of
-    [] ->
-      {noreply, #state{pending_requests = [{From, Identity} | State#state.pending_requests]}};
-    [A] ->
-      {reply, A, State}
-  end;
-
 handle_call({notify, Identity, PID}, _From, State) ->
   ets:insert(naming_db, {Identity, PID}),
-  [gen_server:reply(A, {Id, PID}) || {A, Id} <- State#state.pending_requests, Id =:= Identity],
-  NewState = #state{pending_requests = [{A, Id} || {A, Id} <- State#state.pending_requests, Id =/= Identity]},
-  {reply, ok, NewState};
+  {reply, ok, State};
 
 handle_call({reheir, NewManager}, _From, State) ->
-  ets:setopts(State#state.table_id, {heir, NewManager, naming_db}),
+  ets:setopts(naming_db, {heir, NewManager, naming_db}),
   {noreply, State};
 
 handle_call(Request, _From, State) ->
@@ -116,8 +113,9 @@ handle_cast(Request, State) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_info({'ETS-TRANSFER', TableId, Pid, _Data}, State) ->
+  ets:insert(naming_db, {naming_handler, self()}),
   io:format("Manager(~p) -> Handler(~p) getting TableId: ~p~n", [Pid, self(), TableId]),
-  {noreply, #state{table_id = TableId}};
+  {noreply, State};
 
 handle_info(Info, State) ->
   io:format("Naming Handler: Unexpected ! message: ~p~n", [Info]),

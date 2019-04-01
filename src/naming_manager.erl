@@ -4,7 +4,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, wait_for_handler/0]).
+-export([start_link/1, wait_for_handler/0]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -35,8 +35,8 @@ wait_for_handler() ->
 %%
 %% @end
 %%--------------------------------------------------------------------
-start_link() ->
-  gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
+start_link(Supervisor) ->
+  gen_server:start_link({local, ?SERVER}, ?MODULE, [Supervisor], []).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -53,10 +53,10 @@ start_link() ->
 %%                     {stop, Reason}
 %% @end
 %%--------------------------------------------------------------------
-init([]) ->
+init([Supervisor]) ->
   case whereis(naming_handler) of
     undefined ->
-      startup();
+      startup(Supervisor);
     Pid  ->
       naming_handler:reheir(Pid, self())
   end,
@@ -97,6 +97,7 @@ handle_cast(Request, State) ->
 handle_info({'ETS-TRANSFER', TableId, Pid, Data}, State) ->
   io:format("Warning TableId: ~p HandlerPid: ~p is dying~n"
   "Table is returning to Manager, in order to be passed to the new Handler~n", [TableId, Pid]),
+  ets:delete(naming_db, naming_handler),
   Handler = wait_for_handler(),
   ets:give_away(TableId, Handler, Data),
   {noreply, State#state{}};
@@ -133,11 +134,10 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
-startup() ->
-  SupervisorPid = ok,                               %%TODO change name with the correct PID of supervisor
+startup(Supervisor) ->
   ETSHandler = {naming_handler, {naming_handler, start_link, []},
     permanent, 2000, worker, [naming_handler]},
-  Ret = supervisor:start_child(SupervisorPid, [ETSHandler]),
+  Ret = supervisor:start_child(Supervisor, [ETSHandler]),
   case Ret of
     {ok, Handler} ->
       TableId = ets:new(naming_db, [set, public, named_table, {heir,self(), naming_db}]),
