@@ -125,7 +125,7 @@ handle_call(Request, _From, State) ->
 handle_cast({received, Message}, State) ->
   io:format("~p~n", [Message]),
   %TODO remove above io:format
-  %TODO forward message to communication manager
+  communication_manager:receive_message(Message),
   {noreply, State};
 
 handle_cast({new_connection, Socket}, State) ->

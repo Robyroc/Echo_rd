@@ -83,7 +83,7 @@ init([]) ->
 handle_call({send_msg, Method, Params, Address, Alias}, _From, State) ->
   case check_params(Method,Params) of
     ok ->  {reply,{translate(Method), Address, [list_to_binary(Params)], Alias},State};
-    _ -> fail             %TODO check
+    _ -> {stop, fail, State}
   end;
 
 handle_call({rcv_msg, Method, Address, Params}, _From, State) ->
@@ -116,8 +116,8 @@ handle_cast(Request, State) ->
 %% @end
 %%--------------------------------------------------------------------
 
-%TODO has to be developed?
-handle_info(_Info, State) ->
+handle_info(Info, State) ->
+  io:format("CM: Unexpected ! message: ~p~n", [Info]),
   {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -152,53 +152,20 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 
 
-translate(join) ->
-  1;
-translate(lookup) ->
-  2;
-translate(lookup_response) ->
-  3;
-translate(leave) ->
-  4;
-translate(_) ->
-  method_not_exists.
+translate(join) -> 1;
+translate(lookup) -> 2;
+translate(lookup_response) -> 3;
+translate(leave) -> 4;
+translate(_) -> method_not_exists.
 
+back_translate(1) -> join;
+back_translate(2) -> lookup;
+back_translate(3) -> lookup_response;
+back_translate(4) -> leave;
+back_translate(_) -> error_method_code.
 
-back_translate(1) ->
-  join;
-back_translate(2) ->
-  lookup;
-back_translate(3) ->
-  lookup_response;
-back_translate(4) ->
-  leave;
-back_translate(_) ->
-  error_method_code.
-
-
-check_params(join, Params) ->
-  case length(Params) of
-    1 -> ok;                 %Address
-    _-> unexpected_params
-  end;
-
-check_params(lookup, Params) ->
-  case length(Params) of
-    1 -> ok;                %Requested
-    _-> unexpected_params
-  end;
-
-check_params(lookup_response, Params) ->
-  case length(Params) of
-    1 -> ok;                %Successor
-    _-> unexpected_params
-  end;
-
-check_params(leave, Params) ->
-  case length(Params) of
-    0 -> ok;
-    _-> unexpected_params
-  end;
-
-check_params(_, Params) ->
-  unexpected_params.          %TODO maybe it can be eliminated
+check_params(join, Params) when length(Params) =:= 1 -> ok;
+check_params(lookup, Params) when length(Params) =:= 1 -> ok;
+check_params(lookup_response, Params) when length(Params) =:= 1 -> ok;
+check_params(leave, Params) when length(Params) =:= 0 -> ok;
+check_params(_, _) -> unexpected_params.
