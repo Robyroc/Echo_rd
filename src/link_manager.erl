@@ -33,15 +33,15 @@ start_link() ->
   gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
 incoming_connection(Socket) ->
-  PID = naming_service:get_identity(link_manager),
+  PID = naming_handler:get_identity(link_manager),
   gen_server:cast(PID, {new_connection, Socket}).
 
 notify_incoming_message(Message) ->
-  PID = naming_service:get_identity(link_manager),
+  PID = naming_handler:get_identity(link_manager),
   gen_server:cast(PID, {received, Message}).
 
 send_message({Port, IP}, Message) ->
-  PID = naming_service:get_identity(link_manager),
+  PID = naming_handler:get_identity(link_manager),
   gen_server:call(PID, {send, {Port, IP}, Message}, 10000).
 
 compact_address(Address) ->
@@ -54,7 +54,7 @@ get_own_address() ->
 % {?PORT, public_ip:get_public_ip()}.
 
 move_socket(Socket) ->
-  PID = naming_service:get_identity(link_manager),
+  PID = naming_handler:get_identity(link_manager),
   gen_tcp:controlling_process(Socket, PID).
 
 %%%===================================================================
@@ -73,7 +73,7 @@ move_socket(Socket) ->
 %% @end
 %%--------------------------------------------------------------------
 init([]) ->
-  naming_service:notify_identity(self(), link_manager),
+  naming_handler:notify_identity(self(), link_manager),
   {ok, #state{connections = []}}.
 
 %%--------------------------------------------------------------------
@@ -89,7 +89,7 @@ handle_call({send, {Port, IP}, Message}, _From, State) ->
     [] ->
       case gen_tcp:connect(IP, Port, [binary, {packet, 0}], ?INTERVAL) of
         {ok, RequestSocket} ->
-          Sup = naming_service:get_identity(handler_supervisor),
+          Sup = naming_handler:get_identity(handler_supervisor),
           Ret = supervisor:start_child(Sup, [RequestSocket]),
           case Ret of
             {ok, PID} ->
@@ -129,7 +129,7 @@ handle_cast({received, Message}, State) ->
   {noreply, State};
 
 handle_cast({new_connection, Socket}, State) ->
-  Sup = naming_service:get_identity(handler_supervisor),
+  Sup = naming_handler:get_identity(handler_supervisor),
   Ret = supervisor:start_child(Sup, [Socket]),
   case Ret of
     {ok, PID} ->

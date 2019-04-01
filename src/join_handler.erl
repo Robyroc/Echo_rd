@@ -46,7 +46,7 @@ start_link(ProviderAddress) ->
   gen_statem:start_link({local, ?SERVER}, ?MODULE, [ProviderAddress], []).
 
 join(Address) ->
-  PID = naming_service:get_identity(join_handler),
+  PID = naming_handler:get_identity(join_handler),
   gen_statem:call(PID, {join,Address}).
 
 look_for_join() ->
@@ -76,7 +76,7 @@ lookup_resp() ->
 %% @end
 %%--------------------------------------------------------------------
 init([ProvideAddress]) ->
-  naming_service:notify_identity(self(), join_handler),
+  naming_handler:notify_identity(self(), join_handler),
   {ok, joiner_init, #state{address = ProvideAddress, id = not_used}}.
 
 

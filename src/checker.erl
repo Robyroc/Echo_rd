@@ -4,7 +4,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/4, get_pred/1, clear_pred/0]).
+-export([start_link/2, get_pred/1, clear_pred/0]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -29,15 +29,15 @@
 %%
 %% @end
 %%--------------------------------------------------------------------
-start_link(Predecessor, PredID, OwnID, NBits) ->            %%TODO decide how to pass these parameters
-  gen_server:start_link({local, ?SERVER}, ?MODULE, [Predecessor, PredID, OwnID, NBits], []).
+start_link(Predecessor, NBits) ->
+  gen_server:start_link({local, ?SERVER}, ?MODULE, [Predecessor, NBits], []).
 
 get_pred(Address) ->
-  PID = naming_service:get_identity(checker),
+  PID = naming_handler:get_identity(checker),
   gen_server:call(PID, {pred_find, Address}).
 
 clear_pred() ->
-  PID = naming_service:get_identity(checker),
+  PID = naming_handler:get_identity(checker),
   PID ! timeout.
 
 %%%===================================================================
@@ -55,8 +55,12 @@ clear_pred() ->
 %%                     {stop, Reason}
 %% @end
 %%--------------------------------------------------------------------
-init([Predecessor, PredID, OwnID, NBits]) ->
-  naming_service:notify_identity(self(), checker),
+init([Predecessor, NBits]) ->
+  naming_handler:notify_identity(self(), checker),
+  naming_handler:wait_service(hash_f),
+  OwnAddress = link_manager:get_own_address(),
+  PredID = hash_f:get_hashed_addr(Predecessor),
+  OwnID = hash_f:get_hashed_addr(OwnAddress),
   {ok, #state{pred = Predecessor, pred_id = PredID, own_id = OwnID, n_bits = NBits}};
 
 init(_) ->

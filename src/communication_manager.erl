@@ -36,12 +36,12 @@ start_link() ->
 %TODO remove comment, it is just for testing
 %communication_manager:send_message(lookup,["K20"],{6543,{192,168,1,98}},no_alias).
 send_message(Method, Params, Address, Alias) ->
-  PID = naming_service:get_identity(communication_manager),
+  PID = naming_handler:get_identity(communication_manager),
   gen_server:call(PID, {send_msg, Method, Params, Address, Alias}).
 
 
 receive_message({Method, Address, Params}) ->
-  PID = naming_service:get_identity(communication_manager),
+  PID = naming_handler:get_identity(communication_manager),
   gen_server:call(PID, {rcv_msg, Method, Address, Params}).
 
 %TODO check if create and join have to be here
@@ -68,8 +68,8 @@ join(Address) -> ok.
 
 
 init([]) ->
-  %naming_service:wait_service(),           %TODO check if the CM has to wait for some service
-  naming_service:notify_identity(self(), communication_manager),
+  %naming_handler:wait_service(),           %TODO check if the CM has to wait for some service
+  naming_handler:notify_identity(self(), communication_manager),
   {ok, #state{}}.
 
 %%--------------------------------------------------------------------

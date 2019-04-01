@@ -41,7 +41,7 @@ start_link() ->
 %% @end
 %%--------------------------------------------------------------------
 init([]) ->
-  naming_service:notify_identity(self(), request_supervisor),
+  naming_handler:notify_identity(self(), request_supervisor),
   RestartStrategy = simple_one_for_one,
   MaxRestarts = 1000,
   MaxSecondsBetweenRestarts = 3600,

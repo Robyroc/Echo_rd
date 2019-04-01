@@ -1,5 +1,5 @@
--module(handler_supervisor).
--author("robyroc").
+-module(naming_supervisor).
+-author("Giacomo").
 
 -behaviour(supervisor).
 
@@ -39,21 +39,19 @@ start_link() ->
 %% @end
 %%--------------------------------------------------------------------
 init([]) ->
-  naming_handler:notify_identity(self(), handler_supervisor),
-  RestartStrategy = simple_one_for_one,
+  RestartStrategy = one_for_one,
   MaxRestarts = 1000,
   MaxSecondsBetweenRestarts = 3600,
 
   SupFlags = {RestartStrategy, MaxRestarts, MaxSecondsBetweenRestarts},
 
-  Restart = temporary,
+  Restart = permanent,
   Shutdown = 2000,
-  Type = worker,
 
-  AChild = {handler, {socket_handler, start_link, []},
-    Restart, Shutdown, Type, [socket_handler]},
+  Son1 = {naming_manager, {naming_manager, start_link, [self()]},
+    Restart, Shutdown, worker, [naming_manager]},
 
-  {ok, {SupFlags, [AChild]}}.
+  {ok, {SupFlags, [Son1]}}.
 
 %%%===================================================================
 %%% Internal functions

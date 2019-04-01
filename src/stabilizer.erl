@@ -4,7 +4,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/4, get_successor/0, get_successor_list/0, notify_successor/1]).
+-export([start_link/3, get_successor/0, get_successor_list/0, notify_successor/1]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -29,19 +29,19 @@
 %%
 %% @end
 %%--------------------------------------------------------------------
-start_link(SuccessorList, ID, NBits, Successor) ->                    %%TODO decide how to pass these parameters
-  gen_server:start_link({local, ?SERVER}, ?MODULE, [SuccessorList, ID, NBits, Successor], []).
+start_link(SuccessorList, NBits, Successor) ->                    %%TODO decide how to pass these parameters
+  gen_server:start_link({local, ?SERVER}, ?MODULE, [SuccessorList, NBits, Successor], []).
 
 get_successor() ->
-  PID = naming_service:get_identity(stabilizer),
+  PID = naming_handler:get_identity(stabilizer),
   gen_server:call(PID, {get_succ}).
 
 get_successor_list() ->
-  PID = naming_service:get_identity(stabilizer),
+  PID = naming_handler:get_identity(stabilizer),
   gen_server:call(PID, {get_succ_list}).
 
 notify_successor(SuccessorList) ->
-  PID = naming_service:get_identity(stabilizer),
+  PID = naming_handler:get_identity(stabilizer),
   gen_server:cast(PID, {stabilize_response, SuccessorList}).
 
 %%%===================================================================
@@ -59,8 +59,11 @@ notify_successor(SuccessorList) ->
 %%                     {stop, Reason}
 %% @end
 %%--------------------------------------------------------------------
-init([SuccessorList, ID, NBits, Successor]) ->
-  naming_service:notify_identity(self(), stabilizer),
+init([SuccessorList, NBits, Successor]) ->
+  naming_handler:notify_identity(self(), stabilizer),
+  naming_handler:wait_service(hash_f),
+  OwnAddress = link_manager:get_own_address(),
+  ID = hash_f:get_hashed_addr(OwnAddress),
   CutList = cut_last_element(SuccessorList, NBits),
   Smaller = [{I + round(math:pow(2, NBits)), A} || {I, A} <- CutList, I =< ID],
   Corrected = [{I, A} || {I, A} <- CutList, I > ID] ++ Smaller,

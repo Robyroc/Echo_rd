@@ -32,11 +32,11 @@ start_link() ->
   gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
 add_request(Requested, From, List) ->
-  PID = naming_service:get_identity(request_gateway),
+  PID = naming_handler:get_identity(request_gateway),
   gen_server:call(PID, {add, Requested, From, List}).
 
 lookup_response(Requested, Address) ->
-  PID = naming_service:get_identity(request_gateway),
+  PID = naming_handler:get_identity(request_gateway),
   gen_server:cast(PID, {response, Requested, Address}).
 
 %%%===================================================================
@@ -55,8 +55,8 @@ lookup_response(Requested, Address) ->
 %% @end
 %%--------------------------------------------------------------------
 init([]) ->
-  naming_service:wait_service(router),
-  naming_service:notify_identity(self(), request_gateway),
+  naming_handler:wait_service(router),
+  naming_handler:notify_identity(self(), request_gateway),
   {ok, #state{requests = []}}.
 
 %%--------------------------------------------------------------------
@@ -67,7 +67,7 @@ init([]) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_call({add, Requested, From, List}, _From, State) ->
-  Sup = naming_service:get_identity(request_supervisor),
+  Sup = naming_handler:get_identity(request_supervisor),
   Ret = supervisor:start_child(Sup, [Requested, From, List, finger]),
   case Ret of
     {ok, PID} ->

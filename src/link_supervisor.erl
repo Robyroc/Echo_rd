@@ -60,7 +60,7 @@ init([]) ->
 %%%===================================================================
 
 wait_for_srv() ->
-  case whereis(naming_service) of
+  case whereis(naming_handler) of
     undefined ->
       timer:sleep(1),
       wait_for_srv();

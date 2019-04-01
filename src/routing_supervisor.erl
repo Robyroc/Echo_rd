@@ -1,10 +1,10 @@
--module(router_supervisor).
--author("robyroc").
+-module(routing_supervisor).
+-author("Giacomo").
 
 -behaviour(supervisor).
 
 %% API
--export([start_link/1]).
+-export([start_link/0]).
 
 %% Supervisor callbacks
 -export([init/1]).
@@ -21,8 +21,8 @@
 %%
 %% @end
 %%--------------------------------------------------------------------
-start_link(NBits) ->
-  supervisor:start_link({local, ?SERVER}, ?MODULE, [NBits]).
+start_link() ->
+  supervisor:start_link({local, ?SERVER}, ?MODULE, []).
 
 %%%===================================================================
 %%% Supervisor callbacks
@@ -38,7 +38,14 @@ start_link(NBits) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
-init([NBits]) ->
+init([]) ->
+  naming_handler:wait_service(params_handler),
+  %%TODO getting params from params handler
+  SuccessorList = successorlist,
+  Successor = successor,
+  Predecessor = predecessor,
+  NBits = nbits,
+
   RestartStrategy = rest_for_one,
   MaxRestarts = 1000,
   MaxSecondsBetweenRestarts = 3600,
@@ -48,19 +55,14 @@ init([NBits]) ->
   Restart = permanent,
   Shutdown = 2000,
 
-  Son1 = {router, {router, start_link, [NBits]},
-    Restart, Shutdown, worker, [router]},
-  Son2 = {request_gateway, {request_gateway, start_link, []},
-    Restart, Shutdown, worker, [request_gateway]},
-  Son3 = {request_supervisor, {request_supervisor, start_link, []},
-    Restart, Shutdown, supervisor, [request_supervisor]},
-  Son4 = {fixer, {fixer, start_link, [NBits]},
-    Restart, Shutdown, worker, [fixer]},
+  Son1 = {stabilizer, {stabilizer, start_link, [SuccessorList, NBits, Successor]},
+    Restart, Shutdown, worker, [stabilizer]},
+  Son2 = {killer, {killer, start_link, []},      %%TODO make killer process
+    Restart, Shutdown, worker, [killer]},
+  Son3 = {internal_routing_supervisor, {internal_routing_supervisor, start_link, [Predecessor, NBits]},
+    Restart, Shutdown, supervisor, [internal_routing_supervisor]},
 
-  {ok, {SupFlags, [Son1, Son2, Son3, Son4]}};
-
-init(_) ->
-  {stop, badarg}.
+  {ok, {SupFlags, [Son1, Son2, Son3]}}.
 
 %%%===================================================================
 %%% Internal functions

@@ -32,11 +32,11 @@ start_link(NBits) ->
   gen_server:start_link({local, ?SERVER}, ?MODULE, [NBits], []).
 
 get_hashed_addr(Address) ->
-  PID = naming_service:get_identity(hash_f),
+  PID = naming_handler:get_identity(hash_f),
   gen_server:call(PID, {a_code, Address}).
 
 get_hashed_res(Resource) ->
-  PID = naming_service:get_identity(hash_f),
+  PID = naming_handler:get_identity(hash_f),
   gen_server:call(PID, {r_code, Resource}).
 
 %%%===================================================================
@@ -55,7 +55,7 @@ get_hashed_res(Resource) ->
 %% @end
 %%--------------------------------------------------------------------
 init([NBits]) ->
-  naming_service:notify_identity(self(), hash_f),
+  naming_handler:notify_identity(self(), hash_f),
   {ok, #state{nbits = NBits}}.
 
 %%--------------------------------------------------------------------

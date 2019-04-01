@@ -32,22 +32,22 @@ start_link(Nbits) ->
   gen_server:start_link({local, ?SERVER}, ?MODULE, [Nbits], []).
 
 local_lookup(ID) ->
-  PID = naming_service:get_identity(router),
+  PID = naming_handler:get_identity(router),
   gen_server:call(PID, {lookup, ID}).
 
 update_finger_table(Address, Theoretical) ->
-  PID = naming_service:get_identity(router),
+  PID = naming_handler:get_identity(router),
   gen_server:cast(PID, {update, Address, Theoretical}).
 
 remote_lookup(Alias, Requested) ->
-  PID = naming_service:get_identity(router),
+  PID = naming_handler:get_identity(router),
   gen_server:cast(PID, {lookup, Alias, Requested}).
 
 lookup_for_join(Address) ->
   remote_lookup(Address, hash_f:get_hashed_addr(Address)).
 
 show_table() ->
-  PID = naming_service:get_identity(router),
+  PID = naming_handler:get_identity(router),
   gen_server:call(PID, show_table).
 
 %%%===================================================================
@@ -66,8 +66,8 @@ show_table() ->
 %% @end
 %%--------------------------------------------------------------------
 init([Nbits]) ->
-  naming_service:wait_service(stabilizer),
-  naming_service:notify_identity(self(), router),
+  naming_handler:wait_service(stabilizer),
+  naming_handler:notify_identity(self(), router),
   {SuccId, Succ} = stabilizer:get_successor(),
   ID = hash_f:get_hashed_addr(link_manager:get_own_address()),
   TailRoutingTable = [{ID + round(math:pow(2, Exp)), no_real, no_address} || Exp <- lists:seq(1, Nbits - 1)],
