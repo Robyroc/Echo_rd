@@ -56,7 +56,7 @@ start_link(Supervisor) ->
 init([Supervisor]) ->
   case whereis(naming_handler) of
     undefined ->
-      startup(Supervisor);
+      erlang:send(self(), {startup, Supervisor});
     Pid  ->
       naming_handler:reheir(Pid, self())
   end,
@@ -94,6 +94,20 @@ handle_cast(Request, State) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
+handle_info({startup, Supervisor}, State) ->
+  ETSHandler = {naming_handler, {naming_handler, start_link, []},
+    permanent, 2000, worker, [naming_handler]},
+  Ret = supervisor:start_child(Supervisor, ETSHandler),
+  case Ret of
+    {ok, Handler} ->
+      TableId = ets:new(naming_db, [set, public, named_table, {heir, self(), naming_db}]),
+      ets:give_away(TableId, Handler, naming_db);         %%TODO check if it works passing naming_db in place of Data
+    {ok, Handler, _} ->
+      TableId = ets:new(naming_db, [set, public, named_table, {heir, self(), naming_db}]),
+      ets:give_away(TableId, Handler, naming_db)         %%TODO check if it works passing naming_db in place of Data
+  end,
+  {noreply, State#state{}};
+
 handle_info({'ETS-TRANSFER', TableId, Pid, Data}, State) ->
   io:format("Warning TableId: ~p HandlerPid: ~p is dying~n"
   "Table is returning to Manager, in order to be passed to the new Handler~n", [TableId, Pid]),
@@ -134,15 +148,3 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
-startup(Supervisor) ->
-  ETSHandler = {naming_handler, {naming_handler, start_link, []},
-    permanent, 2000, worker, [naming_handler]},
-  Ret = supervisor:start_child(Supervisor, [ETSHandler]),
-  case Ret of
-    {ok, Handler} ->
-      TableId = ets:new(naming_db, [set, public, named_table, {heir,self(), naming_db}]),
-      ets:give_away(TableId, Handler, naming_db);         %%TODO check if it works passing naming_db in place of Data
-    {ok, Handler, _} ->
-      TableId = ets:new(naming_db, [set, public, named_table, {heir,self(), naming_db}]),
-      ets:give_away(TableId, Handler, naming_db)         %%TODO check if it works passing naming_db in place of Data
-  end.

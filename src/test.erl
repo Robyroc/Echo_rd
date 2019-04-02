@@ -66,7 +66,7 @@ init([]) ->
   Shutdown = 2000,
 
   Son1 = {naming_supervisor, {naming_supervisor, start_link, []},
-    Restart, Shutdown, worker, [naming_supervisor]},
+    Restart, Shutdown, supervisor, [naming_supervisor]},
   Son2 = {link_s, {link_supervisor, start_link, []},
     Restart, Shutdown, supervisor, [link_supervisor]},
 
@@ -75,5 +75,8 @@ init([]) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+
+%TODO communication message, remove it
+% link_manager:send_message({6543, {192, 168, 43, 209}}, {no_alias, 17, []}).
 
 %TODO REMOVE ME PLZ

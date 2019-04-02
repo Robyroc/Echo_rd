@@ -84,12 +84,13 @@ handle_call({notify, Identity, PID}, _From, State) ->
   {reply, ok, State};
 
 handle_call({reheir, NewManager}, _From, State) ->
+  io:format("Naming Hanlder: Changing Heir options ~n"),
   ets:setopts(naming_db, {heir, NewManager, naming_db}),
-  {noreply, State};
+  {reply, ok, State};
 
 handle_call(Request, _From, State) ->
   io:format("Naming Handler: Unexpected call message: ~p~n", [Request]),
-  {noreply, State}.
+  {reply, ok, State}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -133,6 +134,7 @@ handle_info(Info, State) ->
 %% @end
 %%--------------------------------------------------------------------
 terminate(_Reason, _State) ->
+  io:format("Naming Handler is terminating"),
   ok.
 
 %%--------------------------------------------------------------------
