@@ -12,7 +12,7 @@
 -behaviour(gen_statem).
 
 %% API
--export([start_link/1, join/1]).
+-export([start_link/1, join/1, leave/0, look_response/1, info/4, abort/1, ack_join/0, ready_for_info/1, no_priority/1, leave_info/1, ack_info/1, ack_leave/0]).
 
 %% gen_statem callbacks
 -export([
@@ -33,6 +33,54 @@
 %%% API
 %%%===================================================================
 
+create() ->
+  gen_statem:call().
+
+join(Address) ->
+  PID = naming_handler:get_identity(join_handler),
+  gen_statem:call(PID, {join,Address}).
+
+leave() ->
+  PID = naming_handler:get_identity(join_handler),
+  gen_statem:call(PID, {leave}).
+
+look_response(Address) ->
+  PID = naming_handler:get_identity(join_handler),
+  gen_statem:cast(PID, {look_response,Address}).
+
+info(Address, Res, Succ, Nbits) ->
+  PID = naming_handler:get_identity(join_handler),
+  gen_statem:cast(PID, {info,Address, Res, Succ, Nbits}).
+
+abort(Reason) ->
+  PID = naming_handler:get_identity(join_handler),
+  gen_statem:cast(PID, {abort,Reason}).
+
+ack_join() ->
+  PID = naming_handler:get_identity(join_handler),
+  gen_statem:cast(PID, {ack_join}).
+
+ready_for_info(Address) ->
+  PID = naming_handler:get_identity(join_handler),
+  gen_statem:cast(PID, {ready_for_info,Address}).
+
+no_priority(Address) ->
+  PID = naming_handler:get_identity(join_handler),
+  gen_statem:cast(PID, {no_priority,Address}).
+
+leave_info(Address) ->
+  PID = naming_handler:get_identity(join_handler),
+  gen_statem:cast(PID, {leave_info,Address}).
+
+ack_info(Address) ->
+  PID = naming_handler:get_identity(join_handler),
+  gen_statem:cast(PID, {ack_info,Address}).
+
+ack_leave() ->
+  PID = naming_handler:get_identity(join_handler),
+  gen_statem:cast(PID, {ack_leave}).
+
+
 %%--------------------------------------------------------------------
 %% @doc
 %% Creates a gen_statem process which calls Module:init/1 to
@@ -45,18 +93,7 @@
 start_link(ProviderAddress) ->
   gen_statem:start_link({local, ?SERVER}, ?MODULE, [ProviderAddress], []).
 
-join(Address) ->
-  PID = naming_handler:get_identity(join_handler),
-  gen_statem:call(PID, {join,Address}).
 
-look_for_join() ->
-  gen_statem:call().
-
-abort() ->
-  gen_statem:call().
-
-lookup_resp() ->
-  gen_statem:call().
 
 %%%===================================================================
 %%% gen_statem callbacks
