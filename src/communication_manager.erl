@@ -6,6 +6,8 @@
 %% API
 -export([start_link/0, send_message/4, receive_message/1, check_params/2]).
 
+-export([encode_resource/2, decode_resource/2, encode_ID/2, decode_ID/2]).      %TODO remove me when done debugging
+
 %% gen_server callbacks
 -export([init/1,
   handle_call/3,
@@ -201,37 +203,53 @@ decode_params(Method, Params) ->
   ok.
 
 
+%test with communication_manager:decode_ID(communication_manager:encode_ID(17, 9), 9).
+
+encode_ID(ID, NBits) ->
+  NBytes = ceil(NBits / 8),
+  <<ID:(NBytes * 8)/integer>>.
+
+decode_ID(Bin, NBits) ->
+  ActualNBits = ceil(NBits / 8) * 8,
+  <<ID:ActualNBits/integer>> = Bin,
+  ID.
+
+% test with communication_manager:decode_resource(communication_manager:encode_resource([{3587, <<"dwin">>}, {321, <<"abcdefghijklmnopqrstuvwxyz">>}], 12), 12).
 %Resources are in the form of {ID, <<Bin>>}
 encode_resource(Resources, NBits) ->
   N = length(Resources),
+  Indexes = [X || {X, _} <- Resources],
+  EncodedIndexes = list_to_binary([encode_ID(X, NBits) || X <- Indexes]),
   Binaries = [X || {_, X} <- Resources],
-  Lengths = [byte_size(X) + NBits || X <- Binaries],      %NBits due to index
+  Lengths = [byte_size(X) || X <- Binaries],       %NBits due to index
   MaxDim = lists:foldl(fun(Elem, Acc) -> max(Elem, Acc) end, 0, Lengths),
   BitsForDim = ceil(math:log2(MaxDim)),
-  EncodedLengths = << <<X:BitsForDim>> || X <- Lengths>>,
-  EncodedResources = [<<I:NBits, Res/binary>> || {I, Res} <- Resources],
-  BinaryResource = list_to_binary(EncodedResources),
-  <<N:8, BitsForDim:8, EncodedLengths/binary, BinaryResource>>.
+  EncodedLengths = list_to_binary([encode_ID(X, ceil(math:log2(MaxDim))) || X <- Lengths]),
+  BinaryResource = list_to_binary(Binaries),
+  <<N:8, EncodedIndexes/binary, (ceil(BitsForDim / 8)):8, EncodedLengths/binary ,BinaryResource/binary>>.
 
 decode_resource(Bin, NBits) ->
-  <<N:8/integer, BitsForDim:8/integer, Rest/binary>> = Bin,
-  {Lengths, Resources} = extract_lengths(N, BitsForDim, Rest),
-  {RevResult, []} = lists:foldl(
+  <<N:8/integer, Rest/binary>> = Bin,
+  NBytes = ceil(NBits / 8),
+  {Indexes, Remaining} = extract_integer(N, NBytes, Rest),
+  <<BitsForDim:8/integer, LengthsAndBins/binary>> = Remaining,
+  {Lengths, Resources} = extract_integer(N, BitsForDim, LengthsAndBins),
+  {RevResult, <<>>} = lists:foldl(
     fun(Elem, Acc) ->
       {Result, RestBin} = Acc,
       <<First:Elem/binary, Tail/binary>> = RestBin,
       {[First | Result], Tail} end,
     {[], Resources}, Lengths),
   Result = lists:reverse(RevResult),
-  [{ID, Binary} || <<ID:NBits/integer, Binary/binary>> <- Result].
+  lists:zip(Indexes, Result).
 
-extract_lengths(N, BitsForDim, Rest) ->
-  {Result, Res} = extract_lengths(N, BitsForDim, Rest, []),
-  {lists:reverse(Result), Res}.
+extract_integer(N, Bytes, Rest) ->
+  extract_integer(N, Bytes, Rest, []).
 
-extract_lengths(0, _BitsForDim, Rest, Acc) ->
-  {Acc, Rest};
+extract_integer(0, _Bytes, Rest, Acc) ->
+  {lists:reverse(Acc), Rest};
 
-extract_lengths(N, BitsForDim, Rest, Acc) ->
-  <<Length:BitsForDim/integer, NewRest/binary>> = Rest,
-  extract_lengths(N-1, BitsForDim, NewRest, [Length | Acc]).
+extract_integer(N, Bytes, Rest, Acc) ->
+  Bits = Bytes * 8,
+  <<Length:Bits/integer, NewRest/binary>> = Rest,
+  extract_integer(N-1, Bytes, NewRest, [Length | Acc]).
