@@ -4,7 +4,15 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, incoming_connection/1, get_own_address/0, notify_incoming_message/1, send_message/2, compact_address/1, move_socket/1]).
+-export([start_link/0,
+  incoming_connection/1,
+  get_own_address/0,
+  notify_incoming_message/1,
+  send_message/2,
+  compact_address/1,
+  move_socket/1,
+  address_to_binary/1,
+  binary_to_address/1]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -48,6 +56,14 @@ compact_address(Address) ->
   {Port, {IPA, IPB, IPC, IPD}} = Address,
   lists:flatten([integer_to_list(IPA), ".", integer_to_list(IPB), ".", integer_to_list(IPC), ".",
     integer_to_list(IPD), ":", integer_to_list(Port)]).
+
+address_to_binary(Address) ->
+  {Port, {IPA, IPB, IPC, IPD}} = Address,
+  <<Port:16, IPA:8, IPB:8, IPC:8, IPD:8>>.
+
+binary_to_address(Bin) ->
+  <<Port:16/integer, IpA:8/integer, IpB:8/integer, IpC:8/integer, IpD:8/integer>> = Bin,
+  {Port, {IpA, IpB, IpC, IpD}}.
 
 get_own_address() ->
   local_address().
@@ -125,7 +141,8 @@ handle_call(Request, _From, State) ->
 handle_cast({received, Message}, State) ->
   io:format("~p~n", [Message]),
   %TODO remove above io:format
-  communication_manager:receive_message(Message),
+  %communication_manager:receive_message(Message),
+  %TODO uncomment the above line when not working with test.erl
   {noreply, State};
 
 handle_cast({new_connection, Socket}, State) ->

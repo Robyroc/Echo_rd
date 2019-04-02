@@ -120,7 +120,7 @@ handle_cast({lookup, Alias, Requested}, State) ->
   Next = check_if_next(Requested, State#state.id, SuccID, State#state.nbits),
   case Next of
     next ->
-      communication_manager:send_message(lookup_response, [Succ], Alias, no_alias),
+      communication_manager:send_message(lookup_response, [Requested, Succ], Alias, no_alias),
       {noreply, State};
     _ ->
       {_, _, Destination} = hd(lookup(Requested, State#state.id, State#state.finger_table, State#state.nbits)),

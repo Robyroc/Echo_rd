@@ -4,7 +4,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, send_message/4, receive_message/1, create/1, check_params/2]).
+-export([start_link/0, send_message/4, receive_message/1, check_params/2]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -16,7 +16,7 @@
 
 -define(SERVER, ?MODULE).
 
--record(state, {}).
+-record(state, {nbits}).
 
 %%%===================================================================
 %%% API
@@ -44,11 +44,6 @@ receive_message({Method, Address, Params}) ->
   PID = naming_handler:get_identity(communication_manager),
   gen_server:call(PID, {rcv_msg, Method, Address, Params}).
 
-%TODO check if create and join have to be here
-create(NBits) ->
-  ok.
-join(Address) -> ok.
-
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -67,10 +62,11 @@ join(Address) -> ok.
 %%--------------------------------------------------------------------
 
 
-init([]) ->
-  %naming_handler:wait_service(),           %TODO check if the CM has to wait for some service
+init([NBits]) ->
+  naming_handler:wait_service(params_handler),
+  params_handler:get_param(nbits),
   naming_handler:notify_identity(self(), communication_manager),
-  {ok, #state{}}.
+  {ok, #state{nbits = NBits}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -82,12 +78,12 @@ init([]) ->
 
 handle_call({send_msg, Method, Params, Address, Alias}, _From, State) ->
   case check_params(Method,Params) of
-    ok ->  {reply,{translate(Method), Address, [list_to_binary(Params)], Alias},State};
+    ok ->  {reply,{translate(Method), Address, encode_params(Method, Params), Alias},State};
     _ -> {stop, fail, State}
   end;
 
 handle_call({rcv_msg, Method, Address, Params}, _From, State) ->
-  {reply,{back_translate(Method), Address, binary_to_list(list_to_binary(Params))},State};
+  {reply,{back_translate(Method), Address, decode_params(back_translate(Method), Params)},State};
 
 handle_call(Request, _From, State) ->
   io:format("CM: Unexpected call message: ~p~n", [Request]),
@@ -152,20 +148,90 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 
 
-translate(join) -> 1;
-translate(lookup) -> 2;
-translate(lookup_response) -> 3;
-translate(leave) -> 4;
-translate(_) -> method_not_exists.
+translate(lookup_for_join) -> 1;
+translate(lookup_response) -> 2;
+translate(request_for_info) -> 3;
+translate(join_info) -> 4;
+translate(ack_info) -> 5;
+translate(abort) -> 6;
+translate(ack_join) -> 7;
+translate(leave_info) -> 8;
+translate(leave_ack) -> 9;
+translate(ask_pred) -> 10;
+translate(pred_reply) -> 11;
+translate(lookup) -> 12;
+translate(command) -> 13;
+translate(_) -> badarg.
 
-back_translate(1) -> join;
-back_translate(2) -> lookup;
-back_translate(3) -> lookup_response;
-back_translate(4) -> leave;
-back_translate(_) -> error_method_code.
+back_translate(1) -> lookup_for_join;
+back_translate(2) -> lookup_response;
+back_translate(3) -> request_for_info;
+back_translate(4) -> join_info;
+back_translate(5) -> ack_info;
+back_translate(6) -> abort;
+back_translate(7) -> ack_join;
+back_translate(8) -> leave_info;
+back_translate(9) -> leave_ack;
+back_translate(10) -> ask_pred;
+back_translate(11) -> pred_reply;
+back_translate(12) -> lookup;
+back_translate(13) -> command;
+back_translate(_) -> badarg.
 
-check_params(join, Params) when length(Params) =:= 1 -> ok;
+check_params(lookup_for_join, Params) when length(Params) =:= 1 -> ok;
+check_params(lookup_response, Params) when length(Params) =:= 2 -> ok;
+check_params(request_for_info, []) -> ok;
+check_params(join_info, Params) when length(Params) =:= 0 -> ok;    %TODO check this
+check_params(ack_info, []) -> ok;
+check_params(abort, Params) when length(Params) =:= 1 -> ok;
+check_params(ack_join, []) -> ok;
+check_params(leave_info, Params) when length(Params) =:= 1 -> ok;   %TODO check this
+check_params(leave_ack, []) -> ok;
+check_params(ask_pred, []) -> ok;
+check_params(pred_reply, Params) when length(Params) =:= 1 -> ok;   %TODO check this
 check_params(lookup, Params) when length(Params) =:= 1 -> ok;
-check_params(lookup_response, Params) when length(Params) =:= 1 -> ok;
-check_params(leave, Params) when length(Params) =:= 0 -> ok;
-check_params(_, _) -> unexpected_params.
+check_params(command, Params) when length(Params) =:= 1 -> ok;
+check_params(_, _) -> badarg.
+
+
+encode_params(Method, Params) ->
+  ok.
+
+decode_params(Method, Params) ->
+  ok.
+
+
+%Resources are in the form of {ID, <<Bin>>}
+encode_resource(Resources, NBits) ->
+  N = length(Resources),
+  Binaries = [X || {_, X} <- Resources],
+  Lengths = [byte_size(X) + NBits || X <- Binaries],      %NBits due to index
+  MaxDim = lists:foldl(fun(Elem, Acc) -> max(Elem, Acc) end, 0, Lengths),
+  BitsForDim = ceil(math:log2(MaxDim)),
+  EncodedLengths = << <<X:BitsForDim>> || X <- Lengths>>,
+  EncodedResources = [<<I:NBits, Res/binary>> || {I, Res} <- Resources],
+  BinaryResource = list_to_binary(EncodedResources),
+  <<N:8, BitsForDim:8, EncodedLengths/binary, BinaryResource>>.
+
+decode_resource(Bin, NBits) ->
+  <<N:8/integer, BitsForDim:8/integer, Rest/binary>> = Bin,
+  {Lengths, Resources} = extract_lengths(N, BitsForDim, Rest),
+  {RevResult, []} = lists:foldl(
+    fun(Elem, Acc) ->
+      {Result, RestBin} = Acc,
+      <<First:Elem/binary, Tail/binary>> = RestBin,
+      {[First | Result], Tail} end,
+    {[], Resources}, Lengths),
+  Result = lists:reverse(RevResult),
+  [{ID, Binary} || <<ID:NBits/integer, Binary/binary>> <- Result].
+
+extract_lengths(N, BitsForDim, Rest) ->
+  {Result, Res} = extract_lengths(N, BitsForDim, Rest, []),
+  {lists:reverse(Result), Res}.
+
+extract_lengths(0, _BitsForDim, Rest, Acc) ->
+  {Acc, Rest};
+
+extract_lengths(N, BitsForDim, Rest, Acc) ->
+  <<Length:BitsForDim/integer, NewRest/binary>> = Rest,
+  extract_lengths(N-1, BitsForDim, NewRest, [Length | Acc]).
