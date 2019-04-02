@@ -67,24 +67,27 @@ Truth-Table of the CM's state machine
 | ID | Curr_State    | Action      | Re-Action                 | New_State     | 
 |----|---------------|-------------|---------------------------|---------------| 
 | a  | init_joiner   | join        | look_for_join             | look          | 
-| b  | init_joiner   | create      | ack_creation              | init_provider | 
+| b  | init_joiner   | create      |               | init_provider | 
 | c  | look          | look_resp   | ready_for_info            | pre_join      | 
 | c1 | look          | timeout     | hard_abort                | init_joiner   | 
 | d  | pre_join      | info        | ack_info                  | j_ready       | 
 | e  | pre_join      | abort       | look_for_join             | pre_join      | 
 | e1 | pre_join      | timeout     | hard_abort                | init_joiner   | 
 | f  | j_ready       | ack_join    | start                     | init_provider | 
-| g  | j_ready       | abort       | look_for_join             | look          | 
-| g1 | j_ready       | timeout     | hard_abort                | init_joiner   | 
-| h  | init_provider | join        | info                      | not_alone     | 
+| g  | j_ready       | abort                 | look_for_join             | look          | 
+| g1 | j_ready       | timeout               | hard_abort                | init_joiner   | 
+| h  | init_provider | ready_for_info        | info                      | not_alone     | 
 | i  | init_provider | no_priority | abort                     | init_provider | 
-| j  | init_provider | leave_info  | ack                       | init_provider | 
-| k  | init_provider | leave       | h_leave                   | init_joiner   | 
+| j  | init_provider | leave_info  | ack_leave                       | init_provider | 
+| k  | init_provider | leave       | leave_info                   | leaving   | 
 | i  | not_alone     | no_priority | abort                     | not_alone     | 
 | l  | not_alone     | priority    | abort(curr), info(joiner) | not_alone     | 
-| m  | not_alone     | ack         | ack_drop                  | init_provider | 
-| n  | not_alone     | leave       | {ack, h_leave}            | init_joiner   | 
+| m  | not_alone     | ack_info    | ack_join, drop                  | init_provider | 
+| n  | not_alone     | leave       | abort(curr), leave_info         | leaving   | 
 | n1 | not_alone     | timeout     | hard_abort                | init_joiner   | 
+| o  | not_alone     | leave_info  | abort(curr), ack_leave    | init_provider |
+| p  | leaving       | leave_ack   | drop, kill(router)    | init_joiner |
+| p1 | leaving       | timeout  | hard_abort    | init_joiner |
 
 Where:
 - The **ID** field column the id of the event
