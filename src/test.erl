@@ -65,8 +65,8 @@ init([]) ->
   Restart = permanent,
   Shutdown = 2000,
 
-  Son1 = {naming_service, {naming_service, start_link, []},
-    Restart, Shutdown, worker, [naming_service]},
+  Son1 = {naming_supervisor, {naming_supervisor, start_link, []},
+    Restart, Shutdown, worker, [naming_supervisor]},
   Son2 = {link_s, {link_supervisor, start_link, []},
     Restart, Shutdown, supervisor, [link_supervisor]},
 

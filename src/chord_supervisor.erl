@@ -39,6 +39,8 @@ start_link() ->
 %% @end
 %%--------------------------------------------------------------------
 init([]) ->
+  naming_manager:wait_for_handler(),
+
   RestartStrategy = rest_for_one,
   MaxRestarts = 1000,
   MaxSecondsBetweenRestarts = 3600,
@@ -50,7 +52,7 @@ init([]) ->
 
   Son1 = {application_manager, {application_manager, start_link, []},
     Restart, Shutdown, worker, [application_manager]},
-  Son2 = {join_handler, {join_handler, start_link, []},
+  Son2 = {join_handler, {join_handler, start_link, [self()]},     %%TODO check params of start link in join_handler
     Restart, Shutdown, worker, [join_handler]},
   Son3 = {communication_supervisor, {communication_supervisor, start_link, []},
     Restart, Shutdown, supervisor, [communication_supervisor]},

@@ -48,11 +48,11 @@ init([Predecessor, NBits]) ->
   Restart = permanent,
   Shutdown = 2000,
 
-  Son1 = {hash_f, {hash_f, start_link, [Predecessor, NBits]},
+  Son1 = {hash_f, {hash_f, start_link, [NBits]},
     Restart, Shutdown, worker, [hash_f]},
   Son2 = {f_table_supervisor, {f_table_supervisor, start_link, [NBits]},
     Restart, Shutdown, supervisor, [f_table_supervisor]},
-  Son3 = {checker, {checker, start_link, []},
+  Son3 = {checker, {checker, start_link, [Predecessor, NBits]},
     Restart, Shutdown, worker, [checker]},
 
   {ok, {SupFlags, [Son1, Son2, Son3]}}.
