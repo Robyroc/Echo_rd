@@ -1,10 +1,10 @@
--module(params_handler).
--author("robyroc").
+-module(killer).
+-author("Giacomo").
 
 -behaviour(gen_server).
 
 %% API
--export([start_link/4, get_param/1]).
+-export([start_link/0]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -16,7 +16,7 @@
 
 -define(SERVER, ?MODULE).
 
--record(state, {successor, succ_list, nbits, predecessor}).
+-record(state, {}).
 
 %%%===================================================================
 %%% API
@@ -28,12 +28,8 @@
 %%
 %% @end
 %%--------------------------------------------------------------------
-start_link(Successor, SuccessorList, Predecessor, NBits) ->
-  gen_server:start_link({local, ?SERVER}, ?MODULE, [Successor, SuccessorList, Predecessor, NBits], []).
-
-get_param(Param) ->
-  PID = naming_handler:get_identity(params_handler),
-  gen_server:call(PID, {get_param, Param}).
+start_link() ->
+  gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -50,9 +46,11 @@ get_param(Param) ->
 %%                     {stop, Reason}
 %% @end
 %%--------------------------------------------------------------------
-init([Successor, SuccessorList, Predecessor, NBits]) ->
-  naming_handler:notify_identity(self(), params_handler),
-  {ok, #state{successor = Successor, succ_list = SuccessorList, predecessor = Predecessor, nbits = NBits}}.
+init([]) ->
+  process_flag(trap_exit, true),
+  Stabilizer = naming_handler:get_identity(stabilizer),
+  link(Stabilizer),
+  {ok, #state{}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -61,24 +59,8 @@ init([Successor, SuccessorList, Predecessor, NBits]) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
-handle_call({get_param, successor}, _From, State) ->
-  {reply, State#state.successor, State};
-
-handle_call({get_param, succ_list}, _From, State) ->
-  {reply, State#state.succ_list, State};
-
-handle_call({get_param, predecessor}, _From, State) ->
-  {reply, State#state.predecessor, State};
-
-handle_call({get_param, nbits}, _From, State) ->
-  {reply, State#state.nbits, State};
-
-handle_call({get_param, Invalid}, _From, State) ->
-  io:format("PARAMS HANDLER: Invalid Parameter has been requested: ~p~n", [Invalid]),
-  {reply, ok, State};
-
 handle_call(Request, _From, State) ->
-  io:format("PARAMS HANDLER: Unexpected call message: ~p~n", [Request]),
+  io:format("KILLER: Unexpected call message: ~p~n", [Request]),
   {reply, ok, State}.
 
 %%--------------------------------------------------------------------
@@ -89,7 +71,7 @@ handle_call(Request, _From, State) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_cast(Request, State) ->
-  io:format("PARAMS HANDLER: Unexpected cast message: ~p~n", [Request]),
+  io:format("KILLER: Unexpected cast message: ~p~n", [Request]),
   {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -102,8 +84,14 @@ handle_cast(Request, State) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
+handle_info({'EXIT', _Pid, killed}, State) ->
+  io:format("KILLER: Stabilizer crashed, restarting all processes.. ~n"),
+  Supervisor = whereis(naming_supervisor),
+  exit(Supervisor, kill),
+  {noreply, State};
+
 handle_info(Info, State) ->
-  io:format("PARAMS HANDLER: Unexpected ! message: ~p~n", [Info]),
+  io:format("KILLER: Unexpected ! message: ~p~n", [Info]),
   {noreply, State}.
 
 %%--------------------------------------------------------------------
