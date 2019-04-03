@@ -4,7 +4,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/3, get_successor/0, get_successor_list/0, notify_successor/1]).
+-export([start_link/3, get_successor/0, get_successor_list/0, notify_successor/2]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -40,9 +40,9 @@ get_successor_list() ->
   PID = naming_handler:get_identity(stabilizer),
   gen_server:call(PID, {get_succ_list}).
 
-notify_successor(SuccessorList) ->
+notify_successor(Successor, SuccessorList) ->
   PID = naming_handler:get_identity(stabilizer),
-  gen_server:cast(PID, {stabilize_response, SuccessorList}).
+  gen_server:cast(PID, {stabilize_response, Successor, SuccessorList}).
 
 %%%===================================================================
 %%% gen_server callbacks

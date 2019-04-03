@@ -12,7 +12,7 @@
 -behaviour(gen_statem).
 
 %% API
--export([start_link/1, join/1, leave/0, look_response/1, info/4, abort/1, ack_join/0, ready_for_info/1, no_priority/1, leave_info/1, ack_info/1, ack_leave/0]).
+-export([start_link/1, join/1, leave/0, look_response/1, info/4, abort/1, ack_join/1, ready_for_info/1, no_priority/1, leave_info/2, ack_info/1, ack_leave/1]).
 
 %% gen_statem callbacks
 -export([
@@ -56,9 +56,9 @@ abort(Reason) ->
   PID = naming_handler:get_identity(join_handler),
   gen_statem:cast(PID, {abort,Reason}).
 
-ack_join() ->
+ack_join(Address) ->
   PID = naming_handler:get_identity(join_handler),
-  gen_statem:cast(PID, {ack_join}).
+  gen_statem:cast(PID, {ack_join, Address}).
 
 ready_for_info(Address) ->
   PID = naming_handler:get_identity(join_handler),
@@ -68,17 +68,17 @@ no_priority(Address) ->
   PID = naming_handler:get_identity(join_handler),
   gen_statem:cast(PID, {no_priority,Address}).
 
-leave_info(Address) ->
+leave_info(Resources, Address) ->
   PID = naming_handler:get_identity(join_handler),
-  gen_statem:cast(PID, {leave_info,Address}).
+  gen_statem:cast(PID, {leave_info,Resources, Address}).
 
 ack_info(Address) ->
   PID = naming_handler:get_identity(join_handler),
   gen_statem:cast(PID, {ack_info,Address}).
 
-ack_leave() ->
+ack_leave(Address) ->
   PID = naming_handler:get_identity(join_handler),
-  gen_statem:cast(PID, {ack_leave}).
+  gen_statem:cast(PID, {ack_leave, Address}).
 
 
 %%--------------------------------------------------------------------

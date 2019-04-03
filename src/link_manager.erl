@@ -12,7 +12,8 @@
   compact_address/1,
   move_socket/1,
   address_to_binary/1,
-  binary_to_address/1]).
+  binary_to_address/1,
+  binary_address_size/0]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -64,6 +65,9 @@ address_to_binary(Address) ->
 binary_to_address(Bin) ->
   <<Port:16/integer, IpA:8/integer, IpB:8/integer, IpC:8/integer, IpD:8/integer>> = Bin,
   {Port, {IpA, IpB, IpC, IpD}}.
+
+binary_address_size() ->
+  byte_size(address_to_binary({6543, {127, 0, 0, 1}})).
 
 get_own_address() ->
   local_address().
