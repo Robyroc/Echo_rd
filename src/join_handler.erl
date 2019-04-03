@@ -12,7 +12,20 @@
 -behaviour(gen_statem).
 
 %% API
--export([start_link/1, join/1, leave/0, look_response/1, info/4, abort/1, ack_join/1, ready_for_info/1, no_priority/1, leave_info/2, ack_info/1, ack_leave/1]).
+-export([
+  start_link/1,
+  join/1,
+  leave/0,
+  look_response/0,
+  info/4,
+  abort/1,
+  ack_join/1,
+  ready_for_info/1,
+  no_priority/1,
+  leave_info/2,
+  ack_info/1,
+  ack_leave/1,
+  create/0]).
 
 %% gen_statem callbacks
 -export([
@@ -25,16 +38,23 @@
   callback_mode/0
 ]).
 
--define(SERVER, ?MODULE).
+%% state-callback
+-export([
+  init_joiner/3,
+  look/3]).
 
--record(state, {address, id}).
+-define(SERVER, ?MODULE).
+-define(INTERVAL, 10000).
+
+-record(session, {address, id}).
 
 %%%===================================================================
 %%% API
 %%%===================================================================
 
 create() ->
-  gen_statem:call().
+  PID = naming_handler:get_identity(join_handler),
+  gen_statem:call(PID, {create}).
 
 join(Address) ->
   PID = naming_handler:get_identity(join_handler),
@@ -44,9 +64,9 @@ leave() ->
   PID = naming_handler:get_identity(join_handler),
   gen_statem:call(PID, {leave}).
 
-look_response(Address) ->
+look_response() ->
   PID = naming_handler:get_identity(join_handler),
-  gen_statem:cast(PID, {look_response,Address}).
+  gen_statem:cast(PID, {look_resp}).
 
 info(Address, Res, Succ, Nbits) ->
   PID = naming_handler:get_identity(join_handler),
@@ -112,9 +132,10 @@ start_link(ProviderAddress) ->
 %%                     {stop, StopReason}
 %% @end
 %%--------------------------------------------------------------------
-init([ProvideAddress]) ->
+init([ProviderAddress]) ->
   naming_handler:notify_identity(self(), join_handler),
-  {ok, joiner_init, #state{address = ProvideAddress, id = not_used}}.
+  ok = handle(init_statem),                                    %TODO it is for testing, eliminate it
+  {ok, init_joiner, #session{address = ProviderAddress, id = not_used}, []}.     %TODO check the 5th parameter
 
 
 %%--------------------------------------------------------------------
@@ -127,8 +148,8 @@ init([ProvideAddress]) ->
 %% @end
 %%--------------------------------------------------------------------
 callback_mode() ->
-  %state_functions.
-  handle_event_function.       %TODO decide callback_mode
+  state_functions.
+  %handle_event_function.       %TODO decide callback_mode
 
 %%--------------------------------------------------------------------
 %% @private
@@ -170,6 +191,34 @@ format_status(_Opt, [_PDict, _StateName, _State]) ->
 state_name(_EventType, _EventContent, State) ->
   NextStateName = next_state,
   {next_state, NextStateName, State}.
+
+init_joiner({call, From}, join, _State) ->
+  Reply = {reply, From, ok},
+  ok = handle(init_joiner),                                    %TODO it is for testing, eliminate it
+  {next_state, look, _State, [Reply]};
+init_joiner({call, From}, create, _State) ->
+  Reply = {reply, From, ok},
+  ok = handle(init_joiner),                                    %TODO it is for testing, eliminate it
+  {next_state, look, _State, [Reply]};
+init_joiner(EventType, EventContent, #session{}=State) ->
+  handle_generic_event({EventType, EventContent, State});
+%TODO this init joiner is only for test, because cast is NEVER done. After checking delete the following init_joiner
+init_joiner(cast, look_resp, #session{}=State) ->
+  io:format("ascacsajcnasjn~n",[]),
+  ok = handle(look),                                    %TODO it is for testing, eliminate it
+  {next_stat, pre_join, State, [{state_timeout, ?INTERVAL, hard_stop}]}.
+
+look(cast, look_resp, _State) ->
+  ok = handle(look),                                    %TODO it is for testing, eliminate it
+  {next_stat, pre_join, _State, [{state_timeout, ?INTERVAL, hard_stop}]};
+look(state_timeout, hard_stop, _State) ->
+  ok = handle(look),                                    %TODO it is for testing, eliminate it
+  {stop, waiting_timed_out, _State};
+look(EventType, EventContent, #session{}=State) ->
+  ok = handle(look),                                    %TODO it is for testing, eliminate it
+  handle_generic_event({EventType, EventContent, State}).
+
+
 
 %%--------------------------------------------------------------------
 %% @private
@@ -227,3 +276,17 @@ code_change(_OldVsn, StateName, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+
+
+handle(init_statem) ->
+  io:format(user, "*** Start statem~n", []),
+  ok;
+handle(look) ->
+  io:format(user, "*** State look~n", []),
+  ok;
+handle(init_joier) ->
+  io:format(user, "*** State initJoiner~n", []),
+  ok.
+
+handle_generic_event({_, _, Session}) ->
+  {keep_state, Session}.
