@@ -16,7 +16,7 @@
   start_link/1,
   join/1,
   leave/0,
-  look_response/0,
+  look_response/1,
   info/4,
   abort/1,
   ack_join/1,
@@ -64,9 +64,9 @@ leave() ->
   PID = naming_handler:get_identity(join_handler),
   gen_statem:call(PID, {leave}).
 
-look_response() ->
+look_response(Address) ->
   PID = naming_handler:get_identity(join_handler),
-  gen_statem:cast(PID, {look_resp}).
+  gen_statem:cast(PID, {look_resp, Address}).
 
 info(Address, Res, Succ, Nbits) ->
   PID = naming_handler:get_identity(join_handler),
@@ -192,28 +192,33 @@ state_name(_EventType, _EventContent, State) ->
   NextStateName = next_state,
   {next_state, NextStateName, State}.
 
-init_joiner({call, From}, join, _State) ->
+init_joiner({call, From}, {join, Address}, _State) ->
   Reply = {reply, From, ok},
   ok = handle(init_joiner),                                    %TODO it is for testing, eliminate it
   {next_state, look, _State, [Reply]};
+
 init_joiner({call, From}, create, _State) ->
   Reply = {reply, From, ok},
   ok = handle(init_joiner),                                    %TODO it is for testing, eliminate it
   {next_state, look, _State, [Reply]};
-init_joiner(EventType, EventContent, #session{}=State) ->
-  handle_generic_event({EventType, EventContent, State});
-%TODO this init joiner is only for test, because cast is NEVER done. After checking delete the following init_joiner
-init_joiner(cast, look_resp, #session{}=State) ->
-  io:format("ascacsajcnasjn~n",[]),
+
+init_joiner(cast, {look_resp, Address}, #session{}=State) ->
+  io:format("The address is: ~p~n",[Address]),
   ok = handle(look),                                    %TODO it is for testing, eliminate it
-  {next_stat, pre_join, State, [{state_timeout, ?INTERVAL, hard_stop}]}.
+  {next_state, look, State, [{state_timeout, ?INTERVAL, hard_stop}]};
+
+init_joiner(EventType, EventContent, #session{}=State) ->
+  handle_generic_event({EventType, EventContent, State}).
+%TODO this init joiner is only for test, because cast is NEVER done. After checking delete the following init_joiner
 
 look(cast, look_resp, _State) ->
   ok = handle(look),                                    %TODO it is for testing, eliminate it
-  {next_stat, pre_join, _State, [{state_timeout, ?INTERVAL, hard_stop}]};
+  {next_state, pre_join, _State, [{state_timeout, ?INTERVAL, hard_stop}]};
+
 look(state_timeout, hard_stop, _State) ->
   ok = handle(look),                                    %TODO it is for testing, eliminate it
   {stop, waiting_timed_out, _State};
+
 look(EventType, EventContent, #session{}=State) ->
   ok = handle(look),                                    %TODO it is for testing, eliminate it
   handle_generic_event({EventType, EventContent, State}).
@@ -284,7 +289,7 @@ handle(init_statem) ->
 handle(look) ->
   io:format(user, "*** State look~n", []),
   ok;
-handle(init_joier) ->
+handle(init_joiner) ->
   io:format(user, "*** State initJoiner~n", []),
   ok.
 
