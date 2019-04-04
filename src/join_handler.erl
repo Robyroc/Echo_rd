@@ -183,28 +183,35 @@ format_status(_Opt, [_PDict, _StateName, _State]) ->
 %%                   {keep_state_and_data, Actions}
 %% @end
 %%--------------------------------------------------------------------
-%TODO handle() is for testing, it has to be eliminated
+%TODO all the handle() is for testing, it has to be eliminated
+%TODO add respnse to AM in case of timeout {reply, From in session, fail}
 init_joiner({call, From}, {join, Address}, Session) ->
-  Reply = {reply, From, ok},
+  Reply = noreply,
+  %%save From in Session
+  %%save address (request's address)
   ok = handle(init_joiner),
+  communication_manager:send_message(lookup_for_join, [], Address, no_alias),
   {next_state, look, Session, [Reply]};
 
 init_joiner({call, From}, create, Session) ->
   Reply = {reply, From, ok},
   ok = handle(init_joiner),
-  {next_state, look, Session, [Reply]};
+  %TODO start
+  {next_state, init_provider, Session, [Reply]};
 
 init_joiner(EventType, EventContent, Session) ->
   handle_generic_event({EventType, EventContent, Session}).
 
 
-look(cast, look_resp, Session) ->
+look(cast, {look_resp,Address}, Session) ->
   ok = handle(look),
+  %Addres of successor in session
+  communication_manager:send_message(ready_for_info, [], Address, no_alias),
   {next_state, pre_join, Session, [{state_timeout, ?INTERVAL, hard_stop}]};
 
 look(state_timeout, hard_stop, Session) ->
   ok = handle(look),
-  {stop, waiting_timed_out, Session};
+  {next_state, init_joiner, Session};
 
 look(EventType, EventContent, Session) ->
   ok = handle(look),
@@ -213,15 +220,21 @@ look(EventType, EventContent, Session) ->
 
 pre_join(cast, {info,Address, Res, Succ, Nbits}, Session) ->
   ok = handle(pre_join),
+  %check if Address in Session = Address, otherwise keepState
+  %TODO save in Session Res, Succ, Nbits
+  communication_manager:send_message(ack_info, [], Address, no_alias),
   {next_state, j_ready, Session, [{state_timeout, ?INTERVAL, hard_stop}]};
 
 pre_join(cast, {abort, Reason}, Session) ->
   ok = handle(pre_join),
+  io:format("Reason of abort: ~p~n", [Reason]),
+  %address for l4j = Address in session of the initial request
+  communication_manager:send_message(lookup_for_join, [], request_address, no_alias),
   {next_state, look, Session, [{state_timeout, ?INTERVAL, hard_stop}]};
 
 pre_join(state_timeout, hard_stop, Session) ->
   ok = handle(pre_join),
-  {stop, waiting_timed_out, Session};
+  {next_state, init_joiner, Session};
 
 pre_join(EventType, EventContent, Session) ->
   ok = handle(pre_join),
@@ -230,15 +243,18 @@ pre_join(EventType, EventContent, Session) ->
 
 j_ready(cast, {ack_join, Address}, Session) ->
   ok = handle(j_ready),
+  %TODO manage send the start message
   {next_state, init_provider, Session, [{state_timeout, ?INTERVAL, hard_stop}]};
 
 j_ready(cast, {abort, Reason}, Session) ->
   ok = handle(j_ready),
+  %TODO manage Reason (see above)
+  communication_manager:send_message(lookup_for_join, [], _Address, no_alias),
   {next_state, pre_join, Session, [{state_timeout, ?INTERVAL, hard_stop}]};
 
 j_ready(state_timeout, hard_stop, Session) ->
   ok = handle(j_ready),
-  {stop, waiting_timed_out, Session};
+  {next_state, init_joiner, Session};
 
 j_ready(EventType, EventContent, Session) ->
   ok = handle(j_ready),
@@ -251,17 +267,25 @@ init_provider(cast, {ready_for_info, Address}, Session) ->
   JoinerID = hash_f:get_hashed_addr(Address),
   case JoinerID of
     _ when JoinerID =< PredecessorID ->
+      communication_manager:send_message(abort, ["Not updated"],Address, no_alias),
       {keep_state, Session};
     _ when JoinerID > PredecessorID ->
+      DataInfo={res,stabilizer:get_successor_list(),params_handler:get_param(nbits)},   %%TODO Res from AM
+      communication_manager:send_message(join_info,DataInfo,Address,no_alias),
+      %save currID, currAddress in session
       {next_state, not_alone, Session}
   end;
 
 init_provider(cast, {leave_info,Resources, Address}, Session) ->
   ok = handle(init_provider),
+  %TODO send Resources to the AM
+  communication_manager:send_message(leave_ack,[],Address,no_alias),
   {keep_state, Session};
 
 init_provider(cast, leave, Session) ->
   ok = handle(init_provider),
+  %TODO receive resources from AM
+  communication_manager:send_message(leave_info,resource,address_succ,no_alias),
   {next_state, leaving, Session};
 
 init_provider(EventType, EventContent, Session) ->
@@ -271,30 +295,45 @@ init_provider(EventType, EventContent, Session) ->
 
 not_alone(cast, {ready_for_info, Address}, Session) ->
   ok = handle(not_alone),
+  %CURR ID from session
   CurrID = Session#session.id,
   JoinerID = hash_f:get_hashed_addr(Address),
   case JoinerID of
     _ when JoinerID =< CurrID ->
-      {keep_state, Session};
+      communication_manager:send_message(abort, ["No priority"],Address, no_alias),
+      {keep_state, Session, [{state_timeout, ?INTERVAL, hard_stop}]};
     _ when JoinerID > CurrID ->
+      communication_manager:send_message(abort, ["Loss priority"],curr_address, no_alias),
+      DataInfo={res,succ,nbits},
+      communication_manager:send_message(join_info,DataInfo,Address,no_alias),
       {keep_state, Session, [{state_timeout, ?INTERVAL, hard_stop}]}
   end;
 
+%TODO all the leave must be call
 not_alone(cast, leave, Session) ->
   ok = handle(not_alone),
+  communication_manager:send_message(abort, ["Successor is leaving"],address_curr, no_alias),
+  communication_manager:send_message(leave_info,resource,stabilizer:get_successor(),no_alias),
   {next_state, leaving, Session, [{state_timeout, ?INTERVAL, hard_stop}]};
 
 not_alone(cast, {ack_info,Address}, Session) ->
   ok = handle(not_alone),
+  communication_manager:send_message(ack_join,[],Address,no_alias),
+  %TODO manage drop to the AM
   {next_state, init_provider, Session, [{state_timeout, ?INTERVAL, hard_stop}]};
 
 not_alone(cast, {leave_info,Resources, Address}, Session) ->
   ok = handle(not_alone),
+  %%abort(curr), ack_leave
+  %chech if ADDRRESS = checker:get pred
+  communication_manager:send_message(abort,["REASON"],address_curr,no_alias),
+  %TODO send resources to the AM (when ok -> leave_ack)
+  communication_manager:send_message(leave_ack,[],Address,no_alias),
   {next_state, init_provider, Session, [{state_timeout, ?INTERVAL, hard_stop}]};
 
 not_alone(state_timeout, hard_stop, Session) ->
   ok = handle(not_alone),
-  {stop, waiting_timed_out, Session};
+  {next_state, init_provider, Session};
 
 not_alone(EventType, EventContent, Session) ->
   ok = handle(not_alone),
@@ -303,11 +342,12 @@ not_alone(EventType, EventContent, Session) ->
 
 leaving(cast, {ack_leave, Address}, Session) ->
   ok = handle(leaving),
+  %%TODO if Address = succ_address, then send drop to the AM and kill(self())
   {next_state, init_joiner, Session, [{state_timeout, ?INTERVAL_LEAVING, hard_stop}]};
 
 leaving(state_timeout, hard_stop, Session) ->
   ok = handle(leaving),
-  {stop, waiting_timed_out, Session};
+  {next_state, init_joiner, Session};
 
 leaving(EventType, EventContent, Session) ->
   ok = handle(leaving),
@@ -397,3 +437,7 @@ handle(leaving) ->
 
 handle_generic_event({_, _, Session}) ->
   {keep_state, Session}.
+
+
+start() ->      %TODO send params to params_handler and res to AM and wait for hash_f
+  ok.
