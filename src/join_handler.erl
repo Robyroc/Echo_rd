@@ -21,7 +21,6 @@
   abort/1,
   ack_join/1,
   ready_for_info/1,
-  no_priority/1,
   leave_info/2,
   ack_info/1,
   ack_leave/1,
@@ -31,7 +30,6 @@
 -export([
   init/1,
   format_status/2,
-  state_name/3,
   handle_event/4,
   terminate/3,
   code_change/4,
@@ -41,10 +39,11 @@
 %% state-callback
 -export([
   init_joiner/3,
-  look/3]).
+  look/3, pre_join/3, j_ready/3, init_provider/3, not_alone/3, leaving/3]).
 
 -define(SERVER, ?MODULE).
 -define(INTERVAL, 10000).
+-define(INTERVAL_LEAVING, 30000).
 
 -record(session, {address, id}).
 
@@ -83,10 +82,6 @@ ack_join(Address) ->
 ready_for_info(Address) ->
   PID = naming_handler:get_identity(join_handler),
   gen_statem:cast(PID, {ready_for_info,Address}).
-
-no_priority(Address) ->
-  PID = naming_handler:get_identity(join_handler),
-  gen_statem:cast(PID, {no_priority,Address}).
 
 leave_info(Resources, Address) ->
   PID = naming_handler:get_identity(join_handler),
@@ -134,7 +129,7 @@ start_link(ProviderAddress) ->
 %%--------------------------------------------------------------------
 init([ProviderAddress]) ->
   naming_handler:notify_identity(self(), join_handler),
-  ok = handle(init_statem),                                    %TODO it is for testing, eliminate it
+  ok = handle(init_joiner),                                    %TODO it is for testing, eliminate it
   {ok, init_joiner, #session{address = ProviderAddress, id = not_used}, []}.     %TODO check the 5th parameter
 
 
@@ -188,41 +183,135 @@ format_status(_Opt, [_PDict, _StateName, _State]) ->
 %%                   {keep_state_and_data, Actions}
 %% @end
 %%--------------------------------------------------------------------
-state_name(_EventType, _EventContent, State) ->
-  NextStateName = next_state,
-  {next_state, NextStateName, State}.
-
-init_joiner({call, From}, {join, Address}, _State) ->
+%TODO handle() is for testing, it has to be eliminated
+init_joiner({call, From}, {join, Address}, Session) ->
   Reply = {reply, From, ok},
-  ok = handle(init_joiner),                                    %TODO it is for testing, eliminate it
-  {next_state, look, _State, [Reply]};
+  ok = handle(init_joiner),
+  {next_state, look, Session, [Reply]};
 
-init_joiner({call, From}, create, _State) ->
+init_joiner({call, From}, create, Session) ->
   Reply = {reply, From, ok},
-  ok = handle(init_joiner),                                    %TODO it is for testing, eliminate it
-  {next_state, look, _State, [Reply]};
+  ok = handle(init_joiner),
+  {next_state, look, Session, [Reply]};
 
-init_joiner(cast, {look_resp, Address}, #session{}=State) ->
-  io:format("The address is: ~p~n",[Address]),
-  ok = handle(look),                                    %TODO it is for testing, eliminate it
-  {next_state, look, State, [{state_timeout, ?INTERVAL, hard_stop}]};
+init_joiner(EventType, EventContent, Session) ->
+  handle_generic_event({EventType, EventContent, Session}).
 
-init_joiner(EventType, EventContent, #session{}=State) ->
-  handle_generic_event({EventType, EventContent, State}).
-%TODO this init joiner is only for test, because cast is NEVER done. After checking delete the following init_joiner
 
-look(cast, look_resp, _State) ->
-  ok = handle(look),                                    %TODO it is for testing, eliminate it
-  {next_state, pre_join, _State, [{state_timeout, ?INTERVAL, hard_stop}]};
+look(cast, look_resp, Session) ->
+  ok = handle(look),
+  {next_state, pre_join, Session, [{state_timeout, ?INTERVAL, hard_stop}]};
 
-look(state_timeout, hard_stop, _State) ->
-  ok = handle(look),                                    %TODO it is for testing, eliminate it
-  {stop, waiting_timed_out, _State};
+look(state_timeout, hard_stop, Session) ->
+  ok = handle(look),
+  {stop, waiting_timed_out, Session};
 
-look(EventType, EventContent, #session{}=State) ->
-  ok = handle(look),                                    %TODO it is for testing, eliminate it
-  handle_generic_event({EventType, EventContent, State}).
+look(EventType, EventContent, Session) ->
+  ok = handle(look),
+  handle_generic_event({EventType, EventContent, Session}).
 
+
+pre_join(cast, {info,Address, Res, Succ, Nbits}, Session) ->
+  ok = handle(pre_join),
+  {next_state, j_ready, Session, [{state_timeout, ?INTERVAL, hard_stop}]};
+
+pre_join(cast, {abort, Reason}, Session) ->
+  ok = handle(pre_join),
+  {next_state, look, Session, [{state_timeout, ?INTERVAL, hard_stop}]};
+
+pre_join(state_timeout, hard_stop, Session) ->
+  ok = handle(pre_join),
+  {stop, waiting_timed_out, Session};
+
+pre_join(EventType, EventContent, Session) ->
+  ok = handle(pre_join),
+  handle_generic_event({EventType, EventContent, Session}).
+
+
+j_ready(cast, {ack_join, Address}, Session) ->
+  ok = handle(j_ready),
+  {next_state, init_provider, Session, [{state_timeout, ?INTERVAL, hard_stop}]};
+
+j_ready(cast, {abort, Reason}, Session) ->
+  ok = handle(j_ready),
+  {next_state, pre_join, Session, [{state_timeout, ?INTERVAL, hard_stop}]};
+
+j_ready(state_timeout, hard_stop, Session) ->
+  ok = handle(j_ready),
+  {stop, waiting_timed_out, Session};
+
+j_ready(EventType, EventContent, Session) ->
+  ok = handle(j_ready),
+  handle_generic_event({EventType, EventContent, Session}).
+
+
+init_provider(cast, {ready_for_info, Address}, Session) ->
+  ok = handle(init_provider),
+  PredecessorID = hash_f:get_hashed_addr(checker:get_pred(local_address)),
+  JoinerID = hash_f:get_hashed_addr(Address),
+  case JoinerID of
+    _ when JoinerID =< PredecessorID ->
+      {keep_state, Session};
+    _ when JoinerID > PredecessorID ->
+      {next_state, not_alone, Session}
+  end;
+
+init_provider(cast, {leave_info,Resources, Address}, Session) ->
+  ok = handle(init_provider),
+  {keep_state, Session};
+
+init_provider(cast, leave, Session) ->
+  ok = handle(init_provider),
+  {next_state, leaving, Session};
+
+init_provider(EventType, EventContent, Session) ->
+  ok = handle(init_provider),
+  handle_generic_event({EventType, EventContent, Session}).
+
+
+not_alone(cast, {ready_for_info, Address}, Session) ->
+  ok = handle(not_alone),
+  CurrID = Session#session.id,
+  JoinerID = hash_f:get_hashed_addr(Address),
+  case JoinerID of
+    _ when JoinerID =< CurrID ->
+      {keep_state, Session};
+    _ when JoinerID > CurrID ->
+      {keep_state, Session, [{state_timeout, ?INTERVAL, hard_stop}]}
+  end;
+
+not_alone(cast, leave, Session) ->
+  ok = handle(not_alone),
+  {next_state, leaving, Session, [{state_timeout, ?INTERVAL, hard_stop}]};
+
+not_alone(cast, {ack_info,Address}, Session) ->
+  ok = handle(not_alone),
+  {next_state, init_provider, Session, [{state_timeout, ?INTERVAL, hard_stop}]};
+
+not_alone(cast, {leave_info,Resources, Address}, Session) ->
+  ok = handle(not_alone),
+  {next_state, init_provider, Session, [{state_timeout, ?INTERVAL, hard_stop}]};
+
+not_alone(state_timeout, hard_stop, Session) ->
+  ok = handle(not_alone),
+  {stop, waiting_timed_out, Session};
+
+not_alone(EventType, EventContent, Session) ->
+  ok = handle(not_alone),
+  handle_generic_event({EventType, EventContent, Session}).
+
+
+leaving(cast, {ack_leave, Address}, Session) ->
+  ok = handle(leaving),
+  {next_state, init_joiner, Session, [{state_timeout, ?INTERVAL_LEAVING, hard_stop}]};
+
+leaving(state_timeout, hard_stop, Session) ->
+  ok = handle(leaving),
+  {stop, waiting_timed_out, Session};
+
+leaving(EventType, EventContent, Session) ->
+  ok = handle(leaving),
+  handle_generic_event({EventType, EventContent, Session}).
 
 
 %%--------------------------------------------------------------------
@@ -283,15 +372,28 @@ code_change(_OldVsn, StateName, State, _Extra) ->
 %%%===================================================================
 
 
-handle(init_statem) ->
-  io:format(user, "*** Start statem~n", []),
+handle(init_joiner) ->
+  io:format(user, "*** State initJoiner~n", []),
   ok;
 handle(look) ->
   io:format(user, "*** State look~n", []),
   ok;
-handle(init_joiner) ->
-  io:format(user, "*** State initJoiner~n", []),
+handle(pre_join) ->
+  io:format(user, "*** State preJoin~n", []),
+  ok;
+handle(j_ready) ->
+  io:format(user, "*** State jReady~n", []),
+  ok;
+handle(init_provider) ->
+  io:format(user, "*** State initProvider~n", []),
+  ok;
+handle(not_alone) ->
+  io:format(user, "*** State notAlone~n", []),
+  ok;
+handle(leaving) ->
+  io:format(user, "*** State Leaving~n", []),
   ok.
+
 
 handle_generic_event({_, _, Session}) ->
   {keep_state, Session}.

@@ -84,7 +84,7 @@ Truth-Table of the CM's state machine
 | l  | not_alone     | priority    | abort(curr), info(joiner) | not_alone     | 
 | m  | not_alone     | ack_info    | ack_join, drop                  | init_provider | 
 | n  | not_alone     | leave       | abort(curr), leave_info         | leaving   | 
-| n1 | not_alone     | timeout     | hard_abort                | init_joiner   | 
+| n1 | not_alone     | timeout     | hard_abort                | init_provider   | 
 | o  | not_alone     | leave_info  | abort(curr), ack_leave    | init_provider |
 | p  | leaving       | ack_leave   | drop, kill(router)    | init_joiner |
 | p1 | leaving       | timeout  | hard_abort    | init_joiner |
