@@ -7,7 +7,7 @@
 -export([start_link/0, send_message/4, receive_message/1]).
 
 %TODO remove me when done debugging
--export([encode_resource/2, decode_resource/2, encode_ID/2, decode_ID/2, encode_successor_list/2, decode_successor_list/2]).
+-export([encode_resource/2, decode_resource/2, encode_ID/2, decode_ID/2, encode_successor_list/2, decode_successor_list/2, encode_nbits_successor_and_resources/1, decode_nbits_successor_and_resources/1]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -104,7 +104,7 @@ handle_call(Request, _From, State) ->
 handle_cast({rcv_msg, Method, Address, Params}, State) ->
   BackTranslated = back_translate(Method),
   Params = decode_params(back_translate(Method), Params, State#state.nbits),
-  foward(BackTranslated, Params, Address),
+  forward(BackTranslated, Params, Address),
   {noreply,State};
 
 handle_cast(Request, State) ->
@@ -191,7 +191,7 @@ back_translate(_) -> badarg.
 encode_params(lookup_for_join, [], _NBits) -> [];
 encode_params(lookup_response, [ID, A], NBits) -> [encode_ID(ID, NBits), link_manager:address_to_binary(A)];
 encode_params(ready_for_info, [], _NBits) -> [];
-encode_params(join_info, [], _NBits) -> [];         %TODO double check this
+encode_params(join_info, [NB, LS, R], _NBits) -> encode_nbits_successor_and_resources([NB, LS, R]);
 encode_params(ack_info, [], _NBits) -> [];
 encode_params(abort, [S], _NBits) -> [list_to_binary(S)];
 encode_params(ack_join, [], _NBits) -> [];
@@ -206,7 +206,7 @@ encode_params(_, _, _) -> badarg.
 decode_params(lookup_for_join, [], _NBits) -> [];
 decode_params(lookup_response, [ID, A], NBits) -> [decode_ID(ID, NBits), link_manager:binary_to_address(A)];
 decode_params(ready_for_info, [], _NBits) -> [];
-decode_params(join_info, [], _NBits) -> [];         %TODO double check this
+decode_params(join_info, [M], _NBits) -> decode_nbits_successor_and_resources(M);
 decode_params(ack_info, [], _NBits) -> [];
 decode_params(abort, [S], _NBits) -> [binary_to_list(S)];
 decode_params(ack_join, [], _NBits) -> [];
@@ -219,27 +219,28 @@ decode_params(command, [C], _NBits) -> [C];
 decode_params(_, _, _) -> badarg.
 
 
-foward(lookup_for_join, [], From) -> router:lookup_for_join(From);
-foward(lookup_response, [ID, A], _From) -> request_gateway:lookup_response(ID, A), join_handler:look_response(A);
-foward(ready_for_info, [], From) -> join_handler:ready_for_info(From);
-foward(join_info, [], _From) -> [];         %TODO triple check this
-foward(ack_info, [], From) -> join_handler:ack_info(From);
-foward(abort, [S], _From) -> join_handler:abort(S);
-foward(ack_join, [], From) -> join_handler:ack_join(From);
-foward(leave_info, [R], From) -> join_handler:leave_info(R, From);
-foward(leave_ack, [], From) -> join_handler:ack_leave(From);
-foward(ask_pred, [], From) -> checker:get_pred(From);     %TODO remove call, must be cast
-foward(pred_reply, [A, SL], _From) -> stabilizer:notify_successor(A, SL);
-foward(lookup, [ID], From) -> router:remote_lookup(ID, From);
-foward(command, [C], From) -> ok;           %TODO send to AM
-foward(_, _, _) -> badarg.
+forward(lookup_for_join, [], From) -> router:lookup_for_join(From);
+forward(lookup_response, [ID, A], _From) -> request_gateway:lookup_response(ID, A), join_handler:look_response(A);
+forward(ready_for_info, [], From) -> join_handler:ready_for_info(From);
+forward(join_info, [NB, LS, R], From) -> join_handler:info(From, R, LS, NB);
+forward(ack_info, [], From) -> join_handler:ack_info(From);
+forward(abort, [S], _From) -> join_handler:abort(S);
+forward(ack_join, [], From) -> join_handler:ack_join(From);
+forward(leave_info, [R], From) -> join_handler:leave_info(R, From);
+forward(leave_ack, [], From) -> join_handler:ack_leave(From);
+forward(ask_pred, [], From) -> checker:get_pred(From);
+forward(pred_reply, [A, SL], _From) -> stabilizer:notify_successor(A, SL);
+forward(lookup, [ID], From) -> router:remote_lookup(ID, From);
+forward(command, [C], From) -> ok;           %TODO send to AM
+forward(_, _, _) -> badarg.
 
 %TODO remove comment, it is just for testing
-%communication_manager:decode_ID(communication_manager:encode_ID(17, 9), 9).
+% communication_manager:decode_ID(communication_manager:encode_ID(-17, 9), 9).
 
 encode_ID(ID, NBits) ->
   NBytes = ceil(NBits / 8),
-  <<ID:(NBytes * 8)/integer>>.
+  ActualID = router:normalize_id(ID, NBits),
+  <<ActualID:(NBytes * 8)/integer>>.
 
 decode_ID(Bin, NBits) ->
   ActualNBits = ceil(NBits / 8) * 8,
@@ -249,6 +250,7 @@ decode_ID(Bin, NBits) ->
 % communication_manager:decode_resource(communication_manager:encode_resource([{3587, <<"dwin">>}, {321, <<"abcdefghijklmnopqrstuvwxyz">>}], 12), 12).
 encode_resource(Resources, NBits) ->              % Resources are in the form of {ID, <<Bin>>}
   N = length(Resources),
+  DimOfN = ceil(ceil(math:log2(N))/8),
   Indexes = [X || {X, _} <- Resources],
   EncodedIndexes = list_to_binary([encode_ID(X, NBits) || X <- Indexes]),
   Binaries = [X || {_, X} <- Resources],
@@ -257,10 +259,13 @@ encode_resource(Resources, NBits) ->              % Resources are in the form of
   BitsForDim = ceil(math:log2(MaxDim)),
   EncodedLengths = list_to_binary([encode_ID(X, ceil(math:log2(MaxDim))) || X <- Lengths]),
   BinaryResource = list_to_binary(Binaries),
-  <<N:8, EncodedIndexes/binary, (ceil(BitsForDim / 8)):8, EncodedLengths/binary ,BinaryResource/binary>>.
+  BinDimOfN = <<N:(DimOfN*8)>>,
+  <<DimOfN:8, BinDimOfN/binary, EncodedIndexes/binary, (ceil(BitsForDim / 8)):8, EncodedLengths/binary ,BinaryResource/binary>>.
 
 decode_resource(Bin, NBits) ->
-  <<N:8/integer, Rest/binary>> = Bin,
+  <<DimOfN:8/integer, Bin2/binary>> = Bin,
+  BitDim = (DimOfN*8),
+  <<N:BitDim/integer, Rest/binary>> = Bin2,
   NBytes = ceil(NBits / 8),
   {Indexes, Remaining} = extract_integer(N, NBytes, Rest),
   <<BitsForDim:8/integer, LengthsAndBins/binary>> = Remaining,
@@ -273,6 +278,23 @@ decode_resource(Bin, NBits) ->
     {[], Resources}, Lengths),
   Result = lists:reverse(RevResult),
   lists:zip(Indexes, Result).
+
+%TODO remove comment, it is just for testing
+% communication_manager:decode_nbits_successor_and_resources(communication_manager:encode_nbits_successor_and_resources([12, [{1, {2, {1,2,3,4}}}, {7, {743, {6,9,5,2}}}], [{3587, <<"dwin">>}, {321, <<"abcdefghijklmnopqrstuvwxyz">>}]])).
+
+encode_nbits_successor_and_resources([NBits, List, Res]) ->
+  list_to_binary([<<NBits:8>>, encode_successor_list(List, NBits), encode_resource(Res, NBits)]).
+
+decode_nbits_successor_and_resources(Bin) ->
+  <<NBits:8/integer, Rest/binary>> = Bin,
+  <<NList:8/integer, _/binary>> = Rest,
+  BitsPerIndex = ceil(NBits / 8) * 8,
+  BitsPerAddress = link_manager:binary_address_size() * 8,
+  BitsPerList = 8 + BitsPerIndex * NList + BitsPerAddress * NList,
+  BytePerList = BitsPerList div 8,
+  <<List:BytePerList/binary, Res/binary>> = Rest,
+  [NBits, decode_successor_list(List, NBits), decode_resource(Res, NBits)].
+
 %TODO remove comment, it is just for testing
 % communication_manager:decode_successor_list(communication_manager:encode_successor_list([{1, {2, {1,2,3,4}}}, {7, {743, {6,9,5,2}}}], 7), 7).
 

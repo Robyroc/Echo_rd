@@ -32,9 +32,13 @@
 start_link(Predecessor, NBits) ->
   gen_server:start_link({local, ?SERVER}, ?MODULE, [Predecessor, NBits], []).
 
+get_pred(local_address) ->
+  PID = naming_handler:get_identity(checker),
+  gen_server:call(PID, {pred_find, local_address});
+
 get_pred(Address) ->
   PID = naming_handler:get_identity(checker),
-  gen_server:call(PID, {pred_find, Address}).
+  gen_server:cast(PID, {pred_find, Address}).
 
 clear_pred() ->
   PID = naming_handler:get_identity(checker),
@@ -76,31 +80,6 @@ init(_) ->
 handle_call({pred_find, local_address}, _From, State) ->
   {reply, State#state.pred , State, ?INTERVAL};
 
-handle_call({pred_find, Address}, _From, State) ->
-  case State#state.pred of
-    nil ->
-      Index = hash_f:get_hashed_addr(Address),
-      case Index of
-        _ when Index =< State#state.own_id ->
-          {reply, Address, #state{pred = Address, pred_id = Index}, ?INTERVAL};
-        _ when Index > State#state.own_id ->
-          CorrectIndex = Index - round(math:pow(2, State#state.n_bits)),
-          {reply, Address, #state{pred = Address, pred_id = CorrectIndex}, ?INTERVAL}
-      end;
-    Predecessor ->
-      Index = hash_f:get_hashed_addr(Address),
-      #state{pred = Predecessor, pred_id = PredID, own_id = OwnID, n_bits = NBits} = State,
-      case Index of
-        _ when Index =< OwnID ->
-          {Addr, PredecessorID} = predecessor_chooser(Address, Index, Predecessor, PredID),
-          {reply, Addr, #state{pred = Addr, pred_id = PredecessorID}, ?INTERVAL};
-        _ when Index > OwnID ->
-          CorrectIndex = Index - round(math:pow(2, NBits)),
-          {Addr, PredecessorID} = predecessor_chooser(Address, CorrectIndex, Predecessor, PredID),
-          {reply, Addr, #state{pred = Addr, pred_id = PredecessorID}, ?INTERVAL}
-      end
-  end;
-
 handle_call(Request, _From, State) ->
   io:format("CHECKER: Unexpected call message: ~p~n", [Request]),
   {reply, ok, State}.
@@ -112,6 +91,36 @@ handle_call(Request, _From, State) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
+handle_cast({pred_find, Address}, State) ->
+  SuccList = stabilizer:get_successor_list(),
+  case State#state.pred of
+    nil ->
+      Index = hash_f:get_hashed_addr(Address),
+      case Index of
+        _ when Index =< State#state.own_id ->
+          communication_manager:send_message(pred_reply, [Address, SuccList], Address, no_alias),
+          {noreply, #state{pred = Address, pred_id = Index}, ?INTERVAL};
+        _ when Index > State#state.own_id ->
+          CorrectIndex = Index - round(math:pow(2, State#state.n_bits)),
+          communication_manager:send_message(pred_reply, [Address, SuccList], Address, no_alias),
+          {noreply, #state{pred = Address, pred_id = CorrectIndex}, ?INTERVAL}
+      end;
+    Predecessor ->
+      Index = hash_f:get_hashed_addr(Address),
+      #state{pred = Predecessor, pred_id = PredID, own_id = OwnID, n_bits = NBits} = State,
+      case Index of
+        _ when Index =< OwnID ->
+          {Addr, PredecessorID} = predecessor_chooser(Address, Index, Predecessor, PredID),
+          communication_manager:send_message(pred_reply, [Addr, SuccList], Address, no_alias),
+          {noreply, #state{pred = Addr, pred_id = PredecessorID}, ?INTERVAL};
+        _ when Index > OwnID ->
+          CorrectIndex = Index - round(math:pow(2, NBits)),
+          {Addr, PredecessorID} = predecessor_chooser(Address, CorrectIndex, Predecessor, PredID),
+          communication_manager:send_message(pred_reply, [Addr, SuccList], Address, no_alias),
+          {noreply, #state{pred = Addr, pred_id = PredecessorID}, ?INTERVAL}
+      end
+  end;
+
 handle_cast(Request, State) ->
   io:format("CHECKER: Unexpected cast message: ~p~n", [Request]),
   {noreply, State}.

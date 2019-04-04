@@ -4,7 +4,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/1, show_table/0, local_lookup/1, update_finger_table/2, remote_lookup/2, lookup_for_join/1]).
+-export([start_link/1, show_table/0, local_lookup/1, update_finger_table/2, remote_lookup/2, lookup_for_join/1, normalize_id/2]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -50,6 +50,13 @@ show_table() ->
   PID = naming_handler:get_identity(router),
   gen_server:call(PID, show_table).
 
+normalize_id(ID, NBits) ->
+  ActualID = ID rem round(math:pow(2, NBits)),
+  case ActualID of
+    _ when ActualID >= 0 -> ActualID;
+    _ when ActualID < 0 -> ActualID + round(math:pow(2, NBits))
+  end.
+
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
@@ -92,6 +99,7 @@ handle_call({lookup, Requested}, From, State) ->
     next -> {reply, {found, Succ}, State};
     _ ->
       List = lookup(Requested, State#state.id, State#state.finger_table, State#state.nbits),
+
       request_gateway:add_request(Requested, From, List),
       {noreply, State}
   end;
