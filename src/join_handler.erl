@@ -249,7 +249,7 @@ j_ready(cast, {ack_join, Address}, Session) ->
 j_ready(cast, {abort, Reason}, Session) ->
   ok = handle(j_ready),
   %TODO manage Reason (see above)
-  communication_manager:send_message(lookup_for_join, [], _Address, no_alias),
+  communication_manager:send_message(lookup_for_join, [], saved_address, no_alias),
   {next_state, pre_join, Session, [{state_timeout, ?INTERVAL, hard_stop}]};
 
 j_ready(state_timeout, hard_stop, Session) ->
