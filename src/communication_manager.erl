@@ -189,47 +189,47 @@ back_translate(13) -> command;
 back_translate(_) -> badarg.
 
 encode_params(lookup_for_join, [], _NBits) -> [];
-encode_params(lookup_response, [ID, A], NBits) -> [encode_ID(ID, NBits), link_manager:address_to_binary(A)];
+encode_params(lookup_response, [ID, Addr], NBits) -> [encode_ID(ID, NBits), link_manager:address_to_binary(Addr)];
 encode_params(ready_for_info, [], _NBits) -> [];
-encode_params(join_info, [NB, LS, R], _NBits) -> encode_nbits_successor_and_resources([NB, LS, R]);
+encode_params(join_info, [NBits, LS, Res], _NBits) -> encode_nbits_successor_and_resources([NBits, LS, Res]);
 encode_params(ack_info, [], _NBits) -> [];
 encode_params(abort, [S], _NBits) -> [list_to_binary(S)];
 encode_params(ack_join, [], _NBits) -> [];
-encode_params(leave_info, [R], NBits) -> [encode_resource(R, NBits)];
+encode_params(leave_info, [Res], NBits) -> [encode_resource(Res, NBits)];
 encode_params(leave_ack, [], _NBits) -> [];
 encode_params(ask_pred, [], _NBits) -> [];
-encode_params(pred_reply, [A, SL], NBits) -> [link_manager:address_to_binary(A), encode_successor_list(SL, NBits)];
+encode_params(pred_reply, [Pred, SL], NBits) -> [link_manager:address_to_binary(Pred), encode_successor_list(SL, NBits)];
 encode_params(lookup, [ID], NBits) -> [encode_ID(ID, NBits)];
 encode_params(command, [C], _NBits) -> [C];
 encode_params(_, _, _) -> badarg.
 
 decode_params(lookup_for_join, [], _NBits) -> [];
-decode_params(lookup_response, [ID, A], NBits) -> [decode_ID(ID, NBits), link_manager:binary_to_address(A)];
+decode_params(lookup_response, [ID, Addr], NBits) -> [decode_ID(ID, NBits), link_manager:binary_to_address(Addr)];
 decode_params(ready_for_info, [], _NBits) -> [];
 decode_params(join_info, [M], _NBits) -> decode_nbits_successor_and_resources(M);
 decode_params(ack_info, [], _NBits) -> [];
 decode_params(abort, [S], _NBits) -> [binary_to_list(S)];
 decode_params(ack_join, [], _NBits) -> [];
-decode_params(leave_info, [R], NBits) -> [decode_resource(R, NBits)];
+decode_params(leave_info, [Res], NBits) -> [decode_resource(Res, NBits)];
 decode_params(leave_ack, [], _NBits) -> [];
 decode_params(ask_pred, [], _NBits) -> [];
-decode_params(pred_reply, [A, SL], NBits) -> [link_manager:binary_to_address(A), decode_successor_list(SL, NBits)];
+decode_params(pred_reply, [Pred, SL], NBits) -> [link_manager:binary_to_address(Pred), decode_successor_list(SL, NBits)];
 decode_params(lookup, [ID], NBits) -> [decode_ID(ID, NBits)];
 decode_params(command, [C], _NBits) -> [C];
 decode_params(_, _, _) -> badarg.
 
 
 forward(lookup_for_join, [], From) -> router:lookup_for_join(From);
-forward(lookup_response, [ID, A], _From) -> request_gateway:lookup_response(ID, A), join_handler:look_response(A);
+forward(lookup_response, [ID, Addr], _From) -> request_gateway:lookup_response(ID, Addr), join_handler:look_response(Addr);
 forward(ready_for_info, [], From) -> join_handler:ready_for_info(From);
-forward(join_info, [NB, LS, R], From) -> join_handler:info(From, R, LS, NB);
+forward(join_info, [NBits, LS, R], From) -> join_handler:info(From, R, LS, NBits);
 forward(ack_info, [], From) -> join_handler:ack_info(From);
 forward(abort, [S], _From) -> join_handler:abort(S);
 forward(ack_join, [], From) -> join_handler:ack_join(From);
-forward(leave_info, [R], From) -> join_handler:leave_info(R, From);
+forward(leave_info, [Res], From) -> join_handler:leave_info(Res, From);
 forward(leave_ack, [], From) -> join_handler:ack_leave(From);
 forward(ask_pred, [], From) -> checker:get_pred(From);
-forward(pred_reply, [A, SL], _From) -> stabilizer:notify_successor(A, SL);
+forward(pred_reply, [Pred, SL], _From) -> stabilizer:notify_successor(Pred, SL);
 forward(lookup, [ID], From) -> router:remote_lookup(ID, From);
 forward(command, [C], From) -> ok;           %TODO send to AM
 forward(_, _, _) -> badarg.

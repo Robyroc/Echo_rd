@@ -56,7 +56,7 @@ start_link(Supervisor) ->
 init([Supervisor]) ->
   case whereis(naming_handler) of
     undefined ->
-      erlang:send(self(), {startup, Supervisor});
+      self() ! {startup, Supervisor};
     Pid  ->
       naming_handler:reheir(Pid, self())
   end,
@@ -101,10 +101,10 @@ handle_info({startup, Supervisor}, State) ->
   case Ret of
     {ok, Handler} ->
       TableId = ets:new(naming_db, [set, public, named_table, {heir, self(), naming_db}]),
-      ets:give_away(TableId, Handler, naming_db);         %%TODO check if it works passing naming_db in place of Data
+      ets:give_away(TableId, Handler, naming_db);
     {ok, Handler, _} ->
       TableId = ets:new(naming_db, [set, public, named_table, {heir, self(), naming_db}]),
-      ets:give_away(TableId, Handler, naming_db)         %%TODO check if it works passing naming_db in place of Data
+      ets:give_away(TableId, Handler, naming_db)
   end,
   {noreply, State#state{}};
 

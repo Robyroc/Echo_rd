@@ -4,7 +4,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/3, get_successor/0, get_successor_list/0, notify_successor/2]).
+-export([start_link/0, get_successor/0, get_successor_list/0, notify_successor/2]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -17,7 +17,7 @@
 -define(SERVER, ?MODULE).
 -define(INTERVAL, 20000).
 
--record(state, {succ_list, id, nbits, successor}).
+-record(state, {succ_list, id, nbits}).
 
 %%%===================================================================
 %%% API
@@ -29,8 +29,8 @@
 %%
 %% @end
 %%--------------------------------------------------------------------
-start_link(SuccessorList, NBits, Successor) ->                    %%TODO decide how to pass these parameters
-  gen_server:start_link({local, ?SERVER}, ?MODULE, [SuccessorList, NBits, Successor], []).
+start_link() ->                    %%TODO decide how to pass these parameters
+  gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
 get_successor() ->
   PID = naming_handler:get_identity(stabilizer),
@@ -40,9 +40,9 @@ get_successor_list() ->
   PID = naming_handler:get_identity(stabilizer),
   gen_server:call(PID, {get_succ_list}).
 
-notify_successor(Successor, SuccessorList) ->
+notify_successor(Predecessor, SuccessorList) ->
   PID = naming_handler:get_identity(stabilizer),
-  gen_server:cast(PID, {stabilize_response, Successor, SuccessorList}).
+  gen_server:cast(PID, {stabilize_response, Predecessor, SuccessorList}).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -59,18 +59,9 @@ notify_successor(Successor, SuccessorList) ->
 %%                     {stop, Reason}
 %% @end
 %%--------------------------------------------------------------------
-init([SuccessorList, NBits, Successor]) ->
-  naming_handler:notify_identity(self(), stabilizer),
-  naming_handler:wait_service(hash_f),
-  OwnAddress = link_manager:get_own_address(),
-  ID = hash_f:get_hashed_addr(OwnAddress),
-  CutList = cut_last_element(SuccessorList, NBits),
-  Smaller = [{I + round(math:pow(2, NBits)), A} || {I, A} <- CutList, I =< ID],
-  Corrected = [{I, A} || {I, A} <- CutList, I > ID] ++ Smaller,
-  {_, Addr} = hd(Corrected),
-  %%TODO make a call to open a connection for the successor and initialize Successor
-  erlang:send_after(?INTERVAL, self(), stabilize),
-  {ok, #state{succ_list = lists:sort(Corrected), id = ID, nbits = NBits, successor = Successor}}.
+init([]) ->
+  self() ! startup,
+  {ok, #state{}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -97,12 +88,11 @@ handle_call(Request, _From, State) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
-handle_cast({stabilize_response, SuccessorList}, State) ->
-  Address = call_to_successor_for_predecessor,
-  Index = hash_f:get_hashed_addr(Address),
+handle_cast({stabilize_response, Predecessor, NewSuccList}, State) ->
+  PredIndex = hash_f:get_hashed_addr(Predecessor),
   HeadIndex = hd([I || {I, _} <- State#state.succ_list]),
-  #state{succ_list = SuccessorList, id = ID, nbits = NBits} = State,
-  NewSuccessorList = handle_pred_tell(Index, ID, HeadIndex, SuccessorList, Address, NBits),
+  #state{succ_list = OwnSuccessorList, id = ID, nbits = NBits} = State,
+  NewSuccessorList = handle_pred_tell(PredIndex, ID, HeadIndex, NewSuccList, OwnSuccessorList, Predecessor, NBits),
   {noreply, State#state{succ_list = NewSuccessorList}};
 
 handle_cast(Request, State) ->
@@ -119,8 +109,25 @@ handle_cast(Request, State) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
+handle_info(startup, _State) ->
+  naming_handler:wait_service(hash_f),
+  OwnAddress = link_manager:get_own_address(),
+  ID = hash_f:get_hashed_addr(OwnAddress),
+  SuccessorList = params_handler:get_param(succ_list),
+  NBits = params_handler:get_param(nbits),
+  Successor = params_handler:get_param(successor),
+  SuccID = hash_f:get_hashed_addr(Successor),
+  CutList = cut_last_element(SuccessorList, NBits),
+  Smaller = [{I + round(math:pow(2, NBits)), A} || {I, A} <- CutList, I =< ID],
+  Corrected = [{I, A} || {I, A} <- CutList, I > ID] ++ Smaller,
+  NewList = update_successor_list(lists:sort(Corrected), {SuccID, Successor}, NBits),
+  naming_handler:notify_identity(self(), stabilizer),
+  erlang:send_after(?INTERVAL, self(), stabilize),
+  {noreply, #state{succ_list = NewList, id = ID, nbits = NBits}};
+
 handle_info(stabilize, State) ->
-  %%TODO ask to the successor who is his predecessor through Communication Manager
+  Successor = hd([Addr || {_, Addr} <- State#state.succ_list]),
+  communication_manager:send_message(ask_pred, [], Successor, no_alias),
   erlang:send_after(?INTERVAL, self(), stabilize),
   {noreply, State};
 
@@ -167,14 +174,15 @@ cut_last_element(SuccessorList, NBits) ->
       SuccessorList
   end.
 
-handle_pred_tell(Index, ID, HeadIndex, SuccessorList, Address, NBits) when Index > ID and not(Index >= HeadIndex) ->
-  update_successor_list(SuccessorList, {Index, Address}, NBits);
+handle_pred_tell(PredID, ID, HeadID, _NewSuccList, OwnSuccList, Pred, NBits) when PredID > ID and not(PredID >= HeadID) ->
+  update_successor_list(OwnSuccList, {PredID, Pred}, NBits);
 
-handle_pred_tell(Index, ID, _HeadIndex, SuccessorList, _Address, _NBits) when Index =:= ID ->
-  SuccessorList;                        %TODO get succ_list from successor
+handle_pred_tell(PredID, ID, _HeadID, NewSuccList, OwnSuccList, _Pred, NBits) when PredID =:= ID ->
+  Succ = hd(OwnSuccList),
+  update_successor_list(NewSuccList, Succ, NBits);
 
-handle_pred_tell(Index, ID, HeadIndex, SuccessorList, Address, NBits) when Index < ID ->
-  handle_pred_tell(Index + round(math:pow(2, NBits)), ID, HeadIndex, SuccessorList, Address, NBits).
+handle_pred_tell(PredID, ID, HeadID, SuccList, OwnSuccList, Pred, NBits) when PredID < ID ->
+  handle_pred_tell(PredID + round(math:pow(2, NBits)), ID, HeadID, SuccList, OwnSuccList, Pred, NBits).
 
 update_successor_list(SuccessorList, NewElem, NBits) ->
   Cut = cut_last_element(SuccessorList, NBits),

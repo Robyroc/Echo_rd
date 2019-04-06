@@ -55,9 +55,8 @@ lookup_response(Requested, Address) ->
 %% @end
 %%--------------------------------------------------------------------
 init([]) ->
-  naming_handler:wait_service(router),
-  naming_handler:notify_identity(self(), request_gateway),
-  {ok, #state{requests = []}}.
+  self() ! startup,
+  {ok, #state{}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -107,6 +106,11 @@ handle_cast(Request, State) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
+handle_info(startup, _State) ->
+  naming_handler:wait_service(router),
+  naming_handler:notify_identity(self(), request_gateway),
+  {ok, #state{requests = []}};
+
 handle_info({'DOWN', Monitor, process, _PID, Reason}, State) ->
   Present = [X || {_, X, M} <- State#state.requests, M =:= Monitor],
   io:format("R. Gateway: A request failed: Requested: ~p~nReason: ~p~n", [hd(Present), Reason]),

@@ -39,14 +39,7 @@ start_link() ->
 %% @end
 %%--------------------------------------------------------------------
 init([]) ->
-  naming_handler:wait_service(params_handler),
-  %%TODO getting params from params handler
-  SuccessorList = successorlist,
-  Successor = successor,
-  Predecessor = predecessor,
-  NBits = nbits,
-
-  RestartStrategy = rest_for_one,
+  RestartStrategy = one_for_one,
   MaxRestarts = 1000,
   MaxSecondsBetweenRestarts = 3600,
 
@@ -55,12 +48,12 @@ init([]) ->
   Restart = permanent,
   Shutdown = 2000,
 
-  Son1 = {stabilizer, {stabilizer, start_link, [SuccessorList, NBits, Successor]},
-    Restart, Shutdown, worker, [stabilizer]},
-  Son2 = {killer, {killer, start_link, []},      %%TODO make killer process
-    Restart, Shutdown, worker, [killer]},
-  Son3 = {internal_routing_supervisor, {internal_routing_supervisor, start_link, [Predecessor, NBits]},
-    Restart, Shutdown, supervisor, [internal_routing_supervisor]},
+  Son1 = {hash_f, {hash_f, start_link, []},
+    Restart, Shutdown, worker, [hash_f]},
+  Son2 = {f_table_supervisor, {f_table_supervisor, start_link, []},
+    Restart, Shutdown, supervisor, [f_table_supervisor]},
+  Son3 = {checker, {checker, start_link, []},
+    Restart, Shutdown, worker, [checker]},
 
   {ok, {SupFlags, [Son1, Son2, Son3]}}.
 

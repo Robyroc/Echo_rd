@@ -4,7 +4,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/2, get_pred/1, clear_pred/0]).
+-export([start_link/0, get_pred/1, clear_pred/0]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -29,8 +29,8 @@
 %%
 %% @end
 %%--------------------------------------------------------------------
-start_link(Predecessor, NBits) ->
-  gen_server:start_link({local, ?SERVER}, ?MODULE, [Predecessor, NBits], []).
+start_link() ->
+  gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
 get_pred(local_address) ->
   PID = naming_handler:get_identity(checker),
@@ -59,16 +59,9 @@ clear_pred() ->
 %%                     {stop, Reason}
 %% @end
 %%--------------------------------------------------------------------
-init([Predecessor, NBits]) ->
-  naming_handler:notify_identity(self(), checker),
-  naming_handler:wait_service(hash_f),
-  OwnAddress = link_manager:get_own_address(),
-  PredID = hash_f:get_hashed_addr(Predecessor),
-  OwnID = hash_f:get_hashed_addr(OwnAddress),
-  {ok, #state{pred = Predecessor, pred_id = PredID, own_id = OwnID, n_bits = NBits}};
-
-init(_) ->
-  {stop, incorrect_params}.
+init([]) ->
+  self() ! startup,
+  {ok, #state{}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -135,6 +128,16 @@ handle_cast(Request, State) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
+handle_info(startup, _State) ->
+  naming_handler:wait_service(hash_f),
+  OwnAddress = link_manager:get_own_address(),
+  OwnID = hash_f:get_hashed_addr(OwnAddress),
+  Predecessor = params_handler:get_param(predecessor),
+  PredID = hash_f:get_hashed_addr(Predecessor),
+  NBits = params_handler:get_param(nbits),
+  naming_handler:notify_identity(self(), checker),
+  {ok, #state{pred = Predecessor, pred_id = PredID, own_id = OwnID, n_bits = NBits}};
+
 handle_info(timeout, _State) ->
   {noreply, #state{pred = nil, pred_id = nil}};
 

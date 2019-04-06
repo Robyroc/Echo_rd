@@ -4,7 +4,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/1, get_hashed_addr/1, get_hashed_res/1]).
+-export([start_link/0, get_hashed_addr/1, get_hashed_res/1]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -28,8 +28,8 @@
 %%
 %% @end
 %%--------------------------------------------------------------------
-start_link(NBits) ->
-  gen_server:start_link({local, ?SERVER}, ?MODULE, [NBits], []).
+start_link() ->
+  gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
 get_hashed_addr(Address) ->
   PID = naming_handler:get_identity(hash_f),
@@ -54,9 +54,9 @@ get_hashed_res(Resource) ->
 %%                     {stop, Reason}
 %% @end
 %%--------------------------------------------------------------------
-init([NBits]) ->
-  naming_handler:notify_identity(self(), hash_f),
-  {ok, #state{nbits = NBits}}.
+init([]) ->
+  self() ! startup,
+  {ok, #state{}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -96,6 +96,12 @@ handle_cast(_Request, State) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
+handle_info(startup, _State) ->
+  naming_handler:wait_service(params_handler),
+  NBits = params_handler:get_param(nbits),
+  naming_handler:notify_identity(self(), hash_f),
+  {ok, #state{nbits = NBits}};
+
 handle_info(_Info, State) ->
   {noreply, State}.
 

@@ -84,7 +84,7 @@ handle_call({notify, Identity, PID}, _From, State) ->
   {reply, ok, State};
 
 handle_call({reheir, NewManager}, _From, State) ->
-  io:format("Naming Hanlder: Changing Heir options ~n"),
+  io:format("Naming Handler: Changing Heir options ~n"),
   ets:setopts(naming_db, {heir, NewManager, naming_db}),
   {reply, ok, State};
 

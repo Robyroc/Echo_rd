@@ -4,7 +4,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/1]).
+-export([start_link/0]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -28,8 +28,8 @@
 %%
 %% @end
 %%--------------------------------------------------------------------
-start_link(NBits) ->
-  gen_server:start_link({local, ?SERVER}, ?MODULE, [NBits], []).
+start_link() ->
+  gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -46,15 +46,9 @@ start_link(NBits) ->
 %%                     {stop, Reason}
 %% @end
 %%--------------------------------------------------------------------
-init([NBits]) ->
-  naming_handler:wait_service(router),
-  ID = hash_f:get_hashed_addr(link_manager:get_own_address()),
-  naming_handler:notify_identity(self(), fixer),
-  erlang:send_after(20000, self(), fix),                    %TODO tune parameters accordingly
-  {ok, #state{id = ID, nbits = NBits, index = 0}};
-
-init(_) ->
-  {stop, badarg}.
+init([]) ->
+  self() ! startup,
+  {ok, #state{}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -88,6 +82,14 @@ handle_cast(Request, State) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
+handle_info(startup, _State) ->
+  naming_handler:wait_service(router),
+  ID = hash_f:get_hashed_addr(link_manager:get_own_address()),
+  NBits = params_handler:get_param(nbits),
+  naming_handler:notify_identity(self(), fixer),
+  erlang:send_after(20000, self(), fix),                    %TODO tune parameters accordingly
+  {ok, #state{id = ID, nbits = NBits, index = 0}};
+
 handle_info(fix, State) ->
   Theo = (State#state.id + round(math:pow(2, State#state.index)))
     rem math:pow(2, State#state.nbits),

@@ -50,14 +50,16 @@ init([]) ->
   Restart = permanent,
   Shutdown = 2000,
 
-  Son1 = {application_manager, {application_manager, start_link, []},
+  Son1 = {stabilizer, {stabilizer, start_link, []},
+    Restart, Shutdown, worker, [stabilizer]},
+  Son2 = {application_manager, {application_manager, start_link, []},
     Restart, Shutdown, worker, [application_manager]},
-  Son2 = {join_handler, {join_handler, start_link, [self()]},     %%TODO check params of start link in join_handler
+  Son3 = {join_handler, {join_handler, start_link, [self()]},     %%TODO check params of start link in join_handler
     Restart, Shutdown, worker, [join_handler]},
-  Son3 = {communication_supervisor, {communication_supervisor, start_link, []},
+  Son4 = {communication_supervisor, {communication_supervisor, start_link, []},
     Restart, Shutdown, supervisor, [communication_supervisor]},
 
-  {ok, {SupFlags, [Son1, Son2, Son3]}}.
+  {ok, {SupFlags, [Son1, Son2, Son3, Son4]}}.
 
 %%%===================================================================
 %%% Internal functions

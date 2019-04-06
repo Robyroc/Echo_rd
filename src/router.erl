@@ -4,7 +4,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/1, show_table/0, local_lookup/1, update_finger_table/2, remote_lookup/2, lookup_for_join/1, normalize_id/2]).
+-export([start_link/0, show_table/0, local_lookup/1, update_finger_table/2, remote_lookup/2, lookup_for_join/1, normalize_id/2]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -28,8 +28,8 @@
 %%
 %% @end
 %%--------------------------------------------------------------------
-start_link(Nbits) ->
-  gen_server:start_link({local, ?SERVER}, ?MODULE, [Nbits], []).
+start_link() ->
+  gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
 local_lookup(ID) ->
   PID = naming_handler:get_identity(router),
@@ -72,14 +72,9 @@ normalize_id(ID, NBits) ->
 %%                     {stop, Reason}
 %% @end
 %%--------------------------------------------------------------------
-init([Nbits]) ->
-  naming_handler:wait_service(stabilizer),
-  naming_handler:notify_identity(self(), router),
-  {SuccId, Succ} = stabilizer:get_successor(),
-  ID = hash_f:get_hashed_addr(link_manager:get_own_address()),
-  TailRoutingTable = [{ID + round(math:pow(2, Exp)), no_real, no_address} || Exp <- lists:seq(1, Nbits - 1)],
-  HeadRoutingTable = {ID + 1, SuccId, Succ},
-  {ok, #state{finger_table = [HeadRoutingTable | TailRoutingTable], nbits = Nbits, id = ID}}.
+init([]) ->
+  self() ! startup,
+  {ok, #state{}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -150,6 +145,16 @@ handle_cast(Request, State) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
+handle_info(startup, _State) ->
+  naming_handler:wait_service(stabilizer),
+  {SuccId, Succ} = stabilizer:get_successor(),
+  ID = hash_f:get_hashed_addr(link_manager:get_own_address()),
+  Nbits = params_handler:get_param(nbits),
+  TailRoutingTable = [{ID + round(math:pow(2, Exp)), no_real, no_address} || Exp <- lists:seq(1, Nbits - 1)],
+  HeadRoutingTable = {ID + 1, SuccId, Succ},
+  naming_handler:notify_identity(self(), router),
+  {ok, #state{finger_table = [HeadRoutingTable | TailRoutingTable], nbits = Nbits, id = ID}};
+
 handle_info(Info, State) ->
   io:format("Router: Unexpected ! message: ~p~n", [Info]),
   {noreply, State}.
