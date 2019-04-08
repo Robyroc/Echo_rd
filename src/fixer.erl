@@ -87,15 +87,16 @@ handle_info(startup, _State) ->
   ID = hash_f:get_hashed_addr(link_manager:get_own_address()),
   NBits = params_handler:get_param(nbits),
   naming_handler:notify_identity(self(), fixer),
-  erlang:send_after(20000, self(), fix),                    %TODO tune parameters accordingly
+  erlang:send_after(3000, self(), fix),                    %TODO tune parameters accordingly
   {noreply, #state{id = ID, nbits = NBits, index = 0}};
 
 handle_info(fix, State) ->
-  Theo = (State#state.id + round(math:pow(2, State#state.index)))
-    rem math:pow(2, State#state.nbits),
-  {found, A} = router:local_lookup(Theo),
-  router:update_finger_table(Theo, A),
-  erlang:send_after(20000, self(), fix),
+  Theo = (State#state.id + round(math:pow(2, State#state.index))),
+%    rem round(math:pow(2, State#state.nbits)),
+  io:format("Theo: ~p~n", [Theo]),
+  {found, Address} = router:local_lookup(Theo),
+  router:update_finger_table(Address, Theo),
+  erlang:send_after(3000, self(), fix),
   {noreply, iterate_state(State)};
 
 handle_info(Info, State) ->
@@ -133,7 +134,8 @@ code_change(_OldVsn, State, _Extra) ->
 
 iterate_state(State) ->
   #state{id = ID, nbits = NBits, index = Index} = State,
+  MaxIndex = NBits - 1,
   case Index of
-    NBits -> #state{id = ID, nbits = NBits, index = 0};
+    MaxIndex -> #state{id = ID, nbits = NBits, index = 0};
     _ -> #state{id = ID, nbits = NBits, index = Index + 1}
   end.

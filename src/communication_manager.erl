@@ -45,7 +45,7 @@ send_message(Method, Params, Address, Alias) ->
 
 receive_message({Method, Address, Params}) ->
   PID = naming_handler:get_identity(communication_manager),
-  gen_server:call(PID, {rcv_msg, Method, Address, Params}).
+  gen_server:cast(PID, {rcv_msg, Method, Address, Params}).
 
 receive_nbits(NBits) ->
   PID = naming_handler:get_identity(communication_manager),
@@ -109,8 +109,9 @@ handle_call(Request, _From, State) ->
 
 handle_cast({rcv_msg, Method, Address, Params}, State) ->
   BackTranslated = back_translate(Method),
-  Params = decode_params(back_translate(Method), Params, State#state.nbits),
-  forward(BackTranslated, Params, Address),
+  DecodedParams = decode_params(back_translate(Method), Params, State#state.nbits),
+  io:format("CM: Method:~p | Params:~p | Address:~p~n", [BackTranslated, DecodedParams, Address]),
+  forward(BackTranslated, DecodedParams, Address),
   {noreply,State};
 
 handle_cast(Request, State) ->

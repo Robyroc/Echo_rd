@@ -51,6 +51,7 @@ get_param(Param) ->
 %% @end
 %%--------------------------------------------------------------------
 init([Successor, SuccessorList, NBits]) ->
+  communication_manager:receive_nbits(NBits),
   naming_handler:notify_identity(self(), params_handler),
   {ok, #state{successor = Successor, succ_list = SuccessorList, nbits = NBits}}.
 

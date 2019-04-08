@@ -143,10 +143,7 @@ handle_call(Request, _From, State) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_cast({received, Message}, State) ->
-  io:format("~p~n", [Message]),
-  %TODO remove above io:format
-  %communication_manager:receive_message(Message),
-  %TODO uncomment the above line when not working with test.erl
+  communication_manager:receive_message(Message),
   {noreply, State};
 
 handle_cast({new_connection, Socket}, State) ->

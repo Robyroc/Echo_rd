@@ -89,6 +89,7 @@ handle_call(show_table, _From, State) ->
 
 handle_call({lookup, Requested}, From, State) ->
   {_, SuccID, Succ} = hd(State#state.finger_table),
+  io:format("Req:~p~n", [Requested]),
   Next = check_if_next(Requested, State#state.id, SuccID, State#state.nbits),
   case Next of
     next -> {reply, {found, Succ}, State};
@@ -112,21 +113,24 @@ handle_call(Request, _From, State) ->
 %%--------------------------------------------------------------------
 
 handle_cast({update, Address, Theoretical}, State) ->
-  Table = State#state.finger_table,
+  #state{id = ID, nbits = NBits, finger_table = Table} = State,
   Less = [{Theo, R, A} || {Theo, R, A} <- Table, Theo < Theoretical],
   Greater = [{Theo, R, A} || {Theo, R, A} <- Table, Theo > Theoretical],
-  NewTable = [lists:reverse([{Theoretical, hash_f:get_hashed_addr(Address), Address} | lists:reverse(Less)]) | Greater],
+  AdjustedID = adjust_successor(hash_f:get_hashed_addr(Address), ID, NBits),
+  NewTable = lists:flatten([lists:reverse([{Theoretical, AdjustedID, Address} | lists:reverse(Less)]) | Greater]),
+  io:format("Look:~p~n", [NewTable]),
   {noreply, #state{finger_table = NewTable, nbits = State#state.nbits, id = State#state.id}};
 
 handle_cast({lookup, Alias, Requested}, State) ->
   {_, SuccID, Succ} = hd(State#state.finger_table),
+  io:format("Look:~p~n", [SuccID]),
   Next = check_if_next(Requested, State#state.id, SuccID, State#state.nbits),
   case Next of
     next ->
       communication_manager:send_message(lookup_response, [Requested, Succ], Alias, no_alias),
       {noreply, State};
     _ ->
-      {_, _, Destination} = hd(lookup(Requested, State#state.id, State#state.finger_table, State#state.nbits)),
+      Destination = hd(lookup(Requested, State#state.id, State#state.finger_table, State#state.nbits)),
       communication_manager:send_message(lookup, [Requested], Destination, Alias),
       {noreply, State}
   end;
@@ -190,7 +194,7 @@ code_change(_OldVsn, State, _Extra) ->
 show_finger_table(State) ->
   io:format("Finger Table:~n
   Theo | Real | Address~n"),
-  [io:format("~p|~p|~p", [T, R, A]) || {T, R, A} <- State#state.finger_table],  %TODO: handle formatting
+  [io:format("~p|~p|~p~n", [T, R, A]) || {T, R, A} <- State#state.finger_table],  %TODO: handle formatting
   ok.
 
 lookup(Searched, ID, Table, NBits) when Searched < ID ->
@@ -201,10 +205,15 @@ lookup(Searched, _ID, Table, _NBits) ->
   [Address || {_, ID, Address} <- lists:filter(fun({_, Id, _}) -> Id =/= no_real end, RevTable), ID =< Searched].
 
 check_if_next(Requested, ID, SuccId, NBits) when Requested =< ID ->
-  check_if_next(Requested + round(math:pow(2, NBits)), SuccId, ID, NBits);
+  io:format("Next:~p ~p ~p~n", [Requested, ID, SuccId]),
+  check_if_next(Requested + round(math:pow(2, NBits)), ID, SuccId, NBits);
 
-check_if_next(Requested, ID, SuccId, _NBits) when (Requested > ID and not (Requested > SuccId)) ->
+check_if_next(Requested, ID, SuccId, _NBits) when ((Requested > ID) and not (Requested > SuccId)) ->
   next;
 
-check_if_next(_, _, _, _) ->
+check_if_next(Requested, ID, SuccId, _NBits) ->
+  io:format("Next:~p ~p ~p~n", [Requested, ID, SuccId]),
   not_next.
+
+adjust_successor(ID, OwnId, _NBits) when ID > OwnId -> ID;
+adjust_successor(ID, OwnId, NBits) -> adjust_successor(ID + round(math:pow(2, NBits)), OwnId, NBits).

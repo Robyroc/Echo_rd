@@ -15,7 +15,7 @@
   code_change/3]).
 
 -define(SERVER, ?MODULE).
--define(INTERVAL, 20000).
+-define(INTERVAL, 5000).
 
 -record(state, {succ_list, id, nbits}).
 
@@ -29,16 +29,16 @@
 %%
 %% @end
 %%--------------------------------------------------------------------
-start_link() ->                    %%TODO decide how to pass these parameters
+start_link() ->
   gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
 get_successor() ->
   PID = naming_handler:get_identity(stabilizer),
-  gen_server:call(PID, {get_succ}).
+  gen_server:call(PID, get_succ).
 
 get_successor_list() ->
   PID = naming_handler:get_identity(stabilizer),
-  gen_server:call(PID, {get_succ_list}).
+  gen_server:call(PID, get_succ_list).
 
 notify_successor(Predecessor, SuccessorList) ->
   PID = naming_handler:get_identity(stabilizer),
@@ -116,7 +116,7 @@ handle_info(startup, _State) ->
   SuccessorList = params_handler:get_param(succ_list),
   NBits = params_handler:get_param(nbits),
   Successor = params_handler:get_param(successor),
-  SuccID = hash_f:get_hashed_addr(Successor),
+  SuccID = adjust_successor(hash_f:get_hashed_addr(Successor), ID, NBits),
   CutList = cut_last_element(SuccessorList, NBits),
   Smaller = [{I + round(math:pow(2, NBits)), A} || {I, A} <- CutList, I =< ID],
   Corrected = [{I, A} || {I, A} <- CutList, I > ID] ++ Smaller,
@@ -174,7 +174,7 @@ cut_last_element(SuccessorList, NBits) ->
       SuccessorList
   end.
 
-handle_pred_tell(PredID, ID, HeadID, _NewSuccList, OwnSuccList, Pred, NBits) when PredID > ID and not(PredID >= HeadID) ->
+handle_pred_tell(PredID, ID, HeadID, _NewSuccList, OwnSuccList, Pred, NBits) when ((PredID > ID) and not(PredID >= HeadID)) ->
   update_successor_list(OwnSuccList, {PredID, Pred}, NBits);
 
 handle_pred_tell(PredID, ID, _HeadID, NewSuccList, OwnSuccList, _Pred, NBits) when PredID =:= ID ->
@@ -187,3 +187,6 @@ handle_pred_tell(PredID, ID, HeadID, SuccList, OwnSuccList, Pred, NBits) when Pr
 update_successor_list(SuccessorList, NewElem, NBits) ->
   Cut = cut_last_element(SuccessorList, NBits),
   [NewElem | Cut].
+
+adjust_successor(ID, OwnId, _NBits) when ID > OwnId -> ID;
+adjust_successor(ID, OwnId, NBits) -> adjust_successor(ID + round(math:pow(2, NBits)), OwnId, NBits).

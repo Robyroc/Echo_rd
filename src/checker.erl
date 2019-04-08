@@ -91,7 +91,7 @@ handle_cast({pred_find, Address}, State) ->
       Index = hash_f:get_hashed_addr(Address),
       case Index of
         _ when Index =< State#state.own_id ->
-          communication_manager:send_message(pred_reply, [Address, SuccList], Address, no_alias),
+          ok = communication_manager:send_message(pred_reply, [Address, SuccList], Address, no_alias),
           {noreply, #state{pred = Address, pred_id = Index}, ?INTERVAL};
         _ when Index > State#state.own_id ->
           CorrectIndex = Index - round(math:pow(2, State#state.n_bits)),
