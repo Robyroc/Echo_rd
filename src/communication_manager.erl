@@ -4,10 +4,10 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, send_message/4, receive_message/1]).
+-export([start_link/0, send_message/4, receive_message/1, receive_nbits/1]).
 
 %TODO remove me when done debugging
--export([encode_resource/2, decode_resource/2, encode_ID/2, decode_ID/2, encode_successor_list/2, decode_successor_list/2, encode_nbits_successor_and_resources/1, decode_nbits_successor_and_resources/1]).
+-export([encode_resource/2, decode_resource/2, encode_ID/2, decode_ID/1, encode_successor_list/2, decode_successor_list/2, encode_nbits_successor_and_resources/1, decode_nbits_successor_and_resources/1]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -47,6 +47,9 @@ receive_message({Method, Address, Params}) ->
   PID = naming_handler:get_identity(communication_manager),
   gen_server:call(PID, {rcv_msg, Method, Address, Params}).
 
+receive_nbits(NBits) ->
+  PID = naming_handler:get_identity(communication_manager),
+  gen_server:call(PID, {get_nbits, NBits}).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -66,10 +69,10 @@ receive_message({Method, Address, Params}) ->
 
 
 init([]) ->
-  naming_handler:wait_service(params_handler),
-  NBits = params_handler:get_param(nbits),
+  %naming_handler:wait_service(params_handler),
+  %NBits = params_handler:get_param(nbits),
   naming_handler:notify_identity(self(), communication_manager),
-  {ok, #state{nbits = NBits}}.
+  {ok, #state{nbits = no_nbits}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -88,6 +91,9 @@ handle_call({send_msg, Method, Params, Address, Alias}, _From, State) ->
       link_manager:send_message(Address, {Alias, Translated, Encoded}),
       {reply,ok,State}
   end;
+
+handle_call({get_nbits, NBits}, _From, State) ->
+  {reply, ok, State#state{nbits = NBits}};
 
 handle_call(Request, _From, State) ->
   io:format("CM: Unexpected call message: ~p~n", [Request]),
@@ -189,32 +195,38 @@ back_translate(13) -> command;
 back_translate(_) -> badarg.
 
 encode_params(lookup_for_join, [], _NBits) -> [];
-encode_params(lookup_response, [ID, Addr], NBits) -> [encode_ID(ID, NBits), link_manager:address_to_binary(Addr)];
+encode_params(lookup_response, _, no_nbits) -> badarg;
+encode_params(lookup_response, [ID, Addr], NBits) -> [link_manager:address_to_binary(Addr), encode_ID(ID, NBits)];
 encode_params(ready_for_info, [], _NBits) -> [];
 encode_params(join_info, [NBits, LS, Res], _NBits) -> encode_nbits_successor_and_resources([NBits, LS, Res]);
 encode_params(ack_info, [], _NBits) -> [];
 encode_params(abort, [S], _NBits) -> [list_to_binary(S)];
 encode_params(ack_join, [], _NBits) -> [];
+encode_params(leave_info, _, no_nbits) -> badarg;
 encode_params(leave_info, [Res], NBits) -> [encode_resource(Res, NBits)];
 encode_params(leave_ack, [], _NBits) -> [];
 encode_params(ask_pred, [], _NBits) -> [];
+encode_params(pred_reply, _, no_nbits) -> badarg;
 encode_params(pred_reply, [Pred, SL], NBits) -> [link_manager:address_to_binary(Pred), encode_successor_list(SL, NBits)];
+encode_params(lookup, _, no_nbits) -> badarg;
 encode_params(lookup, [ID], NBits) -> [encode_ID(ID, NBits)];
 encode_params(command, [C], _NBits) -> [C];
 encode_params(_, _, _) -> badarg.
 
 decode_params(lookup_for_join, [], _NBits) -> [];
-decode_params(lookup_response, [ID, Addr], NBits) -> [decode_ID(ID, NBits), link_manager:binary_to_address(Addr)];
+decode_params(lookup_response, [ID, Addr], _NBits) -> [decode_ID(ID), link_manager:binary_to_address(Addr)];
 decode_params(ready_for_info, [], _NBits) -> [];
 decode_params(join_info, [M], _NBits) -> decode_nbits_successor_and_resources(M);
 decode_params(ack_info, [], _NBits) -> [];
 decode_params(abort, [S], _NBits) -> [binary_to_list(S)];
 decode_params(ack_join, [], _NBits) -> [];
+decode_params(leave_info, _, no_nbits) -> badarg;
 decode_params(leave_info, [Res], NBits) -> [decode_resource(Res, NBits)];
 decode_params(leave_ack, [], _NBits) -> [];
 decode_params(ask_pred, [], _NBits) -> [];
+decode_params(pred_reply, _, no_nbits) -> badarg;
 decode_params(pred_reply, [Pred, SL], NBits) -> [link_manager:binary_to_address(Pred), decode_successor_list(SL, NBits)];
-decode_params(lookup, [ID], NBits) -> [decode_ID(ID, NBits)];
+decode_params(lookup, [ID], _NBits) -> [decode_ID(ID)];
 decode_params(command, [C], _NBits) -> [C];
 decode_params(_, _, _) -> badarg.
 
@@ -242,10 +254,14 @@ encode_ID(ID, NBits) ->
   ActualID = router:normalize_id(ID, NBits),
   <<ActualID:(NBytes * 8)/integer>>.
 
-decode_ID(Bin, NBits) ->
-  ActualNBits = ceil(NBits / 8) * 8,
-  <<ID:ActualNBits/integer>> = Bin,
-  ID.
+decode_ID(Bin) -> decode_ID(Bin, 0).
+
+decode_ID(<<>>, Acc) -> Acc;
+decode_ID(Bin, Acc) ->
+  NewAcc = Acc bsl 8,
+  <<Int:8/integer, Rest/binary>> = Bin,
+  decode_ID(Rest, NewAcc + Int).
+
 %TODO remove comment, it is just for testing
 % communication_manager:decode_resource(communication_manager:encode_resource([{3587, <<"dwin">>}, {321, <<"abcdefghijklmnopqrstuvwxyz">>}], 12), 12).
 encode_resource(Resources, NBits) ->              % Resources are in the form of {ID, <<Bin>>}

@@ -39,7 +39,6 @@ start_link() ->
 %% @end
 %%--------------------------------------------------------------------
 init([]) ->
-  wait_for_srv(),           %TODO move to sibiling of name server
   RestartStrategy = rest_for_one,
   MaxRestarts = 1000,
   MaxSecondsBetweenRestarts = 3600,
@@ -58,11 +57,3 @@ init([]) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
-
-wait_for_srv() ->
-  case whereis(naming_handler) of
-    undefined ->
-      timer:sleep(1),
-      wait_for_srv();
-    _ -> ok
-  end.
