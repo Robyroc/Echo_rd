@@ -4,7 +4,15 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, join/1, create/1, leave/0, update_block_manager_pid/1, issue_command/2, receive_command/1]).
+-export([start_link/0,
+  join/1,
+  create/1,
+  leave/0,
+  issue_command/2,
+  receive_command/1,
+  add_many_resources/1,
+  get_local_resources/0,
+  drop_many_resources/1]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -31,17 +39,28 @@
 start_link() ->
   gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
-join(_Address) -> ok.
+join(Address) ->
+  join_handler:join(Address).
 
-create(_NBits) -> ok.
+create(NBits) ->
+  join_handler:create(NBits).
 
-leave() -> ok.
+leave() ->
+  join_handler:leave().
 
-update_block_manager_pid(_NewPid) -> ok.
+issue_command(Index, Command) ->
+  {found, Address} = router:local_lookup(Index),
+  communication_manager:send_message(command, [Command], Address, no_alias).
 
-issue_command(_Index, _Command) -> ok.
+receive_command(Command) ->
+  io:format("****Received Command: ~p*****~n", [Command]).
 
-receive_command(_Command) -> ok.
+add_many_resources(Resources) ->
+  io:format("****Resources: ~p*****~n", [Resources]).
+
+get_local_resources() -> [].
+
+drop_many_resources(_From) -> ok.
 
 
 

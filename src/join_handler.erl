@@ -13,7 +13,7 @@
 
 %% API
 -export([
-  start_link/0,
+  start_link/1,
   join/1,
   leave/0,
   look_response/1,
@@ -44,8 +44,9 @@
 -define(SERVER, ?MODULE).
 -define(INTERVAL, 10000).
 -define(INTERVAL_LEAVING, 30000).
+-define(INTERVAL_JOIN, 50000).
 
--record(session, {provider_addr, joiner_addr, succ_addr, res, succ_list, nbits, app_mngr, curr_addr, curr_id}).
+-record(session, {provider_addr, succ_addr, res, succ_list, nbits, app_mngr, curr_addr, curr_id, superv}).
 
 %%%===================================================================
 %%% API
@@ -105,8 +106,8 @@ ack_leave(Address) ->
 %% @spec start_link() -> {ok, Pid} | ignore | {error, Error}
 %% @end
 %%--------------------------------------------------------------------
-start_link() ->
-  gen_statem:start_link({local, ?SERVER}, ?MODULE, [], []).
+start_link(Pid) ->
+  gen_statem:start_link({local, ?SERVER}, ?MODULE, [Pid], []).
 
 
 
@@ -127,12 +128,14 @@ start_link() ->
 %%                     {stop, StopReason}
 %% @end
 %%--------------------------------------------------------------------
-init([]) ->
+init([Pid]) ->
   naming_handler:notify_identity(self(), join_handler),
   ok = handle(init_joiner),
-  {ok, init_joiner, #session{provider_addr = undefined, joiner_addr = link_manager:get_own_address(), %TODO check on addr
-    succ_addr = undefined, res = undefined, succ_list = undefined, nbits = undefined,
-    app_mngr = undefined, curr_addr = undefined, curr_id = undefined}, []}.
+  {ok, init_joiner, #session{provider_addr = undefined, succ_addr = undefined,
+    res = undefined, succ_list = undefined, nbits = undefined, app_mngr = undefined,
+    curr_addr = undefined, curr_id = undefined, superv = Pid}, []};
+
+init(_) -> badarg.
 
 
 %%--------------------------------------------------------------------
@@ -185,18 +188,19 @@ format_status(_Opt, [_PDict, _StateName, _State]) ->
 %% @end
 %%--------------------------------------------------------------------
 %TODO all the handle() is for testing, it has to be eliminated
-%TODO add respnse to AM in case of timeout {reply, From in session, fail}
-init_joiner({call, From}, {join, Address}, _Session) ->
-  Reply = noreply,
+init_joiner({call, From}, {join, Address}, Session) ->
+  Reply = postpone,
   ok = handle(init_joiner),
   communication_manager:send_message(lookup_for_join, [], Address, no_alias),
-  {next_state, look, #session{app_mngr = From, provider_addr = Address}, [Reply]};
+  {next_state, look, Session#session{app_mngr = From, provider_addr = Address},
+    [{state_timeout, ?INTERVAL, hard_stop}, Reply]};
 
 init_joiner({call, From}, {create, Nbits}, Session) ->
-  Reply = {reply, From, ok},
   ok = handle(init_joiner),
-  %TODO start
-  {next_state, init_provider, Session#session{nbits = Nbits}, [Reply]};
+  NewSession = Session#session{nbits = Nbits, succ_list = [], succ_addr = link_manager:get_own_address(),
+    res = [], app_mngr = From},
+  ok = start(NewSession),
+  {next_state, init_provider, NewSession, []};
 
 init_joiner(EventType, EventContent, Session) ->
   handle_generic_event({EventType, EventContent, Session}).
@@ -209,7 +213,8 @@ look(cast, {look_resp,Address}, Session) ->
 
 look(state_timeout, hard_stop, Session) ->
   ok = handle(look),
-  {next_state, init_joiner, Session};
+  gen_statem:reply(Session#session.app_mngr, fail),
+  {next_state, init_joiner, reset_session(Session)};
 
 look(EventType, EventContent, Session) ->
   ok = handle(look),
@@ -222,7 +227,7 @@ pre_join(cast, {info,Address, Res, Succ, Nbits}, Session) ->
   case Address of
     _ when Address =:= ProviderAddr ->
       communication_manager:send_message(ack_info, [], Address, no_alias),
-      {next_state, j_ready, Session#session{res = Res, succ_list = Succ, nbits = Nbits}, [{state_timeout, ?INTERVAL, hard_stop}]};
+      {next_state, j_ready, Session#session{res = Res, succ_list = Succ, nbits = Nbits}, [{state_timeout, ?INTERVAL_JOIN, hard_stop}]};
     _ -> {keep_state, Session, [{state_timeout, ?INTERVAL, hard_stop}]}
   end;
 
@@ -231,32 +236,34 @@ pre_join(cast, {abort, Reason}, Session) ->
   io:format("Reason of abort: ~p~n", [Reason]),
   ProviderAddr = Session#session.provider_addr,
   communication_manager:send_message(lookup_for_join, [], ProviderAddr, no_alias),
-  {next_state, look, Session, [{state_timeout, ?INTERVAL, hard_stop}]};
+  {next_state, look, reset_session(Session), [{state_timeout, ?INTERVAL, hard_stop}]};
 
 pre_join(state_timeout, hard_stop, Session) ->
   ok = handle(pre_join),
-  {next_state, init_joiner, Session};
+  gen_statem:reply(Session#session.app_mngr, fail),
+  {next_state, init_joiner, reset_session(Session)};
 
 pre_join(EventType, EventContent, Session) ->
   ok = handle(pre_join),
   handle_generic_event({EventType, EventContent, Session}).
 
 
-j_ready(cast, {ack_join, Address}, Session) ->
+j_ready(cast, {ack_join, _Address}, Session) ->
   ok = handle(j_ready),
-  %TODO manage send the start message
-  {next_state, init_provider, Session, [{state_timeout, ?INTERVAL, hard_stop}]};
+  ok = start(Session),
+  {next_state, init_provider, Session};
 
 j_ready(cast, {abort, Reason}, Session) ->
   ok = handle(j_ready),
   io:format("Reason of abort: ~p~n", [Reason]),
   ProviderAddr = Session#session.provider_addr,
   communication_manager:send_message(lookup_for_join, [], ProviderAddr, no_alias),
-  {next_state, pre_join, Session, [{state_timeout, ?INTERVAL, hard_stop}]};
+  {next_state, look, reset_session(Session), [{state_timeout, ?INTERVAL, hard_stop}]};
 
 j_ready(state_timeout, hard_stop, Session) ->
   ok = handle(j_ready),
-  {next_state, init_joiner, Session};
+  gen_statem:reply(Session#session.app_mngr, fail),
+  {next_state, init_joiner, reset_session(Session)};
 
 j_ready(EventType, EventContent, Session) ->
   ok = handle(j_ready),
@@ -272,25 +279,25 @@ init_provider(cast, {ready_for_info, Address}, Session) ->
       communication_manager:send_message(abort, ["Not updated"],Address, no_alias),
       {keep_state, Session};
     _ when JoinerID > PredecessorID ->
-      DataInfo={application_manager:receive_command(resources),stabilizer:get_successor_list(),  %%TODO Res from AM
+      DataInfo={application_manager:get_local_resources(),stabilizer:get_successor_list(),
         params_handler:get_param(nbits)},
       communication_manager:send_message(join_info,DataInfo,Address,no_alias),
-      {next_state, not_alone, Session#session{curr_id = JoinerID, curr_addr = Address}}
+      {next_state, not_alone, Session#session{curr_id = JoinerID, curr_addr = Address}, [{state_timeout, ?INTERVAL_JOIN, hard_stop}]}
   end;
 
 init_provider(cast, {leave_info,Resources, Address}, Session) ->
   ok = handle(init_provider),
-  %TODO send Resources to the AM
+  application_manager:add_many_resources(Resources),
   communication_manager:send_message(leave_ack,[],Address,no_alias),
   {keep_state, Session};
 
 init_provider({call,From}, leave, Session) ->
   ok = handle(init_provider),
-  Reply = noreply,
-  %TODO receive resources from AM
+  Reply = postpone,
+  application_manager:get_local_resources(),
   SuccAddr = Session#session.succ_addr,
   communication_manager:send_message(leave_info,resource, SuccAddr, no_alias),
-  {next_state, leaving, Session, [Reply]};
+  {next_state, leaving, Session#session{app_mngr = From}, [{state_timeout, ?INTERVAL_LEAVING, hard_stop}, Reply]};
 
 init_provider(EventType, EventContent, Session) ->
   ok = handle(init_provider),
@@ -304,44 +311,44 @@ not_alone(cast, {ready_for_info, Address}, Session) ->
   case JoinerID of
     _ when JoinerID =< CurrID ->
       communication_manager:send_message(abort, ["No priority"],Address, no_alias),
-      {keep_state, Session, [{state_timeout, ?INTERVAL, hard_stop}]};
+      {keep_state, Session, [{state_timeout, ?INTERVAL_JOIN, hard_stop}]};
     _ when JoinerID > CurrID ->
       CurrAddr = Session#session.curr_addr,
       communication_manager:send_message(abort, ["Loss priority"],CurrAddr, no_alias),
       DataInfo = {Session#session.res,Session#session.succ_list,Session#session.nbits},
       communication_manager:send_message(join_info, DataInfo, Address, no_alias),
-      {keep_state, Session, [{state_timeout, ?INTERVAL, hard_stop}]}
+      {keep_state, Session, [{state_timeout, ?INTERVAL_JOIN, hard_stop}]}
   end;
 
 
 not_alone({call,From}, leave, Session) ->
-  Reply = noreply,
+  Reply = postpone,
   ok = handle(not_alone),
   communication_manager:send_message(abort, ["Successor is leaving"], Session#session.curr_addr, no_alias),
-  communication_manager:send_message(leave_info,resource,stabilizer:get_successor(),no_alias),        %TODO resources
-  {next_state, leaving, Session, [{state_timeout, ?INTERVAL, hard_stop}], [Reply]};
+  communication_manager:send_message(leave_info,application_manager:get_local_resources(),stabilizer:get_successor(),no_alias),
+  {next_state, leaving, Session#session{app_mngr = From}, [{state_timeout, ?INTERVAL_LEAVING, hard_stop}, Reply]};
 
 not_alone(cast, {ack_info,Address}, Session) ->
   ok = handle(not_alone),
   communication_manager:send_message(ack_join, [], Address, no_alias),
-  %TODO manage drop to the AM
-  {next_state, init_provider, Session, [{state_timeout, ?INTERVAL, hard_stop}]};
+  application_manager:drop_many_resources(Session#session.curr_id),
+  {next_state, init_provider, reset_provider_session(Session)};
 
 not_alone(cast, {leave_info,Resources, Address}, Session) ->
   ok = handle(not_alone),
   communication_manager:send_message(abort,["REASON"], Session#session.curr_addr, no_alias),
   PredecessorAddr = checker:get_pred(Session#session.provider_addr),
-  %TODO send resources to the AM (when ok -> leave_ack)
   case Address of
     _ when Address =:= PredecessorAddr ->
       communication_manager:send_message(leave_ack,[], Address, no_alias),
-      {next_state, init_provider, Session, [{state_timeout, ?INTERVAL, hard_stop}]};
-    _ -> {keep_state, Session, [{state_timeout, ?INTERVAL, hard_stop}]}
+      application_manager:add_many_resources(Resources),
+      {next_state, init_provider, reset_provider_session(Session)};
+    _ -> {keep_state, Session, [{state_timeout, ?INTERVAL_JOIN, hard_stop}]}
   end;
 
 not_alone(state_timeout, hard_stop, Session) ->
   ok = handle(not_alone),
-  {next_state, init_provider, Session};
+  {next_state, init_provider, reset_provider_session(Session)};
 
 not_alone(EventType, EventContent, Session) ->
   ok = handle(not_alone),
@@ -353,14 +360,16 @@ leaving(cast, {ack_leave, Address}, Session) ->
   SuccessorAddr = Session#session.succ_addr,
   case Address of
     _ when Address =:= SuccessorAddr ->
-      %%TODO send drop to the AM and kill(self())
-      {next_state, init_joiner, Session, [{state_timeout, ?INTERVAL_LEAVING, hard_stop}]};
-    _ -> {keep_state, Session, [{state_timeout, ?INTERVAL, hard_stop}]}
+      gen_statem:reply(Session#session.app_mngr, ok),
+      application_manager:drop_many_resources(all_res),
+      exit(naming_handler:get_identity(communication_supervisor), kill),
+      {next_state, init_joiner, reset_session(Session)};
+    _ -> {keep_state, Session, [{state_timeout, ?INTERVAL_LEAVING, hard_stop}]}
   end;
 
 leaving(state_timeout, hard_stop, Session) ->
   ok = handle(leaving),
-  {next_state, init_joiner, Session};
+  {next_state, init_joiner, reset_session(Session)};
 
 leaving(EventType, EventContent, Session) ->
   ok = handle(leaving),
@@ -452,5 +461,19 @@ handle_generic_event({_, _, Session}) ->
   {keep_state, Session}.
 
 
-start() ->      %TODO send params to params_handler and res to AM and wait for hash_f
-  ok.
+start(Session) ->
+  #session{nbits = Nbits, succ_list = SuccList, succ_addr = SuccAddr, res = Resources,
+    superv = Supervisor, app_mngr = AM} = Session,
+  ParamsHandler = {params_handler, {params_handler, start_link, [SuccAddr, SuccList, Nbits]},
+    permanent, 2000, worker, [params_handler]},
+  supervisor:start_child(Supervisor, ParamsHandler),
+  application_manager:add_many_resources(Resources),
+  naming_handler:wait_service(hash_f),
+  gen_statem:reply(AM, ok).
+
+reset_session(Session) ->
+  Session#session{provider_addr = undefined, succ_addr = undefined, res = undefined,
+    succ_list = undefined, nbits = undefined, app_mngr = undefined, curr_addr = undefined, curr_id = undefined}.
+
+reset_provider_session(Session) ->
+  Session#session{curr_addr = undefined, curr_id = undefined}.

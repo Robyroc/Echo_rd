@@ -4,7 +4,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/4, get_param/1]).
+-export([start_link/3, get_param/1]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -16,7 +16,7 @@
 
 -define(SERVER, ?MODULE).
 
--record(state, {successor, succ_list, nbits, predecessor}).
+-record(state, {successor, succ_list, nbits}).
 
 %%%===================================================================
 %%% API
@@ -28,8 +28,8 @@
 %%
 %% @end
 %%--------------------------------------------------------------------
-start_link(Successor, SuccessorList, Predecessor, NBits) ->
-  gen_server:start_link({local, ?SERVER}, ?MODULE, [Successor, SuccessorList, Predecessor, NBits], []).
+start_link(Successor, SuccessorList, NBits) ->
+  gen_server:start_link({local, ?SERVER}, ?MODULE, [Successor, SuccessorList, NBits], []).
 
 get_param(Param) ->
   PID = naming_handler:get_identity(params_handler),
@@ -50,9 +50,9 @@ get_param(Param) ->
 %%                     {stop, Reason}
 %% @end
 %%--------------------------------------------------------------------
-init([Successor, SuccessorList, Predecessor, NBits]) ->
+init([Successor, SuccessorList, NBits]) ->
   naming_handler:notify_identity(self(), params_handler),
-  {ok, #state{successor = Successor, succ_list = SuccessorList, predecessor = Predecessor, nbits = NBits}}.
+  {ok, #state{successor = Successor, succ_list = SuccessorList, nbits = NBits}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -66,9 +66,6 @@ handle_call({get_param, successor}, _From, State) ->
 
 handle_call({get_param, succ_list}, _From, State) ->
   {reply, State#state.succ_list, State};
-
-handle_call({get_param, predecessor}, _From, State) ->
-  {reply, State#state.predecessor, State};
 
 handle_call({get_param, nbits}, _From, State) ->
   {reply, State#state.nbits, State};

@@ -24,6 +24,7 @@
 
 notify_identity(PID, Identity) ->
   try
+    io:format("=== NEW ENTRY === Name:~p ===~n", [Identity]),   %TODO remove this line
     Naming = get_identity(naming_handler),
     gen_server:call(Naming, {notify, Identity, PID})          %TODO check if timeout is needed
   of

@@ -132,8 +132,8 @@ handle_info(startup, _State) ->
   naming_handler:wait_service(hash_f),
   OwnAddress = link_manager:get_own_address(),
   OwnID = hash_f:get_hashed_addr(OwnAddress),
-  Predecessor = params_handler:get_param(predecessor),
-  PredID = hash_f:get_hashed_addr(Predecessor),
+  Predecessor = nil,
+  PredID = nil,
   NBits = params_handler:get_param(nbits),
   naming_handler:notify_identity(self(), checker),
   {ok, #state{pred = Predecessor, pred_id = PredID, own_id = OwnID, n_bits = NBits}};
