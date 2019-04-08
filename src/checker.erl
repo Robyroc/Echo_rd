@@ -136,7 +136,7 @@ handle_info(startup, _State) ->
   PredID = nil,
   NBits = params_handler:get_param(nbits),
   naming_handler:notify_identity(self(), checker),
-  {ok, #state{pred = Predecessor, pred_id = PredID, own_id = OwnID, n_bits = NBits}};
+  {noreply, #state{pred = Predecessor, pred_id = PredID, own_id = OwnID, n_bits = NBits}};
 
 handle_info(timeout, _State) ->
   {noreply, #state{pred = nil, pred_id = nil}};

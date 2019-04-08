@@ -153,7 +153,7 @@ handle_info(startup, _State) ->
   TailRoutingTable = [{ID + round(math:pow(2, Exp)), no_real, no_address} || Exp <- lists:seq(1, Nbits - 1)],
   HeadRoutingTable = {ID + 1, SuccId, Succ},
   naming_handler:notify_identity(self(), router),
-  {ok, #state{finger_table = [HeadRoutingTable | TailRoutingTable], nbits = Nbits, id = ID}};
+  {noreply, #state{finger_table = [HeadRoutingTable | TailRoutingTable], nbits = Nbits, id = ID}};
 
 handle_info(Info, State) ->
   io:format("Router: Unexpected ! message: ~p~n", [Info]),

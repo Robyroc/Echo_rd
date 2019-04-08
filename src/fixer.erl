@@ -88,7 +88,7 @@ handle_info(startup, _State) ->
   NBits = params_handler:get_param(nbits),
   naming_handler:notify_identity(self(), fixer),
   erlang:send_after(20000, self(), fix),                    %TODO tune parameters accordingly
-  {ok, #state{id = ID, nbits = NBits, index = 0}};
+  {noreply, #state{id = ID, nbits = NBits, index = 0}};
 
 handle_info(fix, State) ->
   Theo = (State#state.id + round(math:pow(2, State#state.index)))

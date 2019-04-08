@@ -100,7 +100,7 @@ handle_info(startup, _State) ->
   naming_handler:wait_service(params_handler),
   NBits = params_handler:get_param(nbits),
   naming_handler:notify_identity(self(), hash_f),
-  {ok, #state{nbits = NBits}};
+  {noreply, #state{nbits = NBits}};
 
 handle_info(_Info, State) ->
   {noreply, State}.

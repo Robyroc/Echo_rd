@@ -109,7 +109,7 @@ handle_cast(Request, State) ->
 handle_info(startup, _State) ->
   naming_handler:wait_service(router),
   naming_handler:notify_identity(self(), request_gateway),
-  {ok, #state{requests = []}};
+  {noreply, #state{requests = []}};
 
 handle_info({'DOWN', Monitor, process, _PID, Reason}, State) ->
   Present = [X || {_, X, M} <- State#state.requests, M =:= Monitor],
