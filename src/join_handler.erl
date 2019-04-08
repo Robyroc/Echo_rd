@@ -24,7 +24,7 @@
   leave_info/2,
   ack_info/1,
   ack_leave/1,
-  create/0]).
+  create/1]).
 
 %% gen_statem callbacks
 -export([
@@ -51,9 +51,9 @@
 %%% API
 %%%===================================================================
 
-create() ->
+create(Nbits) ->
   PID = naming_handler:get_identity(join_handler),
-  gen_statem:call(PID, {create}).
+  gen_statem:call(PID, {create, Nbits}).
 
 join(Address) ->
   PID = naming_handler:get_identity(join_handler),
@@ -130,7 +130,7 @@ start_link() ->
 init([]) ->
   naming_handler:notify_identity(self(), join_handler),
   ok = handle(init_joiner),
-  {ok, init_joiner, #session{provider_addr = undefined, joiner_addr = link_manager:get_own_address(),
+  {ok, init_joiner, #session{provider_addr = undefined, joiner_addr = link_manager:get_own_address(), %TODO check on addr
     succ_addr = undefined, res = undefined, succ_list = undefined, nbits = undefined,
     app_mngr = undefined, curr_addr = undefined, curr_id = undefined}, []}.
 
@@ -192,20 +192,20 @@ init_joiner({call, From}, {join, Address}, _Session) ->
   communication_manager:send_message(lookup_for_join, [], Address, no_alias),
   {next_state, look, #session{app_mngr = From, provider_addr = Address}, [Reply]};
 
-init_joiner({call, From}, create, Session) ->
+init_joiner({call, From}, {create, Nbits}, Session) ->
   Reply = {reply, From, ok},
   ok = handle(init_joiner),
   %TODO start
-  {next_state, init_provider, Session, [Reply]};
+  {next_state, init_provider, Session#session{nbits = Nbits}, [Reply]};
 
 init_joiner(EventType, EventContent, Session) ->
   handle_generic_event({EventType, EventContent, Session}).
 
 
-look(cast, {look_resp,Address}, _Session) ->
+look(cast, {look_resp,Address}, Session) ->
   ok = handle(look),
   communication_manager:send_message(ready_for_info, [], Address, no_alias),
-  {next_state, pre_join, #session{succ_addr = stabilizer:get_successor()}, [{state_timeout, ?INTERVAL, hard_stop}]};
+  {next_state, pre_join, Session#session{succ_addr = stabilizer:get_successor()}, [{state_timeout, ?INTERVAL, hard_stop}]};
 
 look(state_timeout, hard_stop, Session) ->
   ok = handle(look),
@@ -222,7 +222,7 @@ pre_join(cast, {info,Address, Res, Succ, Nbits}, Session) ->
   case Address of
     _ when Address =:= ProviderAddr ->
       communication_manager:send_message(ack_info, [], Address, no_alias),
-      {next_state, j_ready, #session{res = Res, succ_list = Succ, nbits = Nbits}, [{state_timeout, ?INTERVAL, hard_stop}]};
+      {next_state, j_ready, Session#session{res = Res, succ_list = Succ, nbits = Nbits}, [{state_timeout, ?INTERVAL, hard_stop}]};
     _ -> {keep_state, Session, [{state_timeout, ?INTERVAL, hard_stop}]}
   end;
 
@@ -275,7 +275,7 @@ init_provider(cast, {ready_for_info, Address}, Session) ->
       DataInfo={application_manager:receive_command(resources),stabilizer:get_successor_list(),  %%TODO Res from AM
         params_handler:get_param(nbits)},
       communication_manager:send_message(join_info,DataInfo,Address,no_alias),
-      {next_state, not_alone, #session{curr_id = JoinerID, curr_addr = Address}}
+      {next_state, not_alone, Session#session{curr_id = JoinerID, curr_addr = Address}}
   end;
 
 init_provider(cast, {leave_info,Resources, Address}, Session) ->
