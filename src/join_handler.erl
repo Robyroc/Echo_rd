@@ -209,7 +209,7 @@ init_joiner(EventType, EventContent, Session) ->
 look(cast, {look_resp,Address}, Session) ->
   ok = handle(look),
   communication_manager:send_message(ready_for_info, [], Address, no_alias),
-  {next_state, pre_join, Session#session{succ_addr = stabilizer:get_successor()}, [{state_timeout, ?INTERVAL, hard_stop}]};
+  {next_state, pre_join, Session#session{succ_addr = Address}, [{state_timeout, ?INTERVAL, hard_stop}]};
 
 look(state_timeout, hard_stop, Session) ->
   ok = handle(look),
@@ -276,12 +276,14 @@ init_provider(cast, {ready_for_info, Address}, Session) ->
   JoinerID = hash_f:get_hashed_addr(Address),
   case JoinerID of
     _ when JoinerID =< PredecessorID ->
+      io:format("JH: here"),
       communication_manager:send_message(abort, ["Not updated"],Address, no_alias),
       {keep_state, Session};
     _ when JoinerID > PredecessorID ->
-      DataInfo={application_manager:get_local_resources(),stabilizer:get_successor_list(),
-        params_handler:get_param(nbits)},
-      communication_manager:send_message(join_info,DataInfo,Address,no_alias),
+      io:format("JH: there"),
+      DataInfo={params_handler:get_param(nbits), stabilizer:get_successor_list(),
+        application_manager:get_local_resources()},
+      ok = communication_manager:send_message(join_info,DataInfo,Address,no_alias),   %TODO check this line
       {next_state, not_alone, Session#session{curr_id = JoinerID, curr_addr = Address}, [{state_timeout, ?INTERVAL_JOIN, hard_stop}]}
   end;
 
@@ -315,7 +317,7 @@ not_alone(cast, {ready_for_info, Address}, Session) ->
     _ when JoinerID > CurrID ->
       CurrAddr = Session#session.curr_addr,
       communication_manager:send_message(abort, ["Loss priority"],CurrAddr, no_alias),
-      DataInfo = {Session#session.res,Session#session.succ_list,Session#session.nbits},
+      DataInfo = {Session#session.nbits, Session#session.succ_list, Session#session.res},
       communication_manager:send_message(join_info, DataInfo, Address, no_alias),
       {keep_state, Session, [{state_timeout, ?INTERVAL_JOIN, hard_stop}]}
   end;
