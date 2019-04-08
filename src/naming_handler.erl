@@ -46,6 +46,13 @@ wait_service(Name) ->
 reheir(PID, NewManager) ->
   gen_server:call(PID, {reheir, NewManager}).
 
+get_maybe_identity(Identity) ->
+  try get_identity(Identity) of
+    PID -> PID
+  catch
+    error:badarg -> no_name_registered
+  end.
+
 %%--------------------------------------------------------------------
 %% @doc
 %% Starts the server
@@ -159,11 +166,4 @@ wait_for_srv(Name) ->
       timer:sleep(100),
       wait_for_srv(Name);
     _ -> ok
-  end.
-
-get_maybe_identity(Identity) ->
-  try get_identity(Identity) of
-    PID -> PID
-  catch
-    error:badarg -> no_name_registered
   end.

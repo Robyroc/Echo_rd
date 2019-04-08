@@ -107,7 +107,6 @@ handle_cast(Request, State) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_info(startup, _State) ->
-  naming_handler:wait_service(router),
   naming_handler:notify_identity(self(), request_gateway),
   {noreply, #state{requests = []}};
 
