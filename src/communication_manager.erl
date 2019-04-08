@@ -215,7 +215,7 @@ encode_params(command, [C], _NBits) -> [C];
 encode_params(_, _, _) -> badarg.
 
 decode_params(lookup_for_join, [], _NBits) -> [];
-decode_params(lookup_response, [ID, Addr], _NBits) -> [decode_ID(ID), link_manager:binary_to_address(Addr)];
+decode_params(lookup_response, [Addr, ID], _NBits) -> [decode_ID(ID), link_manager:binary_to_address(Addr)];
 decode_params(ready_for_info, [], _NBits) -> [];
 decode_params(join_info, [M], _NBits) -> decode_nbits_successor_and_resources(M);
 decode_params(ack_info, [], _NBits) -> [];

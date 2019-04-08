@@ -90,10 +90,10 @@ handle_cast({pred_find, Address}, State) ->
     nil ->
       Index = hash_f:get_hashed_addr(Address),
       case Index of
-        _ when Index =< State#state.own_id ->
+        _ when Index < State#state.own_id ->
           ok = communication_manager:send_message(pred_reply, [Address, SuccList], Address, no_alias),
           {noreply, #state{pred = Address, pred_id = Index}, ?INTERVAL};
-        _ when Index > State#state.own_id ->
+        _ when Index >= State#state.own_id ->
           CorrectIndex = Index - round(math:pow(2, State#state.n_bits)),
           communication_manager:send_message(pred_reply, [Address, SuccList], Address, no_alias),
           {noreply, #state{pred = Address, pred_id = CorrectIndex}, ?INTERVAL}
@@ -101,12 +101,13 @@ handle_cast({pred_find, Address}, State) ->
     Predecessor ->
       Index = hash_f:get_hashed_addr(Address),
       #state{pred = Predecessor, pred_id = PredID, own_id = OwnID, n_bits = NBits} = State,
+      io:format("CHECKER: ~p~n", [PredID]),
       case Index of
-        _ when Index =< OwnID ->
+        _ when Index < OwnID ->
           {Addr, PredecessorID} = predecessor_chooser(Address, Index, Predecessor, PredID),
           communication_manager:send_message(pred_reply, [Addr, SuccList], Address, no_alias),
           {noreply, #state{pred = Addr, pred_id = PredecessorID}, ?INTERVAL};
-        _ when Index > OwnID ->
+        _ when Index >= OwnID ->
           CorrectIndex = Index - round(math:pow(2, NBits)),
           {Addr, PredecessorID} = predecessor_chooser(Address, CorrectIndex, Predecessor, PredID),
           communication_manager:send_message(pred_reply, [Addr, SuccList], Address, no_alias),
