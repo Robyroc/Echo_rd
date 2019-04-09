@@ -139,7 +139,7 @@ handle_cast({update, Address, Theoretical}, State) ->
   {noreply, #state{finger_table = NewTable, nbits = State#state.nbits, id = State#state.id}};
 
 handle_cast({lookup, Alias, Requested}, State) ->
-  ActualRequested = normalize_id(Requested, State#state.nbits),
+  ActualRequested = adjust_successor(Requested, State#state.id, State#state.nbits),
   {SuccID, Succ} = stabilizer:get_successor(),
   %io:format("Look:~p~n", [SuccID]),
   Next = check_if_next(ActualRequested, State#state.id, SuccID, State#state.nbits),
