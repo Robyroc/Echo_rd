@@ -465,7 +465,6 @@ soft_reset_session(Session) ->
     res = undefined,
     succ_list = undefined,
     nbits = undefined,
-    app_mngr = undefined,
     curr_addr = undefined,
     curr_id = undefined}.
 

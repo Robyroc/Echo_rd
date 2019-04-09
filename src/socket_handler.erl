@@ -4,7 +4,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/1, send_message/2]).
+-export([start_link/1, send_message/2, start/1]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -30,6 +30,9 @@
 %%--------------------------------------------------------------------
 start_link(Socket) ->
   gen_server:start_link(?MODULE, [Socket], []).
+
+start(Socket) ->
+  gen_server:start(?MODULE, [Socket], []).
 
 send_message(PID, Message) ->
   gen_server:call(PID, {send, Message})   .        %TODO timeout?

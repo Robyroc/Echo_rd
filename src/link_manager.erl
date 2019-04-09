@@ -178,6 +178,13 @@ handle_info({'DOWN', Monitor, process, _PID, Reason}, State) ->
   io:format("LM: A handler failed: Address: ~p~nReason: ~p~n", [hd(Present), Reason]),
   {noreply, #state{connections = [{P, A, M} || {P, A, M} <- State#state.connections, M =/= Monitor]}};
 
+handle_info({tcp, Socket, Bin}, State) ->
+  {ok, Pid} = socket_handler:start(Socket),
+  Pid ! {tcp, Socket, Bin},
+  timer:sleep(100),
+  exit(Pid, kill),
+  {noreply, State};
+
 handle_info(Info, State) ->
   io:format("LM: Unexpected ! message: ~p~n", [Info]),
   {noreply, State}.
