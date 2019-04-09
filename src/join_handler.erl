@@ -47,7 +47,7 @@
 -define(INTERVAL_LEAVING, 30000).
 -define(INTERVAL_JOIN, 50000).
 
--record(session, {provider_addr, succ_addr, res, succ_list, nbits, app_mngr, curr_addr, curr_id, superv}).
+-record(session, {provider_addr, succ_addr, res, succ_list, nbits, app_mngr, curr_addr, curr_id, superv, stabilizer}).
 
 %%%===================================================================
 %%% API
@@ -371,9 +371,11 @@ leaving(cast, {ack_leave, Address}, Session) ->
   case Address of
     _ when Address =:= SuccessorAddress ->
       gen_statem:reply(Session#session.app_mngr, ok),
+      Stab = naming_handler:get_identity(stabilizer),
       application_manager:drop_many_resources(all_res),
       exit(naming_handler:get_identity(communication_supervisor), kill),
-      {next_state, init_joiner, reset_session(Session)};
+      naming_handler:delete_comm_tree(),
+      {next_state, init_joiner, reset_session(Session#session{stabilizer = Stab})};
     _ -> {keep_state, Session, [{state_timeout, ?INTERVAL_LEAVING, hard_stop}]}
   end;
 
@@ -451,6 +453,10 @@ handle_generic_event({_, _, Session}) ->
 
 
 start(Session) ->
+  case Session#session.stabilizer of
+    undefined -> ok;
+    Pid -> stabilizer:turn_on(Pid)
+  end,
   #session{nbits = Nbits, succ_list = SuccList, succ_addr = SuccAddr, res = Resources,
     superv = Supervisor, app_mngr = AM} = Session,
   ParamsHandler = {params_handler, {params_handler, start_link, [SuccAddr, SuccList, Nbits]},

@@ -4,7 +4,8 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, get_successor/0, get_successor_list/0, notify_successor/2, notify_lost_node/1]).
+-export([start_link/0, get_successor/0, get_successor_list/0, notify_successor/2,
+  notify_lost_node/1, turn_off/0, turn_on/1]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -17,7 +18,7 @@
 -define(SERVER, ?MODULE).
 -define(INTERVAL, 5000).
 
--record(state, {succ_list, id, nbits}).
+-record(state, {succ_list, id, nbits, op}).
 
 %%%===================================================================
 %%% API
@@ -48,6 +49,13 @@ notify_lost_node(Address) ->
   PID = naming_handler:get_identity(stabilizer),
   gen_server:call(PID, {lost, Address}).
 
+turn_off() ->
+  PID = naming_handler:get_identity(stabilizer),
+  gen_server:call(PID, turn_off).
+
+turn_on(PID) ->
+  gen_server:call(PID, turn_on).
+
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
@@ -65,7 +73,7 @@ notify_lost_node(Address) ->
 %%--------------------------------------------------------------------
 init([]) ->
   self() ! startup,
-  {ok, #state{}}.
+  {ok, #state{op = no_operating}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -90,6 +98,13 @@ handle_call({lost, Address}, _From, State) ->
     [] -> {stop, ok, State#state{succ_list = AdjNewList}};         %TODO check this corner case
     _ -> {reply, ok, State#state{succ_list = AdjNewList}}
   end;
+
+handle_call(turn_off, _From, _State) ->
+  {reply, ok, #state{succ_list = undefined, nbits = undefined, id = undefined, op = no_operating}};
+
+handle_call(turn_on, _From, _State) ->
+  self ! startup,
+  {ok, #state{op = no_operating}};
 
 handle_call(Request, _From, State) ->
   io:format("STABILIZER: Unexpected call message: ~p~n", [Request]),
@@ -137,13 +152,18 @@ handle_info(startup, _State) ->
   NewList = update_successor_list(lists:sort(Corrected), {SuccID, Successor}, NBits),
   naming_handler:notify_identity(self(), stabilizer),
   erlang:send_after(?INTERVAL, self(), stabilize),
-  {noreply, #state{succ_list = NewList, id = ID, nbits = NBits}};
+  {noreply, #state{succ_list = NewList, id = ID, nbits = NBits, op = operating}};
 
 handle_info(stabilize, State) ->
-  Successor = hd([Addr || {_, Addr} <- State#state.succ_list]),
-  communication_manager:send_message(ask_pred, [], Successor, no_alias),
-  erlang:send_after(?INTERVAL, self(), stabilize),
-  {noreply, State};
+  case State#state.op of
+    operating ->
+      Successor = hd([Addr || {_, Addr} <- State#state.succ_list]),
+      communication_manager:send_message(ask_pred, [], Successor, no_alias),
+      erlang:send_after(?INTERVAL, self(), stabilize),
+      {noreply, State};
+    no_operating ->
+      {noreply, State}
+  end;
 
 handle_info(Info, State) ->
   io:format("STABILIZER: Unexpected ! message: ~p~n", [Info]),

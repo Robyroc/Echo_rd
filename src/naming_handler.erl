@@ -4,7 +4,8 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, notify_identity/2, get_identity/1, wait_service/1, get_maybe_identity/1, reheir/2]).
+-export([start_link/0, notify_identity/2, get_identity/1, wait_service/1,
+  get_maybe_identity/1, reheir/2, delete_comm_tree/0]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -53,6 +54,10 @@ get_maybe_identity(Identity) ->
     error:badarg -> no_name_registered
   end.
 
+delete_comm_tree() ->
+  Naming = get_identity(naming_handler),
+  gen_server:call(Naming, delete).          %TODO check if timeout is needed
+
 %%--------------------------------------------------------------------
 %% @doc
 %% Starts the server
@@ -89,6 +94,13 @@ init([]) ->
 %%--------------------------------------------------------------------
 handle_call({notify, Identity, PID}, _From, State) ->
   ets:insert(naming_db, {Identity, PID}),
+  {reply, ok, State};
+
+handle_call(delete, _From, State) ->
+  ets:delete(naming_db, params_handler),
+  ets:delete(naming_db, hash_f),
+  ets:delete(naming_db, stabilizer),
+  ets:delete(naming_db, router),
   {reply, ok, State};
 
 handle_call({reheir, NewManager}, _From, State) ->
