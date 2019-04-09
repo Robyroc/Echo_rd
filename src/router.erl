@@ -118,12 +118,12 @@ handle_cast({update, Address, Theoretical}, State) ->
   Greater = [{Theo, R, A} || {Theo, R, A} <- Table, Theo > Theoretical],
   AdjustedID = adjust_successor(hash_f:get_hashed_addr(Address), ID, NBits),
   NewTable = lists:flatten([lists:reverse([{Theoretical, AdjustedID, Address} | lists:reverse(Less)]) | Greater]),
-  io:format("Look:~p~n", [NewTable]),
+  %io:format("Look:~p~n", [NewTable]),
   {noreply, #state{finger_table = NewTable, nbits = State#state.nbits, id = State#state.id}};
 
 handle_cast({lookup, Alias, Requested}, State) ->
   {_, SuccID, Succ} = hd(State#state.finger_table),
-  io:format("Look:~p~n", [SuccID]),
+  %io:format("Look:~p~n", [SuccID]),
   Next = check_if_next(Requested, State#state.id, SuccID, State#state.nbits),
   case Next of
     next ->

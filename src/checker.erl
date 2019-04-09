@@ -4,7 +4,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, get_pred/1, clear_pred/0]).
+-export([start_link/0, get_pred/1, clear_pred/0, get_pred_id/0]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -40,6 +40,10 @@ get_pred(Address) ->
   PID = naming_handler:get_identity(checker),
   gen_server:cast(PID, {pred_find, Address}).
 
+get_pred_id() ->
+  PID = naming_handler:get_identity(checker),
+  gen_server:call(PID, pred_id).
+
 clear_pred() ->
   PID = naming_handler:get_identity(checker),
   PID ! timeout.
@@ -73,6 +77,9 @@ init([]) ->
 handle_call({pred_find, local_address}, _From, State) ->
   {reply, State#state.pred , State, ?INTERVAL};
 
+handle_call(pred_id, _From, State) ->
+  {reply, State#state.pred_id , State, ?INTERVAL};
+
 handle_call(Request, _From, State) ->
   io:format("CHECKER: Unexpected call message: ~p~n", [Request]),
   {reply, ok, State}.
@@ -92,11 +99,11 @@ handle_cast({pred_find, Address}, State) ->
       case Index of
         _ when Index < State#state.own_id ->
           ok = communication_manager:send_message(pred_reply, [Address, SuccList], Address, no_alias),
-          {noreply, #state{pred = Address, pred_id = Index}, ?INTERVAL};
+          {noreply, State#state{pred = Address, pred_id = Index}, ?INTERVAL};
         _ when Index >= State#state.own_id ->
           CorrectIndex = Index - round(math:pow(2, State#state.n_bits)),
           communication_manager:send_message(pred_reply, [Address, SuccList], Address, no_alias),
-          {noreply, #state{pred = Address, pred_id = CorrectIndex}, ?INTERVAL}
+          {noreply, State#state{pred = Address, pred_id = CorrectIndex}, ?INTERVAL}
       end;
     Predecessor ->
       Index = hash_f:get_hashed_addr(Address),
@@ -106,12 +113,12 @@ handle_cast({pred_find, Address}, State) ->
         _ when Index < OwnID ->
           {Addr, PredecessorID} = predecessor_chooser(Address, Index, Predecessor, PredID),
           communication_manager:send_message(pred_reply, [Addr, SuccList], Address, no_alias),
-          {noreply, #state{pred = Addr, pred_id = PredecessorID}, ?INTERVAL};
+          {noreply, State#state{pred = Addr, pred_id = PredecessorID}, ?INTERVAL};
         _ when Index >= OwnID ->
           CorrectIndex = Index - round(math:pow(2, NBits)),
           {Addr, PredecessorID} = predecessor_chooser(Address, CorrectIndex, Predecessor, PredID),
           communication_manager:send_message(pred_reply, [Addr, SuccList], Address, no_alias),
-          {noreply, #state{pred = Addr, pred_id = PredecessorID}, ?INTERVAL}
+          {noreply, State#state{pred = Addr, pred_id = PredecessorID}, ?INTERVAL}
       end
   end;
 
@@ -139,8 +146,8 @@ handle_info(startup, _State) ->
   naming_handler:notify_identity(self(), checker),
   {noreply, #state{pred = Predecessor, pred_id = PredID, own_id = OwnID, n_bits = NBits}};
 
-handle_info(timeout, _State) ->
-  {noreply, #state{pred = nil, pred_id = nil}};
+handle_info(timeout, State) ->
+  {noreply, State#state{pred = nil, pred_id = nil}};
 
 handle_info(Info, State) ->
   io:format("CHECKER: Unexpected ! message: ~p~n", [Info]),

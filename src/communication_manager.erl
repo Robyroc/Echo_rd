@@ -199,7 +199,7 @@ encode_params(lookup_for_join, [], _NBits) -> [];
 encode_params(lookup_response, _, no_nbits) -> badarg;
 encode_params(lookup_response, [ID, Addr], NBits) -> [link_manager:address_to_binary(Addr), encode_ID(ID, NBits)];
 encode_params(ready_for_info, [], _NBits) -> [];
-encode_params(join_info, [NBits, LS, Res], _NBits) -> encode_nbits_successor_and_resources([NBits, LS, Res]);
+encode_params(join_info, [NBits, LS, Res], _NBits) -> [encode_nbits_successor_and_resources([NBits, LS, Res])];
 encode_params(ack_info, [], _NBits) -> [];
 encode_params(abort, [S], _NBits) -> [list_to_binary(S)];
 encode_params(ack_join, [], _NBits) -> [];
@@ -265,6 +265,9 @@ decode_ID(Bin, Acc) ->
 
 %TODO remove comment, it is just for testing
 % communication_manager:decode_resource(communication_manager:encode_resource([{3587, <<"dwin">>}, {321, <<"abcdefghijklmnopqrstuvwxyz">>}], 12), 12).
+
+encode_resource([], _) -> <<>>;
+
 encode_resource(Resources, NBits) ->              % Resources are in the form of {ID, <<Bin>>}
   N = length(Resources),
   DimOfN = ceil(ceil(math:log2(N))/8),
@@ -278,6 +281,8 @@ encode_resource(Resources, NBits) ->              % Resources are in the form of
   BinaryResource = list_to_binary(Binaries),
   BinDimOfN = <<N:(DimOfN*8)>>,
   <<DimOfN:8, BinDimOfN/binary, EncodedIndexes/binary, (ceil(BitsForDim / 8)):8, EncodedLengths/binary ,BinaryResource/binary>>.
+
+decode_resource(<<>>, _) -> [];
 
 decode_resource(Bin, NBits) ->
   <<DimOfN:8/integer, Bin2/binary>> = Bin,
