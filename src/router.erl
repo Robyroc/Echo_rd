@@ -88,15 +88,16 @@ handle_call(show_table, _From, State) ->
   {reply, ok, State};
 
 handle_call({lookup, Requested}, From, State) ->
+  ActualRequested = normalize_id(Requested, State#state.nbits),
   {_, SuccID, Succ} = hd(State#state.finger_table),
-  io:format("Req:~p~n", [Requested]),
-  Next = check_if_next(Requested, State#state.id, SuccID, State#state.nbits),
+  io:format("Req:~p~n", [ActualRequested]),
+  Next = check_if_next(ActualRequested, State#state.id, SuccID, State#state.nbits),
   case Next of
     next -> {reply, {found, Succ}, State};
     _ ->
-      List = lookup(Requested, State#state.id, State#state.finger_table, State#state.nbits),
+      List = lookup(ActualRequested, State#state.id, State#state.finger_table, State#state.nbits),
 
-      request_gateway:add_request(Requested, From, List),
+      request_gateway:add_request(ActualRequested, From, List),
       {noreply, State}
   end;
 
@@ -122,16 +123,17 @@ handle_cast({update, Address, Theoretical}, State) ->
   {noreply, #state{finger_table = NewTable, nbits = State#state.nbits, id = State#state.id}};
 
 handle_cast({lookup, Alias, Requested}, State) ->
+  ActualRequested = normalize_id(Requested, State#state.nbits),
   {_, SuccID, Succ} = hd(State#state.finger_table),
   %io:format("Look:~p~n", [SuccID]),
-  Next = check_if_next(Requested, State#state.id, SuccID, State#state.nbits),
+  Next = check_if_next(ActualRequested, State#state.id, SuccID, State#state.nbits),
   case Next of
     next ->
-      communication_manager:send_message(lookup_response, [Requested, Succ], Alias, no_alias),
+      communication_manager:send_message(lookup_response, [ActualRequested, Succ], Alias, no_alias),
       {noreply, State};
     _ ->
-      Destination = hd(lookup(Requested, State#state.id, State#state.finger_table, State#state.nbits)),
-      communication_manager:send_message(lookup, [Requested], Destination, Alias),
+      Destination = hd(lookup(ActualRequested, State#state.id, State#state.finger_table, State#state.nbits)),
+      communication_manager:send_message(lookup, [ActualRequested], Destination, Alias),
       {noreply, State}
   end;
 
