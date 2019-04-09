@@ -39,12 +39,12 @@ update_finger_table(Address, Theoretical) ->
   PID = naming_handler:get_identity(router),
   gen_server:cast(PID, {update, Address, Theoretical}).
 
-remote_lookup(Alias, Requested) ->
+remote_lookup(Requested, Alias) ->
   PID = naming_handler:get_identity(router),
   gen_server:cast(PID, {lookup, Alias, Requested}).
 
 lookup_for_join(Address) ->
-  remote_lookup(Address, hash_f:get_hashed_addr(Address)).
+  remote_lookup(hash_f:get_hashed_addr(Address), Address).
 
 show_table() ->
   PID = naming_handler:get_identity(router),

@@ -76,7 +76,7 @@ handle_call(Request, _From, State) ->
 %%--------------------------------------------------------------------
 handle_cast({response, Address}, State) ->
   gen_server:reply(State#state.from, {found, Address}),
-  {stop, found, State};
+  {stop, normal, State};
 
 handle_cast(Request, State) ->
   io:format("Request: Unexpected cast message: ~p~n", [Request]),

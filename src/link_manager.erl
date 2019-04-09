@@ -181,7 +181,7 @@ handle_info({'DOWN', Monitor, process, _PID, Reason}, State) ->
 handle_info({tcp, Socket, Bin}, State) ->
   {ok, Pid} = socket_handler:start(Socket),
   Pid ! {tcp, Socket, Bin},
-  timer:sleep(100),
+  timer:sleep(10000),
   exit(Pid, kill),
   {noreply, State};
 

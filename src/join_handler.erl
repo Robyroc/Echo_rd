@@ -41,6 +41,7 @@
   init_joiner/3,
   look/3, pre_join/3, j_ready/3, init_provider/3, not_alone/3, leaving/3]).
 
+-define(SLEEP_INTERVAL, 1000).
 -define(SERVER, ?MODULE).
 -define(INTERVAL, 10000).
 -define(INTERVAL_LEAVING, 30000).
@@ -236,6 +237,7 @@ pre_join(cast, {abort, Reason}, Session) ->
   ok = handle(pre_join, look),
   io:format("Reason of abort: ~p~n", [Reason]),
   ProviderAddr = Session#session.provider_addr,
+  timer:sleep(?SLEEP_INTERVAL),
   communication_manager:send_message(lookup_for_join, [], ProviderAddr, no_alias),
   {next_state, look, soft_reset_session(Session), [{state_timeout, ?INTERVAL, hard_stop}]};
 
@@ -258,6 +260,7 @@ j_ready(cast, {abort, Reason}, Session) ->
   ok = handle(j_ready, look),
   io:format("Reason of abort: ~p~n", [Reason]),
   ProviderAddr = Session#session.provider_addr,
+  timer:sleep(?SLEEP_INTERVAL),
   communication_manager:send_message(lookup_for_join, [], ProviderAddr, no_alias),
   {next_state, look, soft_reset_session(Session), [{state_timeout, ?INTERVAL, hard_stop}]};
 

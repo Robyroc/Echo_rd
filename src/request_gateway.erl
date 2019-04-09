@@ -110,6 +110,9 @@ handle_info(startup, _State) ->
   naming_handler:notify_identity(self(), request_gateway),
   {noreply, #state{requests = []}};
 
+handle_info({'DOWN', Monitor, process, _PID, normal}, State) ->
+  {noreply, #state{requests = [{P, R, M} || {P, R, M} <- State#state.requests, M =/= Monitor]}};
+
 handle_info({'DOWN', Monitor, process, _PID, Reason}, State) ->
   Present = [X || {_, X, M} <- State#state.requests, M =:= Monitor],
   io:format("R. Gateway: A request failed: Requested: ~p~nReason: ~p~n", [hd(Present), Reason]),
