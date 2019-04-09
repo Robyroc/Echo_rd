@@ -242,6 +242,7 @@ forward(join_info, [NBits, LS, R], From) -> join_handler:info(From, R, LS, NBits
 forward(ack_info, [], From) -> join_handler:ack_info(From);
 forward(abort, [S], _From) -> join_handler:abort(S);
 forward(ack_join, [], From) -> join_handler:ack_join(From);
+forward(leave_info, [], From) -> join_handler:leave_info([], From);
 forward(leave_info, [Res], From) -> join_handler:leave_info(Res, From);
 forward(leave_ack, [], From) -> join_handler:ack_leave(From);
 forward(ask_pred, [], From) -> checker:get_pred(From);

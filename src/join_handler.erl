@@ -367,9 +367,9 @@ not_alone(EventType, EventContent, Session) ->
 
 leaving(cast, {ack_leave, Address}, Session) ->
   ok = handle(leaving, init_joiner),
-  SuccessorAddr = Session#session.succ_addr,
+  {_, SuccessorAddress} = stabilizer:get_successor(),
   case Address of
-    _ when Address =:= SuccessorAddr ->
+    _ when Address =:= SuccessorAddress ->
       gen_statem:reply(Session#session.app_mngr, ok),
       application_manager:drop_many_resources(all_res),
       exit(naming_handler:get_identity(communication_supervisor), kill),
