@@ -103,8 +103,8 @@ handle_call(turn_off, _From, _State) ->
   {reply, ok, #state{succ_list = undefined, nbits = undefined, id = undefined, op = no_operating}};
 
 handle_call(turn_on, _From, _State) ->
-  self ! startup,
-  {ok, #state{op = no_operating}};
+  self() ! startup,
+  {reply, ok, #state{op = no_operating}};
 
 handle_call(Request, _From, State) ->
   io:format("STABILIZER: Unexpected call message: ~p~n", [Request]),

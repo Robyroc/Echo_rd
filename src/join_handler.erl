@@ -374,6 +374,7 @@ leaving(cast, {ack_leave, Address}, Session) ->
       Stab = naming_handler:get_identity(stabilizer),
       application_manager:drop_many_resources(all_res),
       exit(naming_handler:get_identity(communication_supervisor), kill),
+      stabilizer:turn_off(),
       naming_handler:delete_comm_tree(),
       {next_state, init_joiner, reset_session(Session#session{stabilizer = Stab})};
     _ -> {keep_state, Session, [{state_timeout, ?INTERVAL_LEAVING, hard_stop}]}
@@ -460,7 +461,7 @@ start(Session) ->
   #session{nbits = Nbits, succ_list = SuccList, succ_addr = SuccAddr, res = Resources,
     superv = Supervisor, app_mngr = AM} = Session,
   ParamsHandler = {params_handler, {params_handler, start_link, [SuccAddr, SuccList, Nbits]},
-    transient, 2000, worker, [params_handler]},
+    temporary, 2000, worker, [params_handler]},
   supervisor:start_child(Supervisor, ParamsHandler),
   application_manager:add_many_resources(Resources),
   naming_handler:wait_service(hash_f),
