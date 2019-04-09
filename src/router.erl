@@ -93,7 +93,7 @@ handle_call(show_table, _From, State) ->
 
 handle_call({lookup, Requested}, From, State) ->
   ActualRequested = normalize_id(Requested, State#state.nbits),
-  {_, SuccID, Succ} = hd(State#state.finger_table),
+  {SuccID, Succ} = stabilizer:get_successor(),
   io:format("Req:~p~n", [ActualRequested]),
   Next = check_if_next(ActualRequested, State#state.id, SuccID, State#state.nbits),
   case Next of
@@ -140,7 +140,7 @@ handle_cast({update, Address, Theoretical}, State) ->
 
 handle_cast({lookup, Alias, Requested}, State) ->
   ActualRequested = normalize_id(Requested, State#state.nbits),
-  {_, SuccID, Succ} = hd(State#state.finger_table),
+  {SuccID, Succ} = stabilizer:get_successor(),
   %io:format("Look:~p~n", [SuccID]),
   Next = check_if_next(ActualRequested, State#state.id, SuccID, State#state.nbits),
   case Next of

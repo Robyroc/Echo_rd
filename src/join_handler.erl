@@ -226,9 +226,9 @@ look(EventType, EventContent, Session) ->
 
 pre_join(cast, {info,Address, Res, Succ, Nbits}, Session) ->
   ok = handle(pre_join, j_ready),
-  ProviderAddr = Session#session.provider_addr,
+  SuccAddr = Session#session.succ_addr,
   case Address of
-    _ when Address =:= ProviderAddr ->
+    _ when Address =:= SuccAddr ->
       communication_manager:send_message(ack_info, [], Address, no_alias),
       {next_state, j_ready, Session#session{res = Res, succ_list = Succ, nbits = Nbits}, [{state_timeout, ?INTERVAL_JOIN, hard_stop}]};
     _ -> {keep_state, Session, [{state_timeout, ?INTERVAL, hard_stop}]}
