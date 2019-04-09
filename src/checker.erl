@@ -185,7 +185,9 @@ code_change(_OldVsn, State, _Extra) ->
 predecessor_chooser(Address, AddressID, Predecessor, PredecessorID) ->
   case AddressID of
     _ when AddressID > PredecessorID ->
+      io:format("Pred changed, Address: ~p  Pred:~p  ~n", [Address, Predecessor]),
       {Address, AddressID};
     _ when AddressID =< PredecessorID ->
+      io:format("Pred not changed, Address: ~p  Pred:~p  ~n", [Address, Predecessor]),
       {Predecessor, PredecessorID}
   end.
