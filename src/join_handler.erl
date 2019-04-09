@@ -63,7 +63,7 @@ join(Address) ->
 
 leave() ->
   PID = naming_handler:get_identity(join_handler),
-  gen_statem:call(PID, {leave}).
+  gen_statem:call(PID, leave).
 
 look_response(Address) ->
   PID = naming_handler:get_identity(join_handler),
@@ -220,6 +220,7 @@ look(state_timeout, hard_stop, Session) ->
 
 look(EventType, EventContent, Session) ->
   ok = handle(look, look),
+  io:format("Event abnormal in Look: ~p~n", [EventType]),
   handle_generic_event({EventType, EventContent, Session}).
 
 
@@ -302,11 +303,12 @@ init_provider({call,From}, leave, Session) ->
   ok = handle(init_provider, leaving),
   Reply = postpone,
   application_manager:get_local_resources(),
-  SuccAddr = Session#session.succ_addr,
-  communication_manager:send_message(leave_info, [], SuccAddr, no_alias), %TODO put resources instead of void list
+  {_, Successor} = stabilizer:get_successor(),
+  communication_manager:send_message(leave_info, [], Successor, no_alias), %TODO put resources instead of void list
   {next_state, leaving, Session#session{app_mngr = From}, [{state_timeout, ?INTERVAL_LEAVING, hard_stop}, Reply]};
 
 init_provider(EventType, EventContent, Session) ->
+  io:format("Event abnormal in Init Provider: ~p~n", [EventType]),
   ok = handle(init_provider, init_provider),
   handle_generic_event({EventType, EventContent, Session}).
 
