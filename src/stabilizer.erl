@@ -83,9 +83,12 @@ handle_call(get_succ_list, _From, State) ->
 
 handle_call({lost, Address}, _From, State) ->
   NewList = [{I, A} || {I, A} <- State#state.succ_list, A =/= Address],
-  case NewList of
-    [] -> {stop, ok, State#state{succ_list = NewList}};         %TODO check this corner case
-    _ -> {reply, ok, State#state{succ_list = NewList}}
+  {SuccID, SuccAddr} = hd(NewList),
+  AdjSuccID = adjust_successor(SuccID, State#state.id, State#state.nbits),
+  AdjNewList = [{AdjSuccID, SuccAddr} | tl(NewList)],
+  case AdjNewList of
+    [] -> {stop, ok, State#state{succ_list = AdjNewList}};         %TODO check this corner case
+    _ -> {reply, ok, State#state{succ_list = AdjNewList}}
   end;
 
 handle_call(Request, _From, State) ->

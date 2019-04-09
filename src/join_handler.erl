@@ -454,7 +454,7 @@ start(Session) ->
   #session{nbits = Nbits, succ_list = SuccList, succ_addr = SuccAddr, res = Resources,
     superv = Supervisor, app_mngr = AM} = Session,
   ParamsHandler = {params_handler, {params_handler, start_link, [SuccAddr, SuccList, Nbits]},
-    permanent, 2000, worker, [params_handler]},
+    transient, 2000, worker, [params_handler]},
   supervisor:start_child(Supervisor, ParamsHandler),
   application_manager:add_many_resources(Resources),
   naming_handler:wait_service(hash_f),
