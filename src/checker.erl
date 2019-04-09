@@ -4,7 +4,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, get_pred/1, clear_pred/0, get_pred_id/0]).
+-export([start_link/0, get_pred/1, get_pred_id/0, notify_lost_node/1]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -44,9 +44,9 @@ get_pred_id() ->
   PID = naming_handler:get_identity(checker),
   gen_server:call(PID, pred_id).
 
-clear_pred() ->
+notify_lost_node(Address) ->
   PID = naming_handler:get_identity(checker),
-  PID ! timeout.
+  gen_server:call(PID, {lost, Address}).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -76,6 +76,13 @@ init([]) ->
 %%--------------------------------------------------------------------
 handle_call({pred_find, local_address}, _From, State) ->
   {reply, State#state.pred , State, ?INTERVAL};
+
+handle_call({lost, Address}, _From, State) ->
+  Pred = State#state.pred,
+  case Address of
+    Pred -> {reply, ok , State#state{pred = nil, pred_id = nil}, ?INTERVAL};
+    _ -> {reply, ok, State, ?INTERVAL}
+  end;
 
 handle_call(pred_id, _From, State) ->
   {reply, State#state.pred_id , State, ?INTERVAL};

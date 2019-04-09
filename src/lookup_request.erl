@@ -4,7 +4,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/4, respond/2]).
+-export([start_link/4, respond/2, notify_lost_node/2]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -33,6 +33,9 @@ start_link(Requested, From, List, ListType) ->
 
 respond(PID, Address) ->
   gen_server:cast(PID, {response, Address}).
+
+notify_lost_node(PID, Address) ->
+  gen_server:call(PID, {lost, Address}).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -63,6 +66,11 @@ init(_) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
+handle_call({lost, Address}, _From, State) ->
+  List = State#state.list,
+  CleanedList = [X || X <- List, X =/= Address],
+  {reply, ok, State#state{list = CleanedList}};
+
 handle_call(Request, _From, State) ->
   io:format("Request: Unexpected call message: ~p~n", [Request]),
   {reply, ok, State}.

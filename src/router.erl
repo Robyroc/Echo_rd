@@ -4,7 +4,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, show_table/0, local_lookup/1, update_finger_table/2, remote_lookup/2, lookup_for_join/1, normalize_id/2]).
+-export([start_link/0, show_table/0, local_lookup/1, update_finger_table/2, remote_lookup/2, lookup_for_join/1, normalize_id/2, notify_lost_node/1]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -57,6 +57,10 @@ normalize_id(ID, NBits) ->
     _ when ActualID < 0 -> ActualID + round(math:pow(2, NBits))
   end.
 
+notify_lost_node(Address) ->
+  PID = naming_handler:get_identity(router),
+  gen_server:call(PID, {lost, Address}).
+
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
@@ -100,6 +104,18 @@ handle_call({lookup, Requested}, From, State) ->
       request_gateway:add_request(ActualRequested, From, List),
       {noreply, State}
   end;
+
+handle_call({lost, Address}, _From, State) ->
+  Table = State#state.finger_table,
+  Fun =
+    fun({T, R, A}) ->
+      case A of
+        Address -> {T, no_real, no_address};
+        _ -> {T, R, A}
+      end
+    end,
+  NewTable = lists:map(Fun, Table),
+  {reply, ok, State#state{finger_table = NewTable}};
 
 handle_call(Request, _From, State) ->
   io:format("Router: Unexpected call message: ~p~n", [Request]),

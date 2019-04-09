@@ -173,6 +173,14 @@ handle_cast(Request, State) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
+handle_info({'DOWN', Monitor, process, _PID, tcp_closed}, State) ->
+  Present = [X || {_, X, M} <- State#state.connections, M =:= Monitor],
+  Address = hd(Present),
+  checker:notify_lost_node(Address),
+  stabilizer:notify_lost_node(Address),
+  router:notify_lost_node(Address),
+  {noreply, #state{connections = [{Pid, Addr, Mon} || {Pid, Addr, Mon} <- State#state.connections, Mon =/= Monitor]}};
+
 handle_info({'DOWN', Monitor, process, _PID, Reason}, State) ->
   Present = [X || {_, X, M} <- State#state.connections, M =:= Monitor],
   io:format("LM: A handler failed: Address: ~p~nReason: ~p~n", [hd(Present), Reason]),

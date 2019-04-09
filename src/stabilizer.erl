@@ -4,7 +4,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, get_successor/0, get_successor_list/0, notify_successor/2]).
+-export([start_link/0, get_successor/0, get_successor_list/0, notify_successor/2, notify_lost_node/1]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -44,6 +44,10 @@ notify_successor(Predecessor, SuccessorList) ->
   PID = naming_handler:get_identity(stabilizer),
   gen_server:cast(PID, {stabilize_response, Predecessor, SuccessorList}).
 
+notify_lost_node(Address) ->
+  PID = naming_handler:get_identity(stabilizer),
+  gen_server:call(PID, {lost, Address}).
+
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
@@ -76,6 +80,13 @@ handle_call(get_succ, _From, State) ->
 
 handle_call(get_succ_list, _From, State) ->
   {reply, State#state.succ_list, State};
+
+handle_call({lost, Address}, _From, State) ->
+  NewList = [{I, A} || {I, A} <- State#state.succ_list, A =/= Address],
+  case NewList of
+    [] -> {stop, ok, State#state{succ_list = NewList}};         %TODO check this corner case
+    _ -> {reply, ok, State#state{succ_list = NewList}}
+  end;
 
 handle_call(Request, _From, State) ->
   io:format("STABILIZER: Unexpected call message: ~p~n", [Request]),

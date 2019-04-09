@@ -4,7 +4,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, add_request/3, lookup_response/2]).
+-export([start_link/0, add_request/3, lookup_response/2, notify_lost_node/1]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -38,6 +38,10 @@ add_request(Requested, From, List) ->
 lookup_response(Requested, Address) ->
   PID = naming_handler:get_identity(request_gateway),
   gen_server:cast(PID, {response, Requested, Address}).
+
+notify_lost_node(Address) ->
+  PID = naming_handler:get_identity(request_gateway),
+  gen_server:call(PID, {lost, Address}).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -76,6 +80,10 @@ handle_call({add, Requested, From, List}, _From, State) ->
       Monitor = erlang:monitor(process, PID),
       {reply, ok, #state{requests = [{PID, Requested, Monitor} | State#state.requests]}}
   end;
+
+handle_call({lost, Address}, _From, State) ->
+  [lookup_request:notify_lost_node(Pid, Address) || {Pid, _, _} <- State#state.requests],
+  {reply, ok, State};
 
 handle_call(Request, _From, State) ->
   io:format("R. Gateway: Unexpected call message: ~p~n", [Request]),
