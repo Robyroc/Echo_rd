@@ -1,5 +1,13 @@
--module(communication_supervisor).
--author("Giacomo").
+%%%-------------------------------------------------------------------
+%%% @author mrbo9
+%%% @copyright (C) 2019, <COMPANY>
+%%% @doc
+%%%
+%%% @end
+%%% Created : 25. Mar 2019 16:39
+%%%-------------------------------------------------------------------
+-module(test).
+-author("mrbo9").
 
 -behaviour(supervisor).
 
@@ -21,6 +29,8 @@
 %%
 %% @end
 %%--------------------------------------------------------------------
+-spec(start_link() ->
+  {ok, Pid :: pid()} | ignore | {error, Reason :: term()}).
 start_link() ->
   supervisor:start_link({local, ?SERVER}, ?MODULE, []).
 
@@ -38,8 +48,14 @@ start_link() ->
 %%
 %% @end
 %%--------------------------------------------------------------------
+-spec(init(Args :: term()) ->
+  {ok, {SupFlags :: {RestartStrategy :: supervisor:strategy(),
+    MaxR :: non_neg_integer(), MaxT :: non_neg_integer()},
+    [ChildSpec :: supervisor:child_spec()]
+  }} |
+  ignore |
+  {error, Reason :: term()}).
 init([]) ->
-  naming_handler:notify_identity(self(), communication_supervisor),
   RestartStrategy = one_for_one,
   MaxRestarts = 1000,
   MaxSecondsBetweenRestarts = 3600,
@@ -49,15 +65,18 @@ init([]) ->
   Restart = permanent,
   Shutdown = 2000,
 
-  Son1 = {routing_supervisor, {routing_supervisor, start_link, []},
-    Restart, Shutdown, supervisor, [routing_supervisor]},
-  Son2 = {communication_manager, {communication_manager, start_link, []},
-    Restart, Shutdown, worker, [communication_manager]},
-  Son3 = {link_supervisor, {link_supervisor, start_link, []},
+  Son1 = {naming_supervisor, {naming_supervisor, start_link, []},
+    Restart, Shutdown, supervisor, [naming_supervisor]},
+  Son2 = {link_s, {link_supervisor, start_link, []},
     Restart, Shutdown, supervisor, [link_supervisor]},
 
-  {ok, {SupFlags, [Son1, Son2, Son3]}}.
+  {ok, {SupFlags, [Son1, Son2]}}.
 
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+
+%TODO communication message, remove it
+% link_manager:send_message({6543, {192, 168, 43, 209}}, {no_alias, 17, []}).
+
+%TODO REMOVE ME PLZ

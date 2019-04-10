@@ -69,7 +69,7 @@ receive_nbits(NBits) ->
 
 
 init([]) ->
-  %naming_handler:wait_service(params_handler),
+  %naming_handler:wait_service(params_handler),             %TODO check if these lines shall be removed
   %NBits = params_handler:get_param(nbits),
   naming_handler:notify_identity(self(), communication_manager),
   {ok, #state{nbits = no_nbits}}.
@@ -83,7 +83,7 @@ init([]) ->
 %%--------------------------------------------------------------------
 
 handle_call({send_msg, Method, Params, Address, Alias}, _From, State) ->
-  io:format("### OUT ###: Method:~p | Params:~p | Address:~p~n", [Method, Params, Address]),
+  io:format("### OUT ###: Method:~p | Params:~p | Address:~p~n", [Method, Params, Address]),  %TODO remove this line
   Translated = translate(Method),
   Encoded = encode_params(Method, Params, State#state.nbits),
   case Encoded of
@@ -111,7 +111,7 @@ handle_call(Request, _From, State) ->
 handle_cast({rcv_msg, Method, Address, Params}, State) ->
   BackTranslated = back_translate(Method),
   DecodedParams = decode_params(back_translate(Method), Params, State#state.nbits),
-  io:format("### IN ###: Method:~p | Params:~p | Address:~p~n", [BackTranslated, DecodedParams, Address]),
+  io:format("### IN ###: Method:~p | Params:~p | Address:~p~n", [BackTranslated, DecodedParams, Address]),  %TODO remove this line
   forward(BackTranslated, DecodedParams, Address),
   {noreply,State};
 

@@ -15,7 +15,7 @@
 %%====================================================================
 
 start(_StartType, _StartArgs) ->
-  root_supervisor:start_link().                  %TODO put here top supervisor
+  root_supervisor:start_link().
 
 %%--------------------------------------------------------------------
 stop(_State) ->

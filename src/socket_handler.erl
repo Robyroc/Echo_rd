@@ -66,12 +66,12 @@ init(_) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_call({send, {no_alias, Method, Params}}, _From, State) ->
-  Message = marshall(link_manager:get_own_address(), Method, Params),       %TODO call cm to get method id
+  Message = marshall(link_manager:get_own_address(), Method, Params),
   ok = gen_tcp:send(State#state.socket, Message),
   {reply, ok, State};
 
 handle_call({send, {Alias, Method, Params}}, _From, State) ->
-  Message = marshall(Alias, Method, Params),              %TODO call cm to get method id
+  Message = marshall(Alias, Method, Params),
   ok = gen_tcp:send(State#state.socket, Message),
   {reply, ok, State};
 
@@ -149,7 +149,7 @@ marshall(Address, Method, Params) ->
   case Length of
     0 -> <<Port:16, IpA:8, IpB:8, IpC:8, IpD:8, Method:8, Length:8>>;
     _ ->
-      Sizes = list_to_binary(lists:map(fun(X) ->       %%TODO communication manager send Params in list of binary
+      Sizes = list_to_binary(lists:map(fun(X) ->       %%Note: communication manager sends Params in list of binary
         byte_size(X) end, lists:reverse(tl(lists:reverse(Params))))),
       ParamsList = list_to_binary(Params),
       <<Port:16, IpA:8, IpB:8, IpC:8, IpD:8, Method:8, Length:8, Sizes:(Length-1)/binary, ParamsList/binary>>

@@ -104,7 +104,7 @@ handle_call(delete, _From, State) ->
   {reply, ok, State};
 
 handle_call({reheir, NewManager}, _From, State) ->
-  io:format("Naming Handler: Changing Heir options ~n"),
+  io:format("Naming Handler: Changing Heir options ~n"),        %TODO remove this line
   ets:setopts(naming_db, {heir, NewManager, naming_db}),
   {reply, ok, State};
 
@@ -135,7 +135,7 @@ handle_cast(Request, State) ->
 %%--------------------------------------------------------------------
 handle_info({'ETS-TRANSFER', TableId, Pid, _Data}, State) ->
   ets:insert(naming_db, {naming_handler, self()}),
-  io:format("Manager(~p) -> Handler(~p) getting TableId: ~p~n", [Pid, self(), TableId]),
+  io:format("Manager(~p) -> Handler(~p) getting TableId: ~p~n", [Pid, self(), TableId]),        %TODO remove this line
   {noreply, State};
 
 handle_info(Info, State) ->
