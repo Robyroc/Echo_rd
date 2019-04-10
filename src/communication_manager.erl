@@ -248,7 +248,7 @@ forward(leave_ack, [], From) -> join_handler:ack_leave(From);
 forward(ask_pred, [], From) -> checker:get_pred(From);
 forward(pred_reply, [Pred, SL], _From) -> stabilizer:notify_successor(Pred, SL);
 forward(lookup, [ID], From) -> router:remote_lookup(ID, From);
-forward(command, [C], From) -> ok;           %TODO send to AM
+forward(command, [C], _From) -> application_manager:receive_command(C);
 forward(_, _, _) -> badarg.
 
 %TODO remove comment, it is just for testing
