@@ -225,7 +225,7 @@ lookup(Searched, ID, Table, NBits) when Searched < ID ->
 
 lookup(Searched, _ID, Table, _NBits) ->
   RevTable = lists:reverse(Table),
-  [Address || {_, ID, Address} <- lists:filter(fun({_, Id, _}) -> Id =/= no_real end, RevTable), ID =< Searched].
+  [Address || {_, ID, Address} <- lists:filter(fun({_, Id, _}) -> Id =/= no_real end, RevTable), ID < Searched].
 
 check_if_next(Requested, ID, SuccId, NBits) when Requested =< ID ->
   io:format("Next:~p ~p ~p~n", [Requested, ID, SuccId]),            %TODO remove this line
