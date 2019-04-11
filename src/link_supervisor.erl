@@ -39,6 +39,7 @@ start_link() ->
 %% @end
 %%--------------------------------------------------------------------
 init([]) ->
+  naming_handler:notify_identity(self(), link_supervisor),
   RestartStrategy = rest_for_one,
   MaxRestarts = 1000,
   MaxSecondsBetweenRestarts = 3600,

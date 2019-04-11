@@ -12,7 +12,9 @@
   receive_command/1,
   add_many_resources/1,
   get_local_resources/0,
-  drop_many_resources/1]).
+  drop_many_resources/1,
+  join_p/2,
+  create_p/2]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -39,11 +41,17 @@
 start_link() ->
   gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
-join(Address) ->
-  join_handler:join(Address).
+join_p(Port, Address) ->
+  join_handler:join(Port, Address).
 
-create(NBits) ->
-  join_handler:create(NBits).
+create_p(Port, NBits) ->
+  join_handler:create(Port, NBits).
+
+join(Address) ->
+  join_handler:join(6543, Address).
+
+create(Nbits) ->
+  join_handler:create(6543, Nbits).
 
 leave() ->
   join_handler:leave().

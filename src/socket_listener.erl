@@ -1,6 +1,5 @@
 -module(socket_listener).
 -author("robyroc").
--define(PORT, 6543).
 -behaviour(gen_server).
 
 %% API
@@ -49,10 +48,8 @@ start_link() ->
 %% @end
 %%--------------------------------------------------------------------
 init([]) ->
-  {ok, Listen} = gen_tcp:listen(?PORT, [binary, {packet, 0}, {reuseaddr, true}, {active, true}]),
-  io:format("Listening at port ~p~n", [?PORT]),
-  erlang:send_after(10, self(), loop),
-  {ok, #state{socket = Listen}}.
+  self() ! startup,
+  {ok, #state{}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -93,6 +90,15 @@ handle_info(loop, State) ->
   erlang:send_after(10, self(), loop),
   {noreply, State};
 
+handle_info(startup, _State) ->
+  naming_handler:wait_service(link_manager),
+  Port = naming_handler:get_identity(port),
+  {ok, Listen} = gen_tcp:listen(Port, [binary, {packet, 0}, {reuseaddr, true}, {active, true}]),
+  io:format("Listening at port ~p~n", [Port]),
+  naming_handler:notify_identity(self(), listener),
+  erlang:send_after(10, self(), loop),
+  {noreply, #state{socket = Listen}};
+
 handle_info(Info, State) ->
   io:format("Listen: Unexpected ! message: ~p~n", [Info]),
   {noreply, State}.
@@ -108,7 +114,8 @@ handle_info(Info, State) ->
 %% @spec terminate(Reason, State) -> void()
 %% @end
 %%--------------------------------------------------------------------
-terminate(_Reason, State) ->
+terminate(Reason, State) ->
+  io:format("Listen terminate: ~p~n", [Reason]),
   gen_tcp:close(State#state.socket),
   ok.
 

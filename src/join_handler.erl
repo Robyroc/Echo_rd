@@ -14,7 +14,7 @@
 %% API
 -export([
   start_link/1,
-  join/1,
+  join/2,
   leave/0,
   look_response/1,
   info/4,
@@ -24,7 +24,7 @@
   leave_info/2,
   ack_info/1,
   ack_leave/1,
-  create/1]).
+  create/2]).
 
 %% gen_statem callbacks
 -export([
@@ -53,13 +53,13 @@
 %%% API
 %%%===================================================================
 
-create(Nbits) ->
+create(OwnPort, Nbits) ->
   PID = naming_handler:get_identity(join_handler),
-  gen_statem:call(PID, {create, Nbits}).
+  gen_statem:call(PID, {create, OwnPort, Nbits}).
 
-join(Address) ->
+join(OwnPort, Address) ->
   PID = naming_handler:get_identity(join_handler),
-  gen_statem:call(PID, {join,Address}).
+  gen_statem:call(PID, {join, OwnPort, Address}).
 
 leave() ->
   PID = naming_handler:get_identity(join_handler),
@@ -188,17 +188,27 @@ format_status(_Opt, [_PDict, _StateName, _State]) ->
 %%                   {keep_state_and_data, Actions}
 %% @end
 %%--------------------------------------------------------------------
-init_joiner({call, From}, {join, Address}, Session) ->
-  Reply = postpone,
+init_joiner({call, From}, {join, OwnPort, Address}, Session) ->
   ok = handle(init_joiner, look),         %TODO remove this line
-  communication_manager:send_message(lookup_for_join, [], Address, no_alias),
-  {next_state, look, Session#session{app_mngr = From, provider_addr = Address},
-    [{state_timeout, ?INTERVAL, hard_stop}, Reply]};
+  naming_handler:notify_identity(OwnPort, port),
+  naming_handler:wait_service(listener),
+  Answer = communication_manager:send_message(lookup_for_join, [], Address, no_alias),
+  case Answer of
+    ok ->
+      {next_state, look, Session#session{app_mngr = From, provider_addr = Address},
+        [{state_timeout, ?INTERVAL, hard_stop}, postpone]};
+    Error ->
+      link_shutdown(),
+      {keep_state, Session, [{reply, From, Error}]}
+  end;
 
-init_joiner({call, From}, {create, Nbits}, Session) ->
+
+init_joiner({call, From}, {create, OwnPort, Nbits}, Session) ->
   ok = handle(init_joiner, init_provider),    %TODO remove this line
   NewSession = Session#session{nbits = Nbits, succ_list = [], succ_addr = link_manager:get_own_address(),
     res = [], app_mngr = From},
+  naming_handler:notify_identity(OwnPort, port),
+  naming_handler:wait_service(listener),
   ok = start(NewSession),
   {next_state, init_provider, NewSession, []};
 
@@ -217,9 +227,11 @@ look(state_timeout, hard_stop, Session) ->
   gen_statem:reply(Session#session.app_mngr, fail),
   {next_state, init_joiner, reset_session(Session)};
 
+look({call, _From}, {join, _Port, _Address}, Session) ->
+  {keep_state, Session};
+
 look(EventType, EventContent, Session) ->
   ok = handle(look, look),                %TODO remove this line
-  io:format("Event abnormal in Look: ~p~n", [EventType]),       %TODO remove this line
   handle_generic_event({EventType, EventContent, Session}).       %TODO analyze why this call can occur
 
 
@@ -306,8 +318,10 @@ init_provider({call,From}, leave, Session) ->
   communication_manager:send_message(leave_info, [], Successor, no_alias), %TODO put resources instead of void list
   {next_state, leaving, Session#session{app_mngr = From}, [{state_timeout, ?INTERVAL_LEAVING, hard_stop}, Reply]};
 
+init_provider(cast, {look_resp,_Address}, Session) ->
+  {keep_state, Session};
+
 init_provider(EventType, EventContent, Session) ->
-  io:format("Event abnormal in Init Provider: ~p~n", [EventType]),
   ok = handle(init_provider, init_provider),    %TODO remove this line
   handle_generic_event({EventType, EventContent, Session}).
 
@@ -359,6 +373,9 @@ not_alone(state_timeout, hard_stop, Session) ->
   ok = handle(not_alone, init_provider),          %TODO remove this line
   {next_state, init_provider, reset_provider_session(Session)};
 
+not_alone(cast, {look_resp,_Address}, Session) ->
+  {keep_state, Session};
+
 not_alone(EventType, EventContent, Session) ->
   ok = handle(not_alone, not_alone),        %TODO remove this line
   handle_generic_event({EventType, EventContent, Session}).
@@ -366,22 +383,19 @@ not_alone(EventType, EventContent, Session) ->
 
 leaving(cast, {ack_leave, Address}, Session) ->
   ok = handle(leaving, init_joiner),          %TODO remove this line
-  {_, SuccessorAddress} = stabilizer:get_successor(),
-  case Address of
-    _ when Address =:= SuccessorAddress ->
-      gen_statem:reply(Session#session.app_mngr, ok),
-      Stab = naming_handler:get_identity(stabilizer),
-      application_manager:drop_many_resources(all_res),
-      exit(naming_handler:get_identity(communication_supervisor), kill),
-      stabilizer:turn_off(),
-      naming_handler:delete_comm_tree(),
-      {next_state, init_joiner, reset_session(Session#session{stabilizer = Stab})};
-    _ -> {keep_state, Session, [{state_timeout, ?INTERVAL_LEAVING, hard_stop}]}
-  end;
+  stop(Session, Address);
 
 leaving(state_timeout, hard_stop, Session) ->
   ok = handle(leaving, init_joiner),        %TODO remove this line
+  {_, SuccAddress} = stabilizer:get_successor(),
+  stop(Session, SuccAddress),
   {next_state, init_joiner, reset_session(Session)};
+
+leaving({call, _From}, leave, Session) ->
+  {keep_state, Session};
+
+leaving(cast, {look_resp,_Address}, Session) ->
+  {keep_state, Session};
 
 leaving(EventType, EventContent, Session) ->
   ok = handle(leaving, leaving),          %TODO remove this line
@@ -448,7 +462,8 @@ code_change(_OldVsn, StateName, State, _Extra) ->
 handle(From, To) ->
   io:format("+++ JOINER +++ ~p ---> ~p +++~n", [From, To]).
 
-handle_generic_event({_, _, Session}) ->
+handle_generic_event({EventType, EventContent, Session}) ->
+  io:format("Event abnormal: ~p | ~p~n", [EventType, EventContent]),       %TODO remove this line
   {keep_state, Session}.
 
 
@@ -481,3 +496,22 @@ soft_reset_session(Session) ->
 
 reset_provider_session(Session) ->
   Session#session{curr_addr = undefined, curr_id = undefined}.
+
+stop(Session, Address) ->
+  {_, SuccessorAddress} = stabilizer:get_successor(),
+  case Address of
+    _ when Address =:= SuccessorAddress ->
+      gen_statem:reply(Session#session.app_mngr, ok),
+      Stab = naming_handler:get_identity(stabilizer),
+      application_manager:drop_many_resources(all_res),
+      exit(naming_handler:get_identity(communication_supervisor), kill),
+      stabilizer:turn_off(),
+      naming_handler:delete_comm_tree(),
+      {next_state, init_joiner, reset_session(Session#session{stabilizer = Stab})};
+    _ -> {keep_state, Session, [{state_timeout, ?INTERVAL_LEAVING, hard_stop}]}
+  end.
+
+link_shutdown() ->
+  Pid = naming_handler:get_identity(link_supervisor),
+  naming_handler:delete_comm_tree(),
+  exit(Pid, kill).

@@ -101,6 +101,9 @@ handle_call(delete, _From, State) ->
   ets:delete(naming_db, hash_f),
   ets:delete(naming_db, stabilizer),
   ets:delete(naming_db, router),
+  ets:delete(naming_db, port),
+  ets:delete(naming_db, listener),
+  ets:delete(naming_db, link_manager),
   {reply, ok, State};
 
 handle_call({reheir, NewManager}, _From, State) ->

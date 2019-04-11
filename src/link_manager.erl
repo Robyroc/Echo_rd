@@ -23,10 +23,9 @@
   terminate/2,
   code_change/3]).
 
--define(INTERVAL, 5000).
+-define(INTERVAL, 4000).
 -define(SERVER, ?MODULE).
--define(PORT, 6543).      %TODO merge this def with the one on socket_listener
--record(state, {connections}).
+-record(state, {connections, port}).
 
 %%%===================================================================
 %%% API
@@ -93,8 +92,8 @@ move_socket(Socket) ->
 %% @end
 %%--------------------------------------------------------------------
 init([]) ->
-  naming_handler:notify_identity(self(), link_manager),
-  {ok, #state{connections = []}}.
+  self() ! startup,
+  {ok, #state{}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -193,6 +192,11 @@ handle_info({tcp, Socket, Bin}, State) ->
   exit(Pid, kill),
   {noreply, State};
 
+handle_info(startup, _State) ->
+  naming_handler:wait_service(port),
+  naming_handler:notify_identity(self(), link_manager),
+  {noreply, #state{connections = []}};
+
 handle_info(Info, State) ->
   io:format("LM: Unexpected ! message: ~p~n", [Info]),
   {noreply, State}.
@@ -230,4 +234,4 @@ code_change(_OldVsn, State, _Extra) ->
 local_address() ->
   {ok, Addrs} = inet:getif(),
   IP = hd([Addr || {Addr, _,_} <- Addrs, size(Addr) == 4, Addr =/= {127,0,0,1}]),
-  {?PORT, IP}.
+  {naming_handler:get_identity(port), IP}.

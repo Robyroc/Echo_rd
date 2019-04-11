@@ -89,8 +89,7 @@ handle_call({send_msg, Method, Params, Address, Alias}, _From, State) ->
   case Encoded of
     badarg -> {reply, fail, State};
     _ ->
-      link_manager:send_message(Address, {Alias, Translated, Encoded}),
-      {reply,ok,State}
+      {reply,link_manager:send_message(Address, {Alias, Translated, Encoded}),State}
   end;
 
 handle_call({get_nbits, NBits}, _From, State) ->
