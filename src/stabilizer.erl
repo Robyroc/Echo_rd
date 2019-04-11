@@ -91,15 +91,16 @@ handle_call(get_succ_list, _From, State) ->
 
 handle_call({lost, Address}, _From, State) ->
   NewList = [{I, A} || {I, A} <- State#state.succ_list, A =/= Address],
-  {SuccID, SuccAddr} = hd(NewList),
-  AdjSuccID = adjust_successor(SuccID, State#state.id, State#state.nbits),
-  AdjNewList = [{AdjSuccID, SuccAddr} | tl(NewList)],
-  case AdjNewList of
+  case NewList of
     [] ->                                                               %The corner case is handled by splitting the network in half
       OwnAddress = link_manager:get_own_address(),                      %TODO check this solution
       AdjOwnId = adjust_successor(State#state.id, State#state.id, State#state.nbits),
       {reply, ok, State#state{succ_list = [{AdjOwnId, OwnAddress}]}};
-    _ -> {reply, ok, State#state{succ_list = AdjNewList}}
+    _ ->
+      {SuccID, SuccAddr} = hd(NewList),
+      AdjSuccID = adjust_successor(SuccID, State#state.id, State#state.nbits),
+      AdjNewList = [{AdjSuccID, SuccAddr} | tl(NewList)],
+      {reply, ok, State#state{succ_list = AdjNewList}}
   end;
 
 handle_call(turn_off, _From, _State) ->

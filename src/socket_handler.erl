@@ -72,6 +72,7 @@ handle_call({send, {no_alias, Method, Params}}, _From, State) ->
 
 handle_call({send, {Alias, Method, Params}}, _From, State) ->
   Message = marshall(Alias, Method, Params),
+  %timer:sleep(1000),
   ok = gen_tcp:send(State#state.socket, Message),
   {reply, ok, State};
 

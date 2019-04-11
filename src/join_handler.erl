@@ -205,10 +205,10 @@ init_joiner({call, From}, {join, OwnPort, Address}, Session) ->
 
 init_joiner({call, From}, {create, OwnPort, Nbits}, Session) ->
   ok = handle(init_joiner, init_provider),    %TODO remove this line
-  NewSession = Session#session{nbits = Nbits, succ_list = [], succ_addr = link_manager:get_own_address(),
-    res = [], app_mngr = From},
   naming_handler:notify_identity(OwnPort, port),
   naming_handler:wait_service(listener),
+  NewSession = Session#session{nbits = Nbits, succ_list = [], succ_addr = link_manager:get_own_address(),
+    res = [], app_mngr = From},
   ok = start(NewSession),
   {next_state, init_provider, NewSession, []};
 
@@ -232,8 +232,7 @@ look({call, _From}, {join, _Port, _Address}, Session) ->
 
 look(EventType, EventContent, Session) ->
   ok = handle(look, look),                %TODO remove this line
-  handle_generic_event({EventType, EventContent, Session}).       %TODO analyze why this call can occur
-
+  handle_generic_event({EventType, EventContent, Session}).
 
 pre_join(cast, {info,Address, Res, Succ, Nbits}, Session) ->
   ok = handle(pre_join, j_ready),         %TODO remove this line

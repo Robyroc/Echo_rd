@@ -4,7 +4,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, show_table/0, local_lookup/1, update_finger_table/2, remote_lookup/2, lookup_for_join/1, normalize_id/2, notify_lost_node/1]).
+-export([start_link/0, show_table/0, local_lookup/1, update_finger_table/2, remote_lookup/2, lookup_for_join/1, normalize_id/2, notify_lost_node/1, show_id/0]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -50,6 +50,10 @@ show_table() ->
   PID = naming_handler:get_identity(router),
   gen_server:call(PID, show_table).
 
+show_id() ->
+  PID = naming_handler:get_identity(router),
+  gen_server:call(PID, show_id).
+
 normalize_id(ID, NBits) ->
   ActualID = ID rem round(math:pow(2, NBits)),
   case ActualID of
@@ -90,6 +94,9 @@ init([]) ->
 handle_call(show_table, _From, State) ->
   show_finger_table(State),
   {reply, ok, State};
+
+handle_call(show_id, _From, State) ->
+  {reply, State#state.id, State};
 
 handle_call({lookup, Requested}, From, State) ->
   ActualRequested = normalize_id(Requested, State#state.nbits),
