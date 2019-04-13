@@ -58,7 +58,7 @@ leave() ->
 
 issue_command(Index, Command) ->
   {found, Address} = router:local_lookup(Index),
-  communication_manager:send_message(command, [Command], Address, no_alias).
+  communication_manager:send_message_async(command, [Command], Address, no_alias).
 
 receive_command(Command) ->
   io:format("****Received Command: ~p*****~n", [Command]).

@@ -150,16 +150,16 @@ handle_cast({lookup, Alias, Requested}, State) ->
   Next = check_if_next(ActualRequested, State#state.id, SuccID, State#state.nbits),
   case Next of
     next ->
-      communication_manager:send_message(lookup_response, [ActualRequested, Succ], Alias, no_alias),
+      communication_manager:send_message_async(lookup_response, [ActualRequested, Succ], Alias, no_alias),
       {noreply, State};
     _ ->
       Destinations = lookup(ActualRequested, State#state.id, State#state.finger_table, State#state.nbits),
       case Destinations of
         [] ->
-          communication_manager:send_message(lookup, [ActualRequested], Succ, Alias),
+          communication_manager:send_message_async(lookup, [ActualRequested], Succ, Alias),
           {noreply, State};
         [X | _] ->
-          communication_manager:send_message(lookup, [ActualRequested], X, Alias),
+          communication_manager:send_message_async(lookup, [ActualRequested], X, Alias),
           {noreply, State}
       end
   end;

@@ -4,7 +4,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, send_message/4, receive_message/1, receive_nbits/1]).
+-export([start_link/0, send_message_async/4, receive_message/1, receive_nbits/1, send_message_sync/4]).
 
 %TODO remove me when done debugging
 -export([encode_resource/2, decode_resource/2, encode_ID/2, decode_ID/1, encode_successor_list/2, decode_successor_list/2, encode_nbits_successor_and_resources/1, decode_nbits_successor_and_resources/1]).
@@ -38,10 +38,13 @@ start_link() ->
 
 %TODO remove comment, it is just for testing
 %communication_manager:send_message(lookup,["K20"],{6543,{192,168,1,98}},no_alias).
-send_message(Method, Params, Address, Alias) ->
+send_message_async(Method, Params, Address, Alias) ->
+  PID = naming_handler:get_identity(communication_manager),
+  gen_server:cast(PID, {send_msg, Method, Params, Address, Alias}).
+
+send_message_sync(Method, Params, Address, Alias) ->
   PID = naming_handler:get_identity(communication_manager),
   gen_server:call(PID, {send_msg, Method, Params, Address, Alias}).
-
 
 receive_message({Method, Address, Params}) ->
   PID = naming_handler:get_identity(communication_manager),
@@ -106,6 +109,17 @@ handle_call(Request, _From, State) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
+
+handle_cast({send_msg, Method, Params, Address, Alias}, State) ->
+  io:format("### OUT ###: Method:~p | Params:~p | Address:~p~n", [Method, Params, Address]),  %TODO remove this line
+  Translated = translate(Method),
+  Encoded = encode_params(Method, Params, State#state.nbits),
+  case Encoded of
+    badarg -> {noreply, State};
+    _ ->
+      link_manager:send_message(Address, {Alias, Translated, Encoded}),
+      {noreply,State}
+  end;
 
 handle_cast({rcv_msg, Method, Address, Params}, State) ->
   BackTranslated = back_translate(Method),

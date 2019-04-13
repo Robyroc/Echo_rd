@@ -162,7 +162,7 @@ handle_info(stabilize, State) ->
   case State#state.op of
     operating ->
       Successor = hd([Addr || {_, Addr} <- State#state.succ_list]),
-      communication_manager:send_message(ask_pred, [], Successor, no_alias),
+      communication_manager:send_message_async(ask_pred, [], Successor, no_alias),
       erlang:send_after(?INTERVAL, self(), stabilize),
       {noreply, State};
     no_operating ->

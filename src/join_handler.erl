@@ -192,7 +192,7 @@ init_joiner({call, From}, {join, OwnPort, Address}, Session) ->
   ok = handle(init_joiner, look),         %TODO remove this line
   naming_handler:notify_identity(OwnPort, port),
   naming_handler:wait_service(listener),
-  Answer = communication_manager:send_message(lookup_for_join, [], Address, no_alias),
+  Answer = communication_manager:send_message_sync(lookup_for_join, [], Address, no_alias),
   case Answer of
     ok ->
       {next_state, look, Session#session{app_mngr = From, provider_addr = Address},
@@ -219,7 +219,7 @@ init_joiner(EventType, EventContent, Session) ->
 
 look(cast, {look_resp,Address}, Session) ->
   ok = handle(look, pre_join),            %TODO remove this line
-  communication_manager:send_message(ready_for_info, [], Address, no_alias),
+  communication_manager:send_message_async(ready_for_info, [], Address, no_alias),
   {next_state, pre_join, Session#session{succ_addr = Address}, [{state_timeout, ?INTERVAL, hard_stop}]};
 
 look(state_timeout, hard_stop, Session) ->
@@ -239,7 +239,7 @@ pre_join(cast, {info,Address, Res, Succ, Nbits}, Session) ->
   SuccAddr = Session#session.succ_addr,
   case Address of
     _ when Address =:= SuccAddr ->
-      communication_manager:send_message(ack_info, [], Address, no_alias),
+      communication_manager:send_message_async(ack_info, [], Address, no_alias),
       {next_state, j_ready, Session#session{res = Res, succ_list = Succ, nbits = Nbits}, [{state_timeout, ?INTERVAL_JOIN, hard_stop}]};
     _ -> {keep_state, Session, [{state_timeout, ?INTERVAL, hard_stop}]}
   end;
@@ -249,7 +249,7 @@ pre_join(cast, {abort, Reason}, Session) ->
   io:format(" -- JOIN ABORTED -- Reason of abort: ~p~n", [Reason]),
   ProviderAddr = Session#session.provider_addr,
   timer:sleep(?SLEEP_INTERVAL),
-  communication_manager:send_message(lookup_for_join, [], ProviderAddr, no_alias),
+  communication_manager:send_message_async(lookup_for_join, [], ProviderAddr, no_alias),
   {next_state, look, soft_reset_session(Session), [{state_timeout, ?INTERVAL, hard_stop}]};
 
 pre_join(state_timeout, hard_stop, Session) ->
@@ -272,7 +272,7 @@ j_ready(cast, {abort, Reason}, Session) ->
   io:format("Reason of abort: ~p~n", [Reason]),
   ProviderAddr = Session#session.provider_addr,
   timer:sleep(?SLEEP_INTERVAL),
-  communication_manager:send_message(lookup_for_join, [], ProviderAddr, no_alias),
+  communication_manager:send_message_async(lookup_for_join, [], ProviderAddr, no_alias),
   {next_state, look, soft_reset_session(Session), [{state_timeout, ?INTERVAL, hard_stop}]};
 
 j_ready(state_timeout, hard_stop, Session) ->
@@ -291,14 +291,14 @@ init_provider(cast, {ready_for_info, Address}, Session) ->
   case JoinerID of
     _ when JoinerID =< PredecessorID ->
       io:format("JH here: JoinerID: ~p   PredecessorID: ~p~n", [JoinerID, PredecessorID]),
-      communication_manager:send_message(abort, ["Not updated"],Address, no_alias),
+      communication_manager:send_message_async(abort, ["Not updated"],Address, no_alias),
       handle(init_provider, init_provider),     %TODO remove this line
       {keep_state, Session};
     _ when JoinerID > PredecessorID ->
       io:format("JH there: JoinerID: ~p   PredecessorID: ~p~n", [JoinerID, PredecessorID]),
       DataInfo=[params_handler:get_param(nbits), stabilizer:get_successor_list(),
         application_manager:get_local_resources()],
-      communication_manager:send_message(join_info,DataInfo,Address,no_alias),
+      communication_manager:send_message_async(join_info,DataInfo,Address,no_alias),
       handle(init_provider, not_alone),         %TODO remove this line
       {next_state, not_alone, Session#session{curr_id = JoinerID, curr_addr = Address}, [{state_timeout, ?INTERVAL_JOIN, hard_stop}]}
   end;
@@ -306,7 +306,7 @@ init_provider(cast, {ready_for_info, Address}, Session) ->
 init_provider(cast, {leave_info,Resources, Address}, Session) ->
   ok = handle(init_provider, init_provider),      %TODO remove this line
   application_manager:add_many_resources(Resources),
-  communication_manager:send_message(leave_ack,[],Address,no_alias),
+  communication_manager:send_message_async(leave_ack,[],Address,no_alias),
   {keep_state, Session};
 
 init_provider({call,From}, leave, Session) ->
@@ -314,7 +314,7 @@ init_provider({call,From}, leave, Session) ->
   Reply = postpone,
   application_manager:get_local_resources(),
   {_, Successor} = stabilizer:get_successor(),
-  communication_manager:send_message(leave_info, [], Successor, no_alias), %TODO put resources instead of void list
+  communication_manager:send_message_async(leave_info, [], Successor, no_alias), %TODO put resources instead of void list
   {next_state, leaving, Session#session{app_mngr = From}, [{state_timeout, ?INTERVAL_LEAVING, hard_stop}, Reply]};
 
 init_provider(cast, {look_resp,_Address}, Session) ->
@@ -331,13 +331,13 @@ not_alone(cast, {ready_for_info, Address}, Session) ->
   JoinerID = hash_f:get_hashed_addr(Address),
   case JoinerID of
     _ when JoinerID =< CurrID ->
-      communication_manager:send_message(abort, ["No priority"],Address, no_alias),
+      communication_manager:send_message_async(abort, ["No priority"],Address, no_alias),
       {keep_state, Session, [{state_timeout, ?INTERVAL_JOIN, hard_stop}]};
     _ when JoinerID > CurrID ->
       CurrAddr = Session#session.curr_addr,
-      communication_manager:send_message(abort, ["Loss priority"],CurrAddr, no_alias),
+      communication_manager:send_message_async(abort, ["Loss priority"],CurrAddr, no_alias),
       DataInfo = [Session#session.nbits, Session#session.succ_list, Session#session.res],
-      communication_manager:send_message(join_info, DataInfo, Address, no_alias),
+      communication_manager:send_message_async(join_info, DataInfo, Address, no_alias),
       {keep_state, Session, [{state_timeout, ?INTERVAL_JOIN, hard_stop}]}
   end;
 
@@ -345,24 +345,24 @@ not_alone(cast, {ready_for_info, Address}, Session) ->
 not_alone({call,From}, leave, Session) ->
   Reply = postpone,
   ok = handle(not_alone, leaving),        %TODO remove this line
-  communication_manager:send_message(abort, ["Successor is leaving"], Session#session.curr_addr, no_alias),
+  communication_manager:send_message_async(abort, ["Successor is leaving"], Session#session.curr_addr, no_alias),
   {_, Successor} = stabilizer:get_successor(),
-  communication_manager:send_message(leave_info, application_manager:get_local_resources(), Successor, no_alias),
+  communication_manager:send_message_async(leave_info, application_manager:get_local_resources(), Successor, no_alias),
   {next_state, leaving, Session#session{app_mngr = From}, [{state_timeout, ?INTERVAL_LEAVING, hard_stop}, Reply]};
 
 not_alone(cast, {ack_info,Address}, Session) ->
   ok = handle(not_alone, init_provider),        %TODO remove this line
-  communication_manager:send_message(ack_join, [], Address, no_alias),
+  communication_manager:send_message_async(ack_join, [], Address, no_alias),
   application_manager:drop_many_resources(Session#session.curr_id),
   {next_state, init_provider, reset_provider_session(Session)};
 
 not_alone(cast, {leave_info,Resources, Address}, Session) ->
   ok = handle(not_alone, init_provider),            %TODO remove this line
-  communication_manager:send_message(abort,["Another leave"], Session#session.curr_addr, no_alias),
+  communication_manager:send_message_async(abort,["Another leave"], Session#session.curr_addr, no_alias),
   PredecessorAddr = checker:get_pred(Session#session.provider_addr),
   case Address of
     _ when Address =:= PredecessorAddr ->
-      communication_manager:send_message(leave_ack,[], Address, no_alias),
+      communication_manager:send_message_async(leave_ack,[], Address, no_alias),
       application_manager:add_many_resources(Resources),
       {next_state, init_provider, reset_provider_session(Session)};
     _ -> {keep_state, Session, [{state_timeout, ?INTERVAL_JOIN, hard_stop}]}
