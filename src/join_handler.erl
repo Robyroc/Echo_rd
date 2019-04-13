@@ -44,8 +44,8 @@
 -define(SLEEP_INTERVAL, 1000).
 -define(SERVER, ?MODULE).
 -define(INTERVAL, 10000).
--define(INTERVAL_LEAVING, 30000).
--define(INTERVAL_JOIN, 50000).
+-define(INTERVAL_LEAVING, 20000).
+-define(INTERVAL_JOIN, 20000).
 
 -record(session, {provider_addr, succ_addr, res, succ_list, nbits, app_mngr, curr_addr, curr_id, superv, stabilizer}).
 
@@ -287,7 +287,7 @@ j_ready(EventType, EventContent, Session) ->
 
 init_provider(cast, {ready_for_info, Address}, Session) ->
   PredecessorID = checker:get_pred_id(),
-  JoinerID = hash_f:get_hashed_addr(Address),
+  JoinerID = adjust_predecessor(hash_f:get_hashed_addr(Address), hash_f:get_hashed_addr(link_manager:get_own_address()), Session#session.nbits),
   case JoinerID of
     _ when JoinerID =< PredecessorID ->
       io:format("JH here: JoinerID: ~p   PredecessorID: ~p~n", [JoinerID, PredecessorID]),
@@ -514,3 +514,6 @@ link_shutdown() ->
   Pid = naming_handler:get_identity(link_supervisor),
   naming_handler:delete_comm_tree(),
   exit(Pid, kill).
+
+adjust_predecessor(ID, OwnId, _NBits) when ID < OwnId -> ID;
+adjust_predecessor(ID, OwnId, NBits) -> adjust_predecessor(ID - round(math:pow(2, NBits)), OwnId, NBits).

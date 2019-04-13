@@ -33,7 +33,7 @@ start_link() ->
 
 local_lookup(ID) ->
   PID = naming_handler:get_identity(router),
-  gen_server:call(PID, {lookup, ID}).
+  gen_server:call(PID, {lookup, ID}).                   %TODO tune timeout here accordingly
 
 update_finger_table(Address, Theoretical) ->
   PID = naming_handler:get_identity(router),
@@ -153,9 +153,15 @@ handle_cast({lookup, Alias, Requested}, State) ->
       communication_manager:send_message(lookup_response, [ActualRequested, Succ], Alias, no_alias),
       {noreply, State};
     _ ->
-      Destination = hd(lookup(ActualRequested, State#state.id, State#state.finger_table, State#state.nbits)),
-      communication_manager:send_message(lookup, [ActualRequested], Destination, Alias),
-      {noreply, State}
+      Destinations = lookup(ActualRequested, State#state.id, State#state.finger_table, State#state.nbits),
+      case Destinations of
+        [] ->
+          communication_manager:send_message(lookup, [ActualRequested], Succ, Alias),
+          {noreply, State};
+        [X | _] ->
+          communication_manager:send_message(lookup, [ActualRequested], X, Alias),
+          {noreply, State}
+      end
   end;
 
 handle_cast(Request, State) ->
