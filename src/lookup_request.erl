@@ -106,7 +106,7 @@ handle_info(next, State) ->
     terminate ->
       {stop, not_reachable};
     _ ->
-      erlang:send_after(5000, self(), next),
+      erlang:send_after(1500, self(), next),
       {noreply, NewState}
   end;
 

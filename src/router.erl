@@ -33,7 +33,8 @@ start_link() ->
 
 local_lookup(ID) ->
   PID = naming_handler:get_identity(router),
-  gen_server:call(PID, {lookup, ID}).                   %TODO tune timeout here accordingly
+  Nbits = params_handler:get_param(nbits),
+  gen_server:call(PID, {lookup, ID}, Nbits*2000).                   %TODO tune timeout here accordingly
 
 update_finger_table(Address, Theoretical) ->
   PID = naming_handler:get_identity(router),
