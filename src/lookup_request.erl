@@ -104,7 +104,7 @@ handle_info(next, State) ->
   NewState = next_message(State),
   case NewState of
     terminate ->
-      {stop, not_reachable};
+      {stop, not_reachable, State};
     _ ->
       erlang:send_after(1500, self(), next),
       {noreply, NewState}
