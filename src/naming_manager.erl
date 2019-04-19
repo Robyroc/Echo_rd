@@ -100,10 +100,10 @@ handle_info({startup, Supervisor}, State) ->
   Ret = supervisor:start_child(Supervisor, ETSHandler),
   case Ret of
     {ok, Handler} ->
-      TableId = ets:new(naming_db, [set, public, named_table, {heir, self(), naming_db}]),
+      TableId = ets:new(naming_db, [set, public, named_table, {heir, self(), naming_db}, {read_concurrency, true}]),
       ets:give_away(TableId, Handler, naming_db);
     {ok, Handler, _} ->
-      TableId = ets:new(naming_db, [set, public, named_table, {heir, self(), naming_db}]),
+      TableId = ets:new(naming_db, [set, public, named_table, {heir, self(), naming_db}, {read_concurrency, true}]),
       ets:give_away(TableId, Handler, naming_db)
   end,
   {noreply, State#state{}};
