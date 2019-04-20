@@ -116,7 +116,7 @@ hash_name(Name) ->
 %% @end
 %%--------------------------------------------------------------------
 init([]) ->
-  naming_service:notify_identity(self(), application_manager),
+  naming_handler:notify_identity(self(), application_manager),
   {ok, #state{}}.
 
 %%--------------------------------------------------------------------
