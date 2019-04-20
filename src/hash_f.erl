@@ -4,7 +4,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, get_hashed_addr/1, get_hashed_res/1]).
+-export([start_link/0, get_hashed_addr/1, get_hashed_name/1]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -35,9 +35,9 @@ get_hashed_addr(Address) ->
   PID = naming_handler:get_identity(hash_f),
   gen_server:call(PID, {a_code, Address}).
 
-get_hashed_res(Resource) ->
+get_hashed_name(Resource) ->
   PID = naming_handler:get_identity(hash_f),
-  gen_server:call(PID, {r_code, Resource}).
+  gen_server:call(PID, {n_code, Resource}).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -71,8 +71,8 @@ handle_call({a_code, Address}, _From, State) ->
   Index = Digest rem round(math:pow(2, State#state.nbits)),
   {reply, Index, State};
 
-handle_call({r_code, Resource}, _From, State) ->
-  Digest = crypto:bytes_to_integer(crypto:hash(sha, Resource)),
+handle_call({n_code, Name}, _From, State) ->
+  Digest = crypto:bytes_to_integer(crypto:hash(sha, Name)),
   Index = Digest rem round(math:pow(2, State#state.nbits)),
   {reply, Index, State}.
 

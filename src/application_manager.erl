@@ -9,12 +9,14 @@
   create/1,
   leave/0,
   issue_command/2,
-  receive_command/1,
+  receive_command/2,
   add_many_resources/1,
   get_local_resources/0,
   drop_many_resources/1,
   join_p/2,
-  create_p/2]).
+  create_p/2,
+  connect/1,
+  hash_name/1]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -26,7 +28,7 @@
 
 -define(SERVER, ?MODULE).
 
--record(state, {}).
+-record(state, {name}).
 
 %%%===================================================================
 %%% API
@@ -56,21 +58,47 @@ create(Nbits) ->
 leave() ->
   join_handler:leave().
 
-issue_command(Index, Command) ->
-  {found, Address} = router:local_lookup(Index),
-  communication_manager:send_message_async(command, [Command], Address, no_alias).
+issue_command(Name, Command) ->
+  Router = naming_handler:get_maybe_identity(router),
+  case Router of
+    no_name_registered -> out_of_network;
+    _ ->
+      Index = hash_f:get_hashed_name(Name),
+      {found, Address} = router:local_lookup(Index),
+      communication_manager:send_message_async(command, [link_manager:get_own_address(), Command], Address, no_alias)
+  end.
 
-receive_command(Command) ->
-  io:format("****Received Command: ~p*****~n", [Command]).
+receive_command(From, Command) ->
+  PID = naming_handler:get_identity(application_manager),
+  Module = gen_server:call(PID, get_name),
+  erlang:apply(Module, receive_command, [From, Command]).
 
 add_many_resources(Resources) ->
-  io:format("****Resources: ~p*****~n", [Resources]).
+  PID = naming_handler:get_identity(application_manager),
+  Module = gen_server:call(PID, get_name),
+  erlang:apply(Module, add_many_resources, [Resources]).
 
-get_local_resources() -> [].
+get_local_resources() ->
+  PID = naming_handler:get_identity(application_manager),
+  Module = gen_server:call(PID, get_name),
+  erlang:apply(Module, get_local_resources, []).
 
-drop_many_resources(_From) -> ok.
+drop_many_resources(From) ->
+  PID = naming_handler:get_identity(application_manager),
+  Module = gen_server:call(PID, get_name),
+  erlang:apply(Module, drop_many_resources, [From]).
 
+connect(Name) ->
+  PID = naming_handler:get_identity(application_manager),
+  gen_server:call(PID, {connect, Name}).
 
+hash_name(Name) ->
+  HashF = naming_handler:get_maybe_identity(hash_f),
+  case HashF of
+    no_name_registered -> out_of_network;
+    _ ->
+      hash_f:get_hashed_name(Name)
+  end.
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -88,6 +116,7 @@ drop_many_resources(_From) -> ok.
 %% @end
 %%--------------------------------------------------------------------
 init([]) ->
+  naming_service:notify_identity(self(), application_manager),
   {ok, #state{}}.
 
 %%--------------------------------------------------------------------
@@ -97,6 +126,12 @@ init([]) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
+handle_call(get_name, _From, State) ->
+  {reply, State#state.name, State};
+
+handle_call({connect, Name}, _From, State) ->
+  {reply, ok, State#state{name = Name}};
+
 handle_call(_Request, _From, State) ->
   {reply, ok, State}.
 

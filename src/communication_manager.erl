@@ -7,7 +7,7 @@
 -export([start_link/0, send_message_async/4, receive_message/1, receive_nbits/1, send_message_sync/4]).
 
 %TODO remove me when done debugging
--export([encode_resource/2, decode_resource/2, encode_ID/2, decode_ID/1, encode_successor_list/2, decode_successor_list/2, encode_nbits_successor_and_resources/1, decode_nbits_successor_and_resources/1]).
+-export([encode_resource/1, decode_resource/1, encode_ID/2, decode_ID/1, encode_successor_list/2, decode_successor_list/2, encode_nbits_successor_and_resources/1, decode_nbits_successor_and_resources/1]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -219,14 +219,14 @@ encode_params(abort, [S], _NBits) -> [list_to_binary(S)];
 encode_params(ack_join, [], _NBits) -> [];
 encode_params(leave_info, _, no_nbits) -> badarg;
 encode_params(leave_info, [], _NBits) -> [];
-encode_params(leave_info, [Res], NBits) -> [encode_resource(Res, NBits)];
+encode_params(leave_info, [Res], _NBits) -> [encode_resource(Res)];
 encode_params(leave_ack, [], _NBits) -> [];
 encode_params(ask_pred, [], _NBits) -> [];
 encode_params(pred_reply, _, no_nbits) -> badarg;
 encode_params(pred_reply, [Pred, SL], NBits) -> [link_manager:address_to_binary(Pred), encode_successor_list(SL, NBits)];
 encode_params(lookup, _, no_nbits) -> badarg;
 encode_params(lookup, [ID], NBits) -> [encode_ID(ID, NBits)];
-encode_params(command, [C], _NBits) -> [C];
+encode_params(command, [Address,C], _NBits) -> [link_manager:address_to_binary(Address), C];
 encode_params(_, _, _) -> badarg.
 
 decode_params(lookup_for_join, [], _NBits) -> [];
@@ -238,13 +238,13 @@ decode_params(abort, [S], _NBits) -> [binary_to_list(S)];
 decode_params(ack_join, [], _NBits) -> [];
 decode_params(leave_info, _, no_nbits) -> badarg;
 decode_params(leave_info, [], _NBits) -> [];
-decode_params(leave_info, [Res], NBits) -> [decode_resource(Res, NBits)];
+decode_params(leave_info, [Res], _NBits) -> [decode_resource(Res)];
 decode_params(leave_ack, [], _NBits) -> [];
 decode_params(ask_pred, [], _NBits) -> [];
 decode_params(pred_reply, _, no_nbits) -> badarg;
 decode_params(pred_reply, [Pred, SL], NBits) -> [link_manager:binary_to_address(Pred), decode_successor_list(SL, NBits)];
 decode_params(lookup, [ID], _NBits) -> [decode_ID(ID)];
-decode_params(command, [C], _NBits) -> [C];
+decode_params(command, [A,C], _NBits) -> [link_manager:binary_to_address(A), C];
 decode_params(_, _, _) -> badarg.
 
 
@@ -261,7 +261,7 @@ forward(leave_ack, [], From) -> join_handler:ack_leave(From);
 forward(ask_pred, [], From) -> checker:get_pred(From);
 forward(pred_reply, [Pred, SL], _From) -> stabilizer:notify_successor(Pred, SL);
 forward(lookup, [ID], From) -> router:remote_lookup(ID, From);
-forward(command, [C], _From) -> application_manager:receive_command(C);
+forward(command, [A,C], _From) -> application_manager:receive_command(A,C);
 forward(_, _, _) -> badarg.
 
 %TODO remove comment, it is just for testing
@@ -281,15 +281,22 @@ decode_ID(Bin, Acc) ->
   decode_ID(Rest, NewAcc + Int).
 
 %TODO remove comment, it is just for testing
-% communication_manager:decode_resource(communication_manager:encode_resource([{3587, <<"dwin">>}, {321, <<"abcdefghijklmnopqrstuvwxyz">>}], 12), 12).
+% communication_manager:decode_resource(communication_manager:encode_resource([{"pippo", <<"dwin">>}, {"pluto", <<"abcdefghijklmnopqrstuvwxyz">>}])).
 
-encode_resource([], _) -> <<>>;
+encode_resource([]) -> <<>>;
 
-encode_resource(Resources, NBits) ->              % Resources are in the form of {ID, <<Bin>>}
+encode_resource(Resources) ->              % Resources are in the form of {Name, <<Bin>>}
   N = length(Resources),
   DimOfN = ceil(ceil(math:log2(N))/8),
-  Indexes = [X || {X, _} <- Resources],
-  EncodedIndexes = list_to_binary([encode_ID(X, NBits) || X <- Indexes]),
+  Names = [X || {X, _} <- Resources],
+  PaddedNames = lists:map(
+    fun (X) ->
+      Length = length(X),
+      Pad = lists:duplicate(64 - Length, 0),
+      lists:flatten([Pad, X])
+    end,
+    Names),
+  EncodedNames = list_to_binary(lists:map(fun (X) -> list_to_binary(X) end, PaddedNames)),
   Binaries = [X || {_, X} <- Resources],
   Lengths = [byte_size(X) || X <- Binaries],       %NBits due to index
   MaxDim = lists:foldl(fun(Elem, Acc) -> max(Elem, Acc) end, 0, Lengths),
@@ -297,16 +304,15 @@ encode_resource(Resources, NBits) ->              % Resources are in the form of
   EncodedLengths = list_to_binary([encode_ID(X, ceil(math:log2(MaxDim))) || X <- Lengths]),
   BinaryResource = list_to_binary(Binaries),
   BinDimOfN = <<N:(DimOfN*8)>>,
-  <<DimOfN:8, BinDimOfN/binary, EncodedIndexes/binary, (ceil(BitsForDim / 8)):8, EncodedLengths/binary ,BinaryResource/binary>>.
+  <<DimOfN:8, BinDimOfN/binary, EncodedNames/binary, (ceil(BitsForDim / 8)):8, EncodedLengths/binary ,BinaryResource/binary>>.
 
-decode_resource(<<>>, _) -> [];
+decode_resource(<<>>) -> [];
 
-decode_resource(Bin, NBits) ->
+decode_resource(Bin) ->
   <<DimOfN:8/integer, Bin2/binary>> = Bin,
   BitDim = (DimOfN*8),
   <<N:BitDim/integer, Rest/binary>> = Bin2,
-  NBytes = ceil(NBits / 8),
-  {Indexes, Remaining} = extract_integer(N, NBytes, Rest),
+  {Names, Remaining} = extract_names(N, Rest),
   <<BitsForDim:8/integer, LengthsAndBins/binary>> = Remaining,
   {Lengths, Resources} = extract_integer(N, BitsForDim, LengthsAndBins),
   {RevResult, <<>>} = lists:foldl(
@@ -316,13 +322,13 @@ decode_resource(Bin, NBits) ->
       {[First | Result], Tail} end,
     {[], Resources}, Lengths),
   Result = lists:reverse(RevResult),
-  lists:zip(Indexes, Result).
+  lists:zip(Names, Result).
 
 %TODO remove comment, it is just for testing
-% communication_manager:decode_nbits_successor_and_resources(communication_manager:encode_nbits_successor_and_resources([12, [{1, {2, {1,2,3,4}}}, {7, {743, {6,9,5,2}}}], [{3587, <<"dwin">>}, {321, <<"abcdefghijklmnopqrstuvwxyz">>}]])).
+% communication_manager:decode_nbits_successor_and_resources(communication_manager:encode_nbits_successor_and_resources([12, [{1, {2, {1,2,3,4}}}, {7, {743, {6,9,5,2}}}], [{"pippo", <<"dwin">>}, {"pluto", <<"abcdefghijklmnopqrstuvwxyz">>}]])).
 
 encode_nbits_successor_and_resources([NBits, List, Res]) ->
-  list_to_binary([<<NBits:8>>, encode_successor_list(List, NBits), encode_resource(Res, NBits)]).
+  list_to_binary([<<NBits:8>>, encode_successor_list(List, NBits), encode_resource(Res)]).
 
 decode_nbits_successor_and_resources(Bin) ->
   <<NBits:8/integer, Rest/binary>> = Bin,
@@ -332,7 +338,7 @@ decode_nbits_successor_and_resources(Bin) ->
   BitsPerList = 8 + BitsPerIndex * NList + BitsPerAddress * NList,
   BytePerList = BitsPerList div 8,
   <<List:BytePerList/binary, Res/binary>> = Rest,
-  [NBits, decode_successor_list(List, NBits), decode_resource(Res, NBits)].
+  [NBits, decode_successor_list(List, NBits), decode_resource(Res)].
 
 %TODO remove comment, it is just for testing
 % communication_manager:decode_successor_list(communication_manager:encode_successor_list([{1, {2, {1,2,3,4}}}, {7, {743, {6,9,5,2}}}], 7), 7).
@@ -373,3 +379,16 @@ extract_address(N, Rest, Acc) ->
   Size = link_manager:binary_address_size(),
   <<Address:Size/binary, NewRest/binary>> = Rest,
   extract_address(N-1, NewRest, [link_manager:binary_to_address(Address) | Acc]).
+
+extract_names(N, Rest) ->
+  extract_names(N, Rest, []).
+
+extract_names(0, Rest, Acc) ->
+  {lists:reverse(Acc), Rest};
+
+extract_names(N, Rest, Acc) ->
+  <<Name:64/binary, NewRest/binary>> = Rest,
+  extract_names(N-1, NewRest, [unpad(binary_to_list(Name)) | Acc]).
+
+unpad([0 | X]) -> unpad(X);
+unpad(X) -> X.
