@@ -16,7 +16,9 @@
   join_p/2,
   create_p/2,
   connect/1,
-  hash_name/1]).
+  hash_name/1,
+  get_own_address/0,
+  send_response/2]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -99,6 +101,12 @@ hash_name(Name) ->
     _ ->
       hash_f:get_hashed_name(Name)
   end.
+
+get_own_address() ->
+  link_manager:get_own_address().
+
+send_response(Message, Address) ->
+  communication_manager:send_message_async(command, [Address, Message], Address, no_alias).
 
 %%%===================================================================
 %%% gen_server callbacks

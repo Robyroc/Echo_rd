@@ -476,7 +476,10 @@ start(Session) ->
   ParamsHandler = {params_handler, {params_handler, start_link, [SuccAddr, SuccList, Nbits]},
     temporary, 2000, worker, [params_handler]},
   supervisor:start_child(Supervisor, ParamsHandler),
-  application_manager:add_many_resources(Resources),
+  case Resources of
+    [] -> ok;
+    _ -> application_manager:add_many_resources(Resources)
+  end,
   naming_handler:wait_service(hash_f),
   gen_statem:reply(AM, ok).
 
