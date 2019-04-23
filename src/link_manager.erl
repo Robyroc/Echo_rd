@@ -69,8 +69,8 @@ binary_address_size() ->
   byte_size(address_to_binary({6543, {127, 0, 0, 1}})).
 
 get_own_address() ->
-  local_address().
-% {naming_handler:get_identity(port), public_ip:get_public_ip()}.
+%  local_address().
+ {naming_handler:get_identity(port), public_ip:get_public_ip()}.
 
 move_socket(Socket) ->
   PID = naming_handler:get_identity(link_manager),
