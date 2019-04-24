@@ -139,12 +139,12 @@ handle_call({send, {Port, IP}, Message}, _From, State) ->
         {ok, PID} ->
           gen_tcp:controlling_process(RequestSocket, PID),
           socket_handler:send_message(PID, Message),
-          erlang:send_after(300000, PID, {tcp_closed, RequestSocket}),
+          timer:apply_after(300000, erlang, exit, [PID, kill]),
           {reply, ok, State};
         {ok, PID, _} ->
           gen_tcp:controlling_process(RequestSocket, PID),
           socket_handler:send_message(PID, Message),
-          erlang:send_after(300000, PID, {tcp_closed, RequestSocket}),
+          timer:apply_after(300000, erlang, exit, [PID, kill]),
           {reply, ok, State}
       end;
     {error, Reason} ->
