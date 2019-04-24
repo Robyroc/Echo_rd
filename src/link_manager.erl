@@ -214,7 +214,6 @@ local_address() ->
   {naming_handler:get_identity(port), IP}.
 
 send(Port, IP, Message, State, Size) when Size < 8000 ->
-  io:format("Less~n"),
   Present = [X || {X, Addr, _} <- State#state.connections, Addr == {Port, IP}],
   case Present of
     [] ->
@@ -243,7 +242,6 @@ send(Port, IP, Message, State, Size) when Size < 8000 ->
   end;
 
 send(Port, IP, Message, State, _Size) ->
-  io:format("High~n"),
   case gen_tcp:connect(IP, Port, [binary, {packet, 0}], ?INTERVAL) of
     {ok, RequestSocket} ->
       Sup = naming_handler:get_identity(handler_supervisor),
