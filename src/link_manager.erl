@@ -103,6 +103,7 @@ init([]) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_call({send, {Port, IP}, Message}, _From, State) when byte_size(Message) < 8000 ->
+  io:format("Less~n"),
   Present = [X || {X, Addr, _} <- State#state.connections, Addr == {Port, IP}],
   case Present of
     [] ->
@@ -131,6 +132,7 @@ handle_call({send, {Port, IP}, Message}, _From, State) when byte_size(Message) <
   end;
 
 handle_call({send, {Port, IP}, Message}, _From, State) ->
+  io:format("High~n"),
   case gen_tcp:connect(IP, Port, [binary, {packet, 0}], ?INTERVAL) of
     {ok, RequestSocket} ->
       Sup = naming_handler:get_identity(handler_supervisor),
