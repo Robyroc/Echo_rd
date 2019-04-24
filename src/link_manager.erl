@@ -131,7 +131,7 @@ handle_call({send, {Port, IP}, Message}, _From, State) when byte_size(Message) <
       {reply, ok, State}
   end;
 
-handle_call({send, {Port, IP}, Message}, _From, State) ->
+handle_call({send, {Port, IP}, Message}, _From, State) when byte_size(Message) >= 8000 ->
   io:format("High~n"),
   case gen_tcp:connect(IP, Port, [binary, {packet, 0}], ?INTERVAL) of
     {ok, RequestSocket} ->
