@@ -110,7 +110,7 @@ handle_info({tcp, Socket , Bin}, State) when Socket =:= State#state.socket ->
       Received = byte_size(Message),
       case Size of
         Received ->
-          {Address, Method, Params} = parse_message(Bin),
+          {Address, Method, Params} = parse_message(Message),
           link_manager:notify_incoming_message({Method, Address, Params}),
           {noreply, State};
         _ -> {noreply, State#state{remaining = Size - Received, acc = Message}}
