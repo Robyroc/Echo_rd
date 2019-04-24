@@ -102,56 +102,10 @@ init([]) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
-handle_call({send, {Port, IP}, Message}, _From, State) when byte_size(Message) < 8000 ->
-  io:format("Less~n"),
-  Present = [X || {X, Addr, _} <- State#state.connections, Addr == {Port, IP}],
-  case Present of
-    [] ->
-      case gen_tcp:connect(IP, Port, [binary, {packet, 0}], ?INTERVAL) of
-        {ok, RequestSocket} ->
-          Sup = naming_handler:get_identity(handler_supervisor),
-          Ret = supervisor:start_child(Sup, [RequestSocket]),
-          case Ret of
-            {ok, PID} ->
-              gen_tcp:controlling_process(RequestSocket, PID),
-              Monitor = erlang:monitor(process, PID),
-              socket_handler:send_message(PID, Message),
-              {reply, ok, #state{connections = [{PID, {Port, IP}, Monitor} | State#state.connections]}};
-            {ok, PID, _} ->
-              gen_tcp:controlling_process(RequestSocket, PID),
-              Monitor = erlang:monitor(process, PID),
-              socket_handler:send_message(PID, Message),
-              {reply, ok, #state{connections = [{PID, {Port, IP}, Monitor} | State#state.connections]}}
-          end;
-        {error, Reason} ->
-          {reply, {error, Reason}, State}
-      end;
-    [H|_] ->
-      socket_handler:send_message(H, Message),
-      {reply, ok, State}
-  end;
-
-handle_call({send, {Port, IP}, Message}, _From, State) when byte_size(Message) >= 8000 ->
-  io:format("High~n"),
-  case gen_tcp:connect(IP, Port, [binary, {packet, 0}], ?INTERVAL) of
-    {ok, RequestSocket} ->
-      Sup = naming_handler:get_identity(handler_supervisor),
-      Ret = supervisor:start_child(Sup, [RequestSocket]),
-      case Ret of
-        {ok, PID} ->
-          gen_tcp:controlling_process(RequestSocket, PID),
-          socket_handler:send_message(PID, Message),
-          timer:apply_after(300000, erlang, exit, [PID, kill]),
-          {reply, ok, State};
-        {ok, PID, _} ->
-          gen_tcp:controlling_process(RequestSocket, PID),
-          socket_handler:send_message(PID, Message),
-          timer:apply_after(300000, erlang, exit, [PID, kill]),
-          {reply, ok, State}
-      end;
-    {error, Reason} ->
-      {reply, {error, Reason}, State}
-  end;
+handle_call({send, {Port, IP}, Message}, _From, State) ->
+  {_, _, Params} = Message,
+  Size = byte_size(list_to_binary(Params)),
+  send(Port, IP, Message, State, Size);
 
 handle_call(Request, _From, State) ->
   io:format("LM: Unexpected call message: ~p~n", [Request]),
@@ -258,3 +212,54 @@ local_address() ->
   {ok, Addrs} = inet:getif(),
   IP = hd([Addr || {Addr, _,_} <- Addrs, size(Addr) == 4, Addr =/= {127,0,0,1}]),
   {naming_handler:get_identity(port), IP}.
+
+send(Port, IP, Message, State, Size) when Size < 8000 ->
+  io:format("Less~n"),
+  Present = [X || {X, Addr, _} <- State#state.connections, Addr == {Port, IP}],
+  case Present of
+    [] ->
+      case gen_tcp:connect(IP, Port, [binary, {packet, 0}], ?INTERVAL) of
+        {ok, RequestSocket} ->
+          Sup = naming_handler:get_identity(handler_supervisor),
+          Ret = supervisor:start_child(Sup, [RequestSocket]),
+          case Ret of
+            {ok, PID} ->
+              gen_tcp:controlling_process(RequestSocket, PID),
+              Monitor = erlang:monitor(process, PID),
+              socket_handler:send_message(PID, Message),
+              {reply, ok, #state{connections = [{PID, {Port, IP}, Monitor} | State#state.connections]}};
+            {ok, PID, _} ->
+              gen_tcp:controlling_process(RequestSocket, PID),
+              Monitor = erlang:monitor(process, PID),
+              socket_handler:send_message(PID, Message),
+              {reply, ok, #state{connections = [{PID, {Port, IP}, Monitor} | State#state.connections]}}
+          end;
+        {error, Reason} ->
+          {reply, {error, Reason}, State}
+      end;
+    [H|_] ->
+      socket_handler:send_message(H, Message),
+      {reply, ok, State}
+  end;
+
+send(Port, IP, Message, State, _Size) ->
+  io:format("High~n"),
+  case gen_tcp:connect(IP, Port, [binary, {packet, 0}], ?INTERVAL) of
+    {ok, RequestSocket} ->
+      Sup = naming_handler:get_identity(handler_supervisor),
+      Ret = supervisor:start_child(Sup, [RequestSocket]),
+      case Ret of
+        {ok, PID} ->
+          gen_tcp:controlling_process(RequestSocket, PID),
+          socket_handler:send_message(PID, Message),
+          timer:apply_after(300000, erlang, exit, [PID, kill]),
+          {reply, ok, State};
+        {ok, PID, _} ->
+          gen_tcp:controlling_process(RequestSocket, PID),
+          socket_handler:send_message(PID, Message),
+          timer:apply_after(300000, erlang, exit, [PID, kill]),
+          {reply, ok, State}
+      end;
+    {error, Reason} ->
+      {reply, {error, Reason}, State}
+  end.
