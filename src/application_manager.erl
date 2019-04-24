@@ -11,7 +11,7 @@
   issue_command/2,
   receive_command/2,
   add_many_resources/1,
-  get_local_resources/0,
+  get_local_resources/1,
   drop_many_resources/1,
   join_p/2,
   create_p/2,
@@ -79,10 +79,10 @@ add_many_resources(Resources) ->
   Module = gen_server:call(PID, get_name),
   erlang:apply(Module, add_many_resources, [Resources]).
 
-get_local_resources() ->
+get_local_resources(From) ->
   PID = naming_handler:get_identity(application_manager),
   Module = gen_server:call(PID, get_name),
-  erlang:apply(Module, get_local_resources, []).
+  erlang:apply(Module, get_local_resources, [From]).
 
 drop_many_resources(From) ->
   PID = naming_handler:get_identity(application_manager),

@@ -297,7 +297,7 @@ init_provider(cast, {ready_for_info, Address}, Session) ->
     _ when JoinerID > PredecessorID ->
       io:format("JH there: JoinerID: ~p   PredecessorID: ~p~n", [JoinerID, PredecessorID]),
       DataInfo=[params_handler:get_param(nbits), stabilizer:get_successor_list(),
-        application_manager:get_local_resources()],
+        application_manager:get_local_resources(JoinerID)],
       communication_manager:send_message_async(join_info,DataInfo,Address,no_alias),
       handle(init_provider, not_alone),         %TODO remove this line
       {next_state, not_alone, Session#session{curr_id = JoinerID, curr_addr = Address}, [{state_timeout, ?INTERVAL_JOIN, hard_stop}]}
@@ -312,7 +312,7 @@ init_provider(cast, {leave_info,Resources, Address}, Session) ->
 init_provider({call,From}, leave, Session) ->
   ok = handle(init_provider, leaving),        %TODO remove this line
   Reply = postpone,
-  application_manager:get_local_resources(),
+  application_manager:get_local_resources(all_res),
   {_, Successor} = stabilizer:get_successor(),
   communication_manager:send_message_async(leave_info, [], Successor, no_alias), %TODO put resources instead of void list
   {next_state, leaving, Session#session{app_mngr = From}, [{state_timeout, ?INTERVAL_LEAVING, hard_stop}, Reply]};
@@ -347,7 +347,7 @@ not_alone({call,From}, leave, Session) ->
   ok = handle(not_alone, leaving),        %TODO remove this line
   communication_manager:send_message_async(abort, ["Successor is leaving"], Session#session.curr_addr, no_alias),
   {_, Successor} = stabilizer:get_successor(),
-  communication_manager:send_message_async(leave_info, application_manager:get_local_resources(), Successor, no_alias),
+  communication_manager:send_message_async(leave_info, application_manager:get_local_resources(all_res), Successor, no_alias),
   {next_state, leaving, Session#session{app_mngr = From}, [{state_timeout, ?INTERVAL_LEAVING, hard_stop}, Reply]};
 
 not_alone(cast, {ack_info,Address}, Session) ->
