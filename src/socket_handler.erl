@@ -53,7 +53,7 @@ send_message(PID, Message) ->
 %% @end
 %%--------------------------------------------------------------------
 init([Socket]) ->
-  {ok, #state{socket = Socket, remaining = 0, acc = nothing}};
+  {ok, #state{socket = Socket, remaining = 0, acc = []}};
 
 init(_) ->
   {stop, badarg}.
@@ -113,18 +113,18 @@ handle_info({tcp, Socket , Bin}, State) when Socket =:= State#state.socket ->
           {Address, Method, Params} = parse_message(Message),
           link_manager:notify_incoming_message({Method, Address, Params}),
           {noreply, State};
-        _ -> {noreply, State#state{remaining = Size - Received, acc = Message}}
+        _ -> {noreply, State#state{remaining = Size - Received, acc = [Message]}}
       end;
     _ ->
       Received = byte_size(Bin),
       Remaining = State#state.remaining,
       case Received of
         Remaining ->
-          Total = <<(State#state.acc)/binary, Bin/binary>>,
+          Total = list_to_binary(lists:reverse([Bin | State#state.acc])),
           {Address, Method, Params} = parse_message(Total),
           link_manager:notify_incoming_message({Method, Address, Params}),
-          {noreply, State#state{remaining = 0, acc = nothing}};
-        _ -> {noreply, State#state{remaining = Remaining - Received, acc = <<(State#state.acc)/binary, Bin/binary>>}}
+          {noreply, State#state{remaining = 0, acc = []}};
+        _ -> {noreply, State#state{remaining = Remaining - Received, acc = [Bin | State#state.acc]}}
       end
   end;
 

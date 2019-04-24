@@ -94,7 +94,7 @@ handle_info(startup, _State) ->
 handle_info(fix, State) ->
   Theo = (State#state.id + round(math:pow(2, State#state.index))),
 %    rem round(math:pow(2, State#state.nbits)),     %TODO check if it can be removed
-  io:format("Theo: ~p~n", [Theo]),                  %TODO remove this line
+  %io:format("Theo: ~p~n", [Theo]),                  %TODO remove this line
   {found, Address} = router:local_lookup(Theo),
   router:update_finger_table(Address, Theo),
   erlang:send_after(?INTERVAL, self(), fix),
