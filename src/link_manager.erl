@@ -106,7 +106,7 @@ handle_call({send, {Port, IP}, Message}, _From, State) ->
   Present = [X || {X, Addr, _} <- State#state.connections, Addr == {Port, IP}],
   case Present of
     [] ->
-      case gen_tcp:connect(IP, Port, [binary, {packet, 4}], ?INTERVAL) of
+      case gen_tcp:connect(IP, Port, [binary, {packet, 0}], ?INTERVAL) of
         {ok, RequestSocket} ->
           Sup = naming_handler:get_identity(handler_supervisor),
           Ret = supervisor:start_child(Sup, [RequestSocket]),

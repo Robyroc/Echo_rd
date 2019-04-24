@@ -16,7 +16,7 @@
 
 -define(SERVER, ?MODULE).
 
--record(state, {socket}).
+-record(state, {socket, remaining, acc}).
 
 %%%===================================================================
 %%% API
@@ -53,7 +53,7 @@ send_message(PID, Message) ->
 %% @end
 %%--------------------------------------------------------------------
 init([Socket]) ->
-  {ok, #state{socket = Socket}};
+  {ok, #state{socket = Socket, remaining = 0, acc = nothing}};
 
 init(_) ->
   {stop, badarg}.
@@ -67,13 +67,14 @@ init(_) ->
 %%--------------------------------------------------------------------
 handle_call({send, {no_alias, Method, Params}}, _From, State) ->
   Message = marshall(link_manager:get_own_address(), Method, Params),
-  ok = gen_tcp:send(State#state.socket, Message),
+  Size = byte_size(Message),
+  ok = gen_tcp:send(State#state.socket, <<Size:40/integer, Message/binary>>),
   {reply, ok, State};
 
 handle_call({send, {Alias, Method, Params}}, _From, State) ->
   Message = marshall(Alias, Method, Params),
-  %timer:sleep(1000),
-  ok = gen_tcp:send(State#state.socket, Message),
+  Size = byte_size(Message),
+  ok = gen_tcp:send(State#state.socket, <<Size:40/integer, Message/binary>>),
   {reply, ok, State};
 
 handle_call(Request, _From, State) ->
@@ -103,9 +104,29 @@ handle_cast(Request, State) ->
 %%--------------------------------------------------------------------
 
 handle_info({tcp, Socket , Bin}, State) when Socket =:= State#state.socket ->
-  {Address, Method, Params} = parse_message(Bin),
-  link_manager:notify_incoming_message({Method, Address, Params}),
-  {noreply, State};
+  case State#state.remaining of
+    0 ->
+      <<Size:40/integer, Message/binary>> = Bin,
+      Received = byte_size(Message),
+      case Size of
+        Received ->
+          {Address, Method, Params} = parse_message(Bin),
+          link_manager:notify_incoming_message({Method, Address, Params}),
+          {noreply, State};
+        _ -> {noreply, State#state{remaining = Size - Received, acc = Message}}
+      end;
+    _ ->
+      Received = byte_size(Bin),
+      Remaining = State#state.remaining,
+      case Received of
+        Remaining ->
+          Total = <<(State#state.acc)/binary, Bin/binary>>,
+          {Address, Method, Params} = parse_message(Total),
+          link_manager:notify_incoming_message({Method, Address, Params}),
+          {noreply, State#state{remaining = 0, acc = nothing}};
+        _ -> {noreply, State#state{remaining = Remaining - Received, acc = <<(State#state.acc)/binary, Bin/binary>>}}
+      end
+  end;
 
 handle_info({tcp_closed, Socket}, State) when Socket =:= State#state.socket ->
   gen_tcp:close(Socket),
