@@ -102,7 +102,7 @@ init([]) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
-handle_call({send, {Port, IP}, Message}, _From, State) ->
+handle_call({send, {Port, IP}, Message}, _From, State) when byte_size(Message) < 8000 ->
   Present = [X || {X, Addr, _} <- State#state.connections, Addr == {Port, IP}],
   case Present of
     [] ->
@@ -128,6 +128,27 @@ handle_call({send, {Port, IP}, Message}, _From, State) ->
     [H|_] ->
       socket_handler:send_message(H, Message),
       {reply, ok, State}
+  end;
+
+handle_call({send, {Port, IP}, Message}, _From, State) ->
+  case gen_tcp:connect(IP, Port, [binary, {packet, 0}], ?INTERVAL) of
+    {ok, RequestSocket} ->
+      Sup = naming_handler:get_identity(handler_supervisor),
+      Ret = supervisor:start_child(Sup, [RequestSocket]),
+      case Ret of
+        {ok, PID} ->
+          gen_tcp:controlling_process(RequestSocket, PID),
+          socket_handler:send_message(PID, Message),
+          erlang:send_after(300000, PID, {tcp_closed, RequestSocket}),
+          {reply, ok, State};
+        {ok, PID, _} ->
+          gen_tcp:controlling_process(RequestSocket, PID),
+          socket_handler:send_message(PID, Message),
+          erlang:send_after(300000, PID, {tcp_closed, RequestSocket}),
+          {reply, ok, State}
+      end;
+    {error, Reason} ->
+      {reply, {error, Reason}, State}
   end;
 
 handle_call(Request, _From, State) ->
