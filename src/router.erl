@@ -102,7 +102,10 @@ handle_call(show_id, _From, State) ->
 handle_call({lookup, Requested}, From, State) ->
   ActualRequested = normalize_id(Requested, State#state.nbits),
   {SuccID, Succ} = stabilizer:get_successor(),
-  %io:format("Req:~p~n", [ActualRequested]),         %TODO remove this line
+  case logging_policies:check_policy(?MODULE) of
+    able -> io:format("$$$ ROUTER $$$:~p~n", [ActualRequested]);
+    unable -> ok
+  end,
   Next = check_if_next(ActualRequested, State#state.id, SuccID, State#state.nbits),
   case Next of
     next -> {reply, {found, Succ}, State};
@@ -148,6 +151,10 @@ handle_cast({update, Address, Theoretical}, State) ->
 handle_cast({lookup, Alias, Requested}, State) ->
   ActualRequested = adjust_successor(Requested, State#state.id, State#state.nbits),
   {SuccID, Succ} = stabilizer:get_successor(),
+  case logging_policies:check_policy(?MODULE) of
+    able -> io:format("$$$ ROUTER $$$:~p~n", [ActualRequested]);
+    unable -> ok
+  end,
   Next = check_if_next(ActualRequested, State#state.id, SuccID, State#state.nbits),
   case Next of
     next ->
@@ -235,14 +242,12 @@ lookup(Searched, _ID, Table, _NBits) ->
   [Address || {_, ID, Address} <- lists:filter(fun({_, Id, _}) -> Id =/= no_real end, RevTable), ID < Searched].
 
 check_if_next(Requested, ID, SuccId, NBits) when Requested =< ID ->
-  %io:format("Next:~p ~p ~p~n", [Requested, ID, SuccId]),            %TODO remove this line
   check_if_next(Requested + round(math:pow(2, NBits)), ID, SuccId, NBits);
 
 check_if_next(Requested, ID, SuccId, _NBits) when ((Requested > ID) and not (Requested > SuccId)) ->
   next;
 
-check_if_next(Requested, ID, SuccId, _NBits) ->
-  %io:format("Next:~p ~p ~p~n", [Requested, ID, SuccId]),            %TODO remove this line
+check_if_next(_, _, _, _) ->
   not_next.
 
 adjust_successor(ID, OwnId, _NBits) when ID > OwnId -> ID;

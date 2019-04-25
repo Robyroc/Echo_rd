@@ -86,7 +86,10 @@ init([]) ->
 %%--------------------------------------------------------------------
 
 handle_call({send_msg, Method, Params, Address, Alias}, _From, State) ->
-  %io:format("### OUT ###: Method:~p | Params:~p | Address:~p~n", [Method, Params, Address]),  %TODO remove this line
+  case logging_policies:check_policy(?MODULE) of
+    able -> io:format("### OUT ###: Method:~p | Params:~p | Address:~p~n", [Method, Params, Address]);
+    unable -> ok
+  end,
   Translated = translate(Method),
   Encoded = encode_params(Method, Params, State#state.nbits),
   case Encoded of
@@ -111,7 +114,10 @@ handle_call(Request, _From, State) ->
 %%--------------------------------------------------------------------
 
 handle_cast({send_msg, Method, Params, Address, Alias}, State) ->
-  %io:format("### OUT ###: Method:~p | Params:~p | Address:~p~n", [Method, Params, Address]),  %TODO remove this line
+  case logging_policies:check_policy(?MODULE) of
+    able -> io:format("### OUT ###: Method:~p | Params:~p | Address:~p~n", [Method, Params, Address]);
+    unable -> ok
+  end,
   Translated = translate(Method),
   Encoded = encode_params(Method, Params, State#state.nbits),
   case Encoded of
@@ -124,7 +130,10 @@ handle_cast({send_msg, Method, Params, Address, Alias}, State) ->
 handle_cast({rcv_msg, Method, Address, Params}, State) ->
   BackTranslated = back_translate(Method),
   DecodedParams = decode_params(back_translate(Method), Params, State#state.nbits),
-  %io:format("### IN ###: Method:~p | Params:~p | Address:~p~n", [BackTranslated, DecodedParams, Address]),  %TODO remove this line
+  case logging_policies:check_policy(?MODULE) of
+    able -> io:format("### IN ###: Method:~p | Params:~p | Address:~p~n", [BackTranslated, DecodedParams, Address]);
+    unable -> ok
+  end,
   forward(BackTranslated, DecodedParams, Address),
   {noreply,State};
 
