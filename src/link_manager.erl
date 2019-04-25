@@ -69,8 +69,10 @@ binary_address_size() ->
   byte_size(address_to_binary({6543, {127, 0, 0, 1}})).
 
 get_own_address() ->
-  local_address().
-% {naming_handler:get_identity(port), public_ip:get_public_ip()}.
+  case application:get_env(echo_rd, ip) of
+    {ok, public} -> {naming_handler:get_identity(port), public_ip:get_public_ip()};
+    _ -> local_address()
+  end.
 
 move_socket(Socket) ->
   PID = naming_handler:get_identity(link_manager),
