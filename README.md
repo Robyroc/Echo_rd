@@ -72,7 +72,7 @@ Truth-Table of the CM's state machine
 | d  | look          | join           |                                | look          | 
 | ti | look          | timeout        | hard_stop                      | init_joiner   | 
 | e  | pre_join      | info           | ack_info                       | j_ready       | 
-| f  | pre_join      | abort          | lookup_for_join                | pre_join      | 
+| f  | pre_join      | abort          | lookup_for_join                | look          | 
 | ti | pre_join      | timeout        | hard_stop                      | init_joiner   | 
 | g  | j_ready       | ack_join       | start                          | init_provider | 
 | h  | j_ready       | abort          | lookup_for_join                | look          | 
