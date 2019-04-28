@@ -306,7 +306,7 @@ init_provider(cast, {ready_for_info, Address}, Session) ->
 init_provider(cast, {leave_info,Resources, Address}, Session) ->
   ok = handle(init_provider, init_provider),      %TODO remove this line
   application_manager:add_many_resources(Resources),
-  communication_manager:send_message_async(leave_ack,[],Address,no_alias),
+  communication_manager:send_message_async(ack_leave,[],Address,no_alias),
   {keep_state, Session};
 
 init_provider({call,From}, leave, Session) ->
@@ -362,7 +362,7 @@ not_alone(cast, {leave_info,Resources, Address}, Session) ->
   PredecessorAddr = checker:get_pred(Session#session.provider_addr),
   case Address of
     _ when Address =:= PredecessorAddr ->
-      communication_manager:send_message_async(leave_ack,[], Address, no_alias),
+      communication_manager:send_message_async(ack_leave,[], Address, no_alias),
       application_manager:add_many_resources(Resources),
       {next_state, init_provider, reset_provider_session(Session)};
     _ -> {keep_state, Session, [{state_timeout, ?INTERVAL_JOIN, hard_stop}]}
