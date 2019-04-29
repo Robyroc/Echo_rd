@@ -92,6 +92,7 @@ Truth-Table of the CM's state machine
 | r  | leaving       | ack_leave      | stop                           | init_joiner   |
 | s  | leaving       | leave          |                                | init_joiner   |
 | u  | leaving       | look_resp      |                                | leaving       |
+| v  | leaving       | ready_for_info | abort                          | leaving       |
 | tl | leaving       | timeout        | hard_stop                      | init_joiner   |
 
 Where:
