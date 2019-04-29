@@ -109,8 +109,12 @@ handle_info({startup, Supervisor}, State) ->
   {noreply, State#state{}};
 
 handle_info({'ETS-TRANSFER', TableId, Pid, Data}, State) ->
-  io:format("Warning TableId: ~p HandlerPid: ~p is dying~n"
-  "Table is returning to Manager, in order to be passed to the new Handler~n", [TableId, Pid]),     %TODO remove this line
+  case logging_policies:check_policy(?MODULE) of
+    able ->
+      io:format("Warning TableId: ~p HandlerPid: ~p is dying~n"
+      "Table is returning to Manager, in order to be passed to the new Handler~n", [TableId, Pid]);
+    unable -> ok
+  end,
   ets:delete(naming_db, naming_handler),
   Handler = wait_for_handler(),
   ets:give_away(TableId, Handler, Data),

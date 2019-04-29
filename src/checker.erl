@@ -115,7 +115,10 @@ handle_cast({pred_find, Address}, State) ->
     Predecessor ->
       Index = hash_f:get_hashed_addr(Address),
       #state{pred = Predecessor, pred_id = PredID, own_id = OwnID, n_bits = NBits} = State,
-      io:format("CHECKER: ~p~n", [PredID]),         %TODO remove this line
+      case logging_policies:check_policy(?MODULE) of
+        able -> io:format("]]] CHECKER [[[: ~p~n", [PredID]);
+        unable -> ok
+      end,
       case Index of
         _ when Index < OwnID ->
           {Addr, PredecessorID} = predecessor_chooser(Address, Index, Predecessor, PredID),
@@ -192,9 +195,7 @@ code_change(_OldVsn, State, _Extra) ->
 predecessor_chooser(Address, AddressID, Predecessor, PredecessorID) ->
   case AddressID of
     _ when AddressID > PredecessorID ->
-      io:format("Pred changed, Address: ~p  Pred:~p  ~n", [Address, Predecessor]),        %TODO remove this line
       {Address, AddressID};
     _ when AddressID =< PredecessorID ->
-      io:format("Pred not changed, Address: ~p  Pred:~p  ~n", [Address, Predecessor]),    %TODO remove this line
       {Predecessor, PredecessorID}
   end.

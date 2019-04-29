@@ -131,7 +131,7 @@ start_link(Pid) ->
 %%--------------------------------------------------------------------
 init([Pid]) ->
   naming_handler:notify_identity(self(), join_handler),
-  ok = handle(init,init_joiner),        %TODO remove this line
+  ok = handle(init,init_joiner),
   {ok, init_joiner, #session{provider_addr = undefined, succ_addr = undefined,
     res = undefined, succ_list = undefined, nbits = undefined, app_mngr = undefined,
     curr_addr = undefined, curr_id = undefined, superv = Pid}, []};
@@ -189,7 +189,7 @@ format_status(_Opt, [_PDict, _StateName, _State]) ->
 %% @end
 %%--------------------------------------------------------------------
 init_joiner({call, From}, {join, OwnPort, Address}, Session) ->
-  ok = handle(init_joiner, look),         %TODO remove this line
+  ok = handle(init_joiner, look),
   naming_handler:notify_identity(OwnPort, port),
   naming_handler:wait_service(listener),
   Answer = communication_manager:send_message_sync(lookup_for_join, [], Address, no_alias),
@@ -204,7 +204,7 @@ init_joiner({call, From}, {join, OwnPort, Address}, Session) ->
 
 
 init_joiner({call, From}, {create, OwnPort, Nbits}, Session) ->
-  ok = handle(init_joiner, init_provider),    %TODO remove this line
+  ok = handle(init_joiner, init_provider),
   naming_handler:notify_identity(OwnPort, port),
   naming_handler:wait_service(listener),
   NewSession = Session#session{nbits = Nbits, succ_list = [], succ_addr = link_manager:get_own_address(),
@@ -213,17 +213,17 @@ init_joiner({call, From}, {create, OwnPort, Nbits}, Session) ->
   {next_state, init_provider, NewSession, []};
 
 init_joiner(EventType, EventContent, Session) ->
-  handle(init_joiner, init_joiner),       %TODO remove this line
+  handle(init_joiner, init_joiner),
   handle_generic_event({EventType, EventContent, Session}).
 
 
 look(cast, {look_resp,Address}, Session) ->
-  ok = handle(look, pre_join),            %TODO remove this line
+  ok = handle(look, pre_join),
   communication_manager:send_message_async(ready_for_info, [], Address, no_alias),
   {next_state, pre_join, Session#session{succ_addr = Address}, [{state_timeout, ?INTERVAL, hard_stop}]};
 
 look(state_timeout, hard_stop, Session) ->
-  ok = handle(look, init_joiner),         %TODO remove this line
+  ok = handle(look, init_joiner),
   gen_statem:reply(Session#session.app_mngr, fail),
   {next_state, init_joiner, reset_session(Session)};
 
@@ -231,11 +231,11 @@ look({call, _From}, {join, _Port, _Address}, Session) ->
   {keep_state, Session};
 
 look(EventType, EventContent, Session) ->
-  ok = handle(look, look),                %TODO remove this line
+  ok = handle(look, look),
   handle_generic_event({EventType, EventContent, Session}).
 
 pre_join(cast, {info,Address, Res, Succ, Nbits}, Session) ->
-  ok = handle(pre_join, j_ready),         %TODO remove this line
+  ok = handle(pre_join, j_ready),
   SuccAddr = Session#session.succ_addr,
   case Address of
     _ when Address =:= SuccAddr ->
@@ -245,7 +245,7 @@ pre_join(cast, {info,Address, Res, Succ, Nbits}, Session) ->
   end;
 
 pre_join(cast, {abort, Reason}, Session) ->
-  ok = handle(pre_join, look),            %TODO remove this line
+  ok = handle(pre_join, look),
   io:format(" -- JOIN ABORTED -- Reason of abort: ~p~n", [Reason]),
   ProviderAddr = Session#session.provider_addr,
   timer:sleep(?SLEEP_INTERVAL),
@@ -253,22 +253,22 @@ pre_join(cast, {abort, Reason}, Session) ->
   {next_state, look, soft_reset_session(Session), [{state_timeout, ?INTERVAL, hard_stop}]};
 
 pre_join(state_timeout, hard_stop, Session) ->
-  ok = handle(pre_join, init_joiner),     %TODO remove this line
+  ok = handle(pre_join, init_joiner),
   gen_statem:reply(Session#session.app_mngr, fail),
   {next_state, init_joiner, reset_session(Session)};
 
 pre_join(EventType, EventContent, Session) ->
-  ok = handle(pre_join, pre_join),        %TODO remove this line
+  ok = handle(pre_join, pre_join),
   handle_generic_event({EventType, EventContent, Session}).
 
 
 j_ready(cast, {ack_join, _Address}, Session) ->
-  ok = handle(j_ready, init_provider),    %TODO remove this line
+  ok = handle(j_ready, init_provider),
   ok = start(Session),
   {next_state, init_provider, Session};
 
 j_ready(cast, {abort, Reason}, Session) ->
-  ok = handle(j_ready, look),             %TODO remove this line
+  ok = handle(j_ready, look),
   io:format("Reason of abort: ~p~n", [Reason]),
   ProviderAddr = Session#session.provider_addr,
   timer:sleep(?SLEEP_INTERVAL),
@@ -276,12 +276,12 @@ j_ready(cast, {abort, Reason}, Session) ->
   {next_state, look, soft_reset_session(Session), [{state_timeout, ?INTERVAL, hard_stop}]};
 
 j_ready(state_timeout, hard_stop, Session) ->
-  ok = handle(j_ready, init_joiner),      %TODO remove this line
+  ok = handle(j_ready, init_joiner),
   gen_statem:reply(Session#session.app_mngr, fail),
   {next_state, init_joiner, reset_session(Session)};
 
 j_ready(EventType, EventContent, Session) ->
-  ok = handle(j_ready, j_ready),          %TODO remove this line
+  ok = handle(j_ready, j_ready),
   handle_generic_event({EventType, EventContent, Session}).
 
 
@@ -290,27 +290,25 @@ init_provider(cast, {ready_for_info, Address}, Session) ->
   JoinerID = adjust_predecessor(hash_f:get_hashed_addr(Address), hash_f:get_hashed_addr(link_manager:get_own_address()), Session#session.nbits),
   case JoinerID of
     _ when JoinerID =< PredecessorID ->
-      io:format("JH here: JoinerID: ~p   PredecessorID: ~p~n", [JoinerID, PredecessorID]),
       communication_manager:send_message_async(abort, ["Not updated"],Address, no_alias),
-      handle(init_provider, init_provider),     %TODO remove this line
+      handle(init_provider, init_provider),
       {keep_state, Session};
     _ when JoinerID > PredecessorID ->
-      io:format("JH there: JoinerID: ~p   PredecessorID: ~p~n", [JoinerID, PredecessorID]),
       DataInfo=[params_handler:get_param(nbits), stabilizer:get_successor_list(),
         application_manager:get_local_resources(JoinerID)],
       communication_manager:send_message_async(join_info,DataInfo,Address,no_alias),
-      handle(init_provider, not_alone),         %TODO remove this line
+      handle(init_provider, not_alone),
       {next_state, not_alone, Session#session{curr_id = JoinerID, curr_addr = Address}, [{state_timeout, ?INTERVAL_JOIN, hard_stop}]}
   end;
 
 init_provider(cast, {leave_info,Resources, Address}, Session) ->
-  ok = handle(init_provider, init_provider),      %TODO remove this line
+  ok = handle(init_provider, init_provider),
   application_manager:add_many_resources(Resources),
   communication_manager:send_message_async(ack_leave,[],Address,no_alias),
   {keep_state, Session};
 
 init_provider({call,From}, leave, Session) ->
-  ok = handle(init_provider, leaving),        %TODO remove this line
+  ok = handle(init_provider, leaving),
   Reply = postpone,
   application_manager:get_local_resources(all_res),
   {_, Successor} = stabilizer:get_successor(),
@@ -321,12 +319,12 @@ init_provider(cast, {look_resp,_Address}, Session) ->
   {keep_state, Session};
 
 init_provider(EventType, EventContent, Session) ->
-  ok = handle(init_provider, init_provider),    %TODO remove this line
+  ok = handle(init_provider, init_provider),
   handle_generic_event({EventType, EventContent, Session}).
 
 
 not_alone(cast, {ready_for_info, Address}, Session) ->
-  ok = handle(not_alone, not_alone),        %TODO remove this line
+  ok = handle(not_alone, not_alone),
   CurrID = Session#session.curr_id,
   JoinerID = hash_f:get_hashed_addr(Address),
   case JoinerID of
@@ -344,20 +342,20 @@ not_alone(cast, {ready_for_info, Address}, Session) ->
 
 not_alone({call,From}, leave, Session) ->
   Reply = postpone,
-  ok = handle(not_alone, leaving),        %TODO remove this line
+  ok = handle(not_alone, leaving),
   communication_manager:send_message_async(abort, ["Successor is leaving"], Session#session.curr_addr, no_alias),
   {_, Successor} = stabilizer:get_successor(),
   communication_manager:send_message_async(leave_info, application_manager:get_local_resources(all_res), Successor, no_alias),
   {next_state, leaving, Session#session{app_mngr = From}, [{state_timeout, ?INTERVAL_LEAVING, hard_stop}, Reply]};
 
 not_alone(cast, {ack_info,Address}, Session) ->
-  ok = handle(not_alone, init_provider),        %TODO remove this line
+  ok = handle(not_alone, init_provider),
   communication_manager:send_message_async(ack_join, [], Address, no_alias),
   application_manager:drop_many_resources(Session#session.curr_id),
   {next_state, init_provider, reset_provider_session(Session)};
 
 not_alone(cast, {leave_info,Resources, Address}, Session) ->
-  ok = handle(not_alone, init_provider),            %TODO remove this line
+  ok = handle(not_alone, init_provider),
   communication_manager:send_message_async(abort,["Another leave"], Session#session.curr_addr, no_alias),
   PredecessorAddr = checker:get_pred(Session#session.provider_addr),
   case Address of
@@ -369,19 +367,19 @@ not_alone(cast, {leave_info,Resources, Address}, Session) ->
   end;
 
 not_alone(state_timeout, hard_stop, Session) ->
-  ok = handle(not_alone, init_provider),          %TODO remove this line
+  ok = handle(not_alone, init_provider),
   {next_state, init_provider, reset_provider_session(Session)};
 
 not_alone(cast, {look_resp,_Address}, Session) ->
   {keep_state, Session};
 
 not_alone(EventType, EventContent, Session) ->
-  ok = handle(not_alone, not_alone),        %TODO remove this line
+  ok = handle(not_alone, not_alone),
   handle_generic_event({EventType, EventContent, Session}).
 
 
 leaving(cast, {ack_leave, Address}, Session) ->
-  ok = handle(leaving, init_joiner),          %TODO remove this line
+  ok = handle(leaving, init_joiner),
   stop(Session, Address);
 
 leaving(cast, {ready_for_info, Address}, Session) ->
@@ -389,7 +387,7 @@ leaving(cast, {ready_for_info, Address}, Session) ->
   {keep_state, Session};
 
 leaving(state_timeout, hard_stop, Session) ->
-  ok = handle(leaving, init_joiner),        %TODO remove this line
+  ok = handle(leaving, init_joiner),
   {_, SuccAddress} = stabilizer:get_successor(),
   stop(Session, SuccAddress),
   {next_state, init_joiner, reset_session(Session)};
@@ -401,7 +399,7 @@ leaving(cast, {look_resp,_Address}, Session) ->
   {keep_state, Session};
 
 leaving(EventType, EventContent, Session) ->
-  ok = handle(leaving, leaving),          %TODO remove this line
+  ok = handle(leaving, leaving),
   handle_generic_event({EventType, EventContent, Session}).
 
 
@@ -463,10 +461,13 @@ code_change(_OldVsn, StateName, State, _Extra) ->
 %%%===================================================================
 
 handle(From, To) ->
-  io:format("+++ JOINER +++ ~p ---> ~p +++~n", [From, To]).
+  case logging_policies:check_policy(?MODULE) of
+    able -> io:format("+++ JOINER +++ ~p ---> ~p +++~n", [From, To]);
+    unable -> ok
+  end.
 
 handle_generic_event({EventType, EventContent, Session}) ->
-  io:format("Event abnormal: ~p | ~p~n", [EventType, EventContent]),       %TODO remove this line
+  io:format("Event abnormal: ~p | ~p~n", [EventType, EventContent]),
   {keep_state, Session}.
 
 

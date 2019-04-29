@@ -7,7 +7,7 @@
    [kernel,
     stdlib
    ]},
-  {env,[]},
+  {env,[{ip, private}]},
   {modules, []},
 
   {licenses, ["Apache 2.0"]},

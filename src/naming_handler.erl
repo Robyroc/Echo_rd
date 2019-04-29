@@ -25,7 +25,10 @@
 
 notify_identity(PID, Identity) ->
   try
-    io:format("=== NEW ENTRY === Name:~p ===~n", [Identity]),   %TODO remove this line
+    case logging_policies:check_policy(?MODULE) of
+      able -> io:format("=== NEW ENTRY === Name:~p ===~n", [Identity]);
+      unable -> ok
+    end,
     Naming = get_identity(naming_handler),
     gen_server:call(Naming, {notify, Identity, PID})          %TODO check if timeout is needed
   of
@@ -107,7 +110,10 @@ handle_call(delete, _From, State) ->
   {reply, ok, State};
 
 handle_call({reheir, NewManager}, _From, State) ->
-  io:format("Naming Handler: Changing Heir options ~n"),        %TODO remove this line
+  case logging_policies:check_policy(?MODULE) of
+    able -> io:format("Naming Handler: Changing Heir options ~n");
+    unable -> ok
+  end,
   ets:setopts(naming_db, {heir, NewManager, naming_db}),
   {reply, ok, State};
 
@@ -138,7 +144,10 @@ handle_cast(Request, State) ->
 %%--------------------------------------------------------------------
 handle_info({'ETS-TRANSFER', TableId, Pid, _Data}, State) ->
   ets:insert(naming_db, {naming_handler, self()}),
-  io:format("Manager(~p) -> Handler(~p) getting TableId: ~p~n", [Pid, self(), TableId]),        %TODO remove this line
+  case logging_policies:check_policy(?MODULE) of
+    able -> io:format("Manager(~p) -> Handler(~p) getting TableId: ~p~n", [Pid, self(), TableId]);
+    unable -> ok
+  end,
   {noreply, State};
 
 handle_info(Info, State) ->
