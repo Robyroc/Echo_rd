@@ -384,6 +384,10 @@ leaving(cast, {ack_leave, Address}, Session) ->
   ok = handle(leaving, init_joiner),          %TODO remove this line
   stop(Session, Address);
 
+leaving(cast, {ready_for_info, Address}, Session) ->
+  communication_manager:send_message_async(abort, ["Successor is leaving"], Address, no_alias),
+  {keep_state, Session};
+
 leaving(state_timeout, hard_stop, Session) ->
   ok = handle(leaving, init_joiner),        %TODO remove this line
   {_, SuccAddress} = stabilizer:get_successor(),
