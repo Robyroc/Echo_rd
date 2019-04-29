@@ -98,7 +98,8 @@ hash_name(Name) ->
   case HashF of
     no_name_registered -> out_of_network;
     _ ->
-      hash_f:get_hashed_name(Name)
+      naming_handler:wait_service(router),
+      router:normalize_as_successor(hash_f:get_hashed_name(Name))
   end.
 
 send_response(Message, Address) ->

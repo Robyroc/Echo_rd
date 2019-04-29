@@ -295,7 +295,7 @@ init_provider(cast, {ready_for_info, Address}, Session) ->
       {keep_state, Session};
     _ when JoinerID > PredecessorID ->
       DataInfo=[params_handler:get_param(nbits), stabilizer:get_successor_list(),
-        application_manager:get_local_resources(router:normalize_id(JoinerID, Session#session.nbits))],
+        application_manager:get_local_resources(JoinerID)],
       communication_manager:send_message_async(join_info,DataInfo,Address,no_alias),
       handle(init_provider, not_alone),
       {next_state, not_alone, Session#session{curr_id = JoinerID, curr_addr = Address}, [{state_timeout, ?INTERVAL_JOIN, hard_stop}]}
@@ -351,7 +351,7 @@ not_alone({call,From}, leave, Session) ->
 not_alone(cast, {ack_info,Address}, Session) ->
   ok = handle(not_alone, init_provider),
   communication_manager:send_message_async(ack_join, [], Address, no_alias),
-  application_manager:drop_many_resources(router:normalize_id(Session#session.curr_id, Session#session.nbits)),
+  application_manager:drop_many_resources(Session#session.curr_id),
   {next_state, init_provider, reset_provider_session(Session)};
 
 not_alone(cast, {leave_info,Resources, Address}, Session) ->
@@ -481,11 +481,11 @@ start(Session) ->
   ParamsHandler = {params_handler, {params_handler, start_link, [SuccAddr, SuccList, Nbits]},
     temporary, 2000, worker, [params_handler]},
   supervisor:start_child(Supervisor, ParamsHandler),
+  naming_handler:wait_service(router),
   case Resources of
     [] -> ok;
     _ -> application_manager:add_many_resources(Resources)
   end,
-  naming_handler:wait_service(hash_f),
   gen_statem:reply(AM, ok).
 
 reset_session(Session) ->
