@@ -308,10 +308,8 @@ encode_resource(Resources) ->              % Resources are in the form of {Name,
   EncodedNames = list_to_binary(lists:map(fun (X) -> list_to_binary(X) end, PaddedNames)),
   Binaries = [X || {_, X} <- Resources],
   Lengths = [byte_size(X) || X <- Binaries],       %NBits due to index
-  io:format("Lengths: ~p~n", [Lengths]),
   MaxDim = lists:foldl(fun(Elem, Acc) -> max(Elem, Acc) end, 0, Lengths),
   BitsForDim = ceil(math:log2(MaxDim + 1)),
-  io:format("Bits4Dim: ~p~n", [BitsForDim]),
   EncodedLengths = list_to_binary([encode_ID(X, ceil(math:log2(MaxDim + 1))) || X <- Lengths]),
   BinaryResource = list_to_binary(Binaries),
   BinDimOfN = <<N:(DimOfN*8)>>,
@@ -320,15 +318,12 @@ encode_resource(Resources) ->              % Resources are in the form of {Name,
 decode_resource(<<>>) -> [];
 
 decode_resource(Bin) ->
-  io:format("BIN: ~p~n", [Bin]),
   <<DimOfN:8/integer, Bin2/binary>> = Bin,
   BitDim = (DimOfN*8),
   <<N:BitDim/integer, Rest/binary>> = Bin2,
   {Names, Remaining} = extract_names(N, Rest),
-  io:format("Names: ~p~n", [Names]),
   <<ByteForDim:8/integer, LengthsAndBins/binary>> = Remaining,
   {Lengths, Resources} = extract_integer(N, ByteForDim, LengthsAndBins),
-  io:format("Lengths: ~p~n", [Lengths]),
   {RevResult, <<>>} = lists:foldl(
     fun(Elem, Acc) ->
       {Result, RestBin} = Acc,
