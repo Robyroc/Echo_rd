@@ -228,7 +228,7 @@ encode_params(abort, [S], _NBits) -> [list_to_binary(S)];
 encode_params(ack_join, [], _NBits) -> [];
 encode_params(leave_info, _, no_nbits) -> badarg;
 encode_params(leave_info, [], _NBits) -> [];
-encode_params(leave_info, [Res], _NBits) -> [encode_resource(Res)];
+encode_params(leave_info, Res, _NBits) -> [encode_resource(Res)];
 encode_params(ack_leave, [], _NBits) -> [];
 encode_params(ask_pred, [], _NBits) -> [];
 encode_params(pred_reply, _, no_nbits) -> badarg;
