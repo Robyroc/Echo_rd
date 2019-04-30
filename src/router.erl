@@ -269,4 +269,4 @@ adjust_successor(ID, OwnId, _NBits) when ID > OwnId -> ID;
 adjust_successor(ID, OwnId, NBits) -> adjust_successor(ID + round(math:pow(2, NBits)), OwnId, NBits).
 
 adjust_predecessor(ID, OwnId, _NBits) when not (ID > OwnId) -> ID;
-adjust_predecessor(ID, OwnId, NBits) -> adjust_successor(ID - round(math:pow(2, NBits)), OwnId, NBits).
+adjust_predecessor(ID, OwnId, NBits) -> adjust_predecessor(ID - round(math:pow(2, NBits)), OwnId, NBits).
