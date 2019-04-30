@@ -312,7 +312,7 @@ init_provider({call,From}, leave, Session) ->
   Reply = postpone,
   Res = application_manager:get_local_resources(all_res),
   {_, Successor} = stabilizer:get_successor(),
-  communication_manager:send_message_async(leave_info, [Res], Successor, no_alias),
+  communication_manager:send_message_async(leave_info, Res, Successor, no_alias),
   {next_state, leaving, Session#session{app_mngr = From}, [{state_timeout, ?INTERVAL_LEAVING, hard_stop}, Reply]};
 
 init_provider(cast, {look_resp,_Address}, Session) ->
