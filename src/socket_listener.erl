@@ -3,7 +3,8 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0]).
+-export([start_link/0,
+  check_availability/1]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -31,6 +32,15 @@
   {ok, Pid :: pid()} | ignore | {error, Reason :: term()}).
 start_link() ->
   gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
+
+check_availability(Port) ->
+  case gen_tcp:listen(Port, [binary, {packet, 0}, {active, false}])
+  of
+    {ok, Sock} ->
+      ok = gen_tcp:close(Sock);
+    {error, Reason} ->
+      Reason
+end.
 
 %%%===================================================================
 %%% gen_server callbacks

@@ -190,27 +190,36 @@ format_status(_Opt, [_PDict, _StateName, _State]) ->
 %%--------------------------------------------------------------------
 init_joiner({call, From}, {join, OwnPort, Address}, Session) ->
   ok = handle(init_joiner, look),
-  naming_handler:notify_identity(OwnPort, port),
-  naming_handler:wait_service(listener),
-  Answer = communication_manager:send_message_sync(lookup_for_join, [], Address, no_alias),
-  case Answer of
+  case socket_listener:check_availability(OwnPort) of
     ok ->
-      {next_state, look, Session#session{app_mngr = From, provider_addr = Address},
-        [{state_timeout, ?INTERVAL, hard_stop}, postpone]};
+      naming_handler:notify_identity(OwnPort, port),
+      naming_handler:wait_service(listener),
+      Answer = communication_manager:send_message_sync(lookup_for_join, [], Address, no_alias),
+      case Answer of
+        ok ->
+          {next_state, look, Session#session{app_mngr = From, provider_addr = Address},
+            [{state_timeout, ?INTERVAL, hard_stop}, postpone]};
+        Error ->
+          link_shutdown(),
+          {keep_state, Session, [{reply, From, Error}]}
+      end;
     Error ->
-      link_shutdown(),
-      {keep_state, Session, [{reply, From, Error}]}
+      {keep_state, Session, [reply, From, Error]}
   end;
-
 
 init_joiner({call, From}, {create, OwnPort, Nbits}, Session) ->
   ok = handle(init_joiner, init_provider),
-  naming_handler:notify_identity(OwnPort, port),
-  naming_handler:wait_service(listener),
-  NewSession = Session#session{nbits = Nbits, succ_list = [], succ_addr = link_manager:get_own_address(),
-    res = [], app_mngr = From},
-  ok = start(NewSession),
-  {next_state, init_provider, NewSession, []};
+  case socket_listener:check_availability(OwnPort) of
+    ok ->
+      naming_handler:notify_identity(OwnPort, port),
+      naming_handler:wait_service(listener),
+      NewSession = Session#session{nbits = Nbits, succ_list = [], succ_addr = link_manager:get_own_address(),
+        res = [], app_mngr = From},
+      ok = start(NewSession),
+      {next_state, init_provider, NewSession, []};
+    Error ->
+      {keep_state, Session, [{reply, From, Error}]}
+  end;
 
 init_joiner(EventType, EventContent, Session) ->
   handle(init_joiner, init_joiner),
