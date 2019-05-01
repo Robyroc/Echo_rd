@@ -198,13 +198,13 @@ init_joiner({call, From}, {join, OwnPort, Address}, Session) ->
       case Answer of
         ok ->
           {next_state, look, Session#session{app_mngr = From, provider_addr = Address},
-            [{state_timeout, ?INTERVAL, hard_stop}, postpone]};
+            [{state_timeout, ?INTERVAL, hard_stop}]};
         Error ->
           link_shutdown(),
           {keep_state, Session, [{reply, From, Error}]}
       end;
     Error ->
-      {keep_state, Session, [reply, From, Error]}
+      {keep_state, Session, [{reply, From, Error}]}
   end;
 
 init_joiner({call, From}, {create, OwnPort, Nbits}, Session) ->
