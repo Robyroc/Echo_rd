@@ -107,14 +107,6 @@ handle_call({send, {Port, IP}, Message}, _From, State) ->
   Size = byte_size(list_to_binary(Params)),
   send(Port, IP, Message, State, Size);
 
-handle_call(get_address, _From, State) when State#state.ip == undefined ->
-  case application:get_env(echo_rd, ip) of
-    {ok, public} ->
-      IP = {naming_handler:get_identity(port), public_ip:get_public_ip()},
-      {reply, IP, State#state{ip = IP}};
-    _ -> {reply, local_address(), State#state{ip = local_address()}}
-  end;
-
 handle_call(get_address, _From, State) ->
   {reply, State#state.ip, State};
 
@@ -183,7 +175,12 @@ handle_info({tcp, Socket, Bin}, State) ->
 handle_info(startup, _State) ->
   naming_handler:wait_service(port),
   naming_handler:notify_identity(self(), link_manager),
-  {noreply, #state{connections = [], ip = undefined}};
+  case application:get_env(echo_rd, ip) of
+    {ok, public} ->
+      IP = {naming_handler:get_identity(port), public_ip:get_public_ip()};
+    _ -> IP = local_address();
+  end,
+  {noreply, #state{connections = [], ip = IP}};
 
 handle_info(Info, State) ->
   io:format("LM: Unexpected ! message: ~p~n", [Info]),
