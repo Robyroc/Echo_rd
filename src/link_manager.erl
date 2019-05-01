@@ -178,7 +178,7 @@ handle_info(startup, _State) ->
   case application:get_env(echo_rd, ip) of
     {ok, public} ->
       IP = {naming_handler:get_identity(port), public_ip:get_public_ip()};
-    _ -> IP = local_address();
+    _ -> IP = local_address()
   end,
   {noreply, #state{connections = [], ip = IP}};
 
