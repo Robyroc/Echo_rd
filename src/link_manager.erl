@@ -25,7 +25,7 @@
 
 -define(INTERVAL, 4000).
 -define(SERVER, ?MODULE).
--record(state, {connections, port}).
+-record(state, {connections, port, ip}).
 
 %%%===================================================================
 %%% API
@@ -69,10 +69,8 @@ binary_address_size() ->
   byte_size(address_to_binary({6543, {127, 0, 0, 1}})).
 
 get_own_address() ->
-  case application:get_env(echo_rd, ip) of
-    {ok, public} -> {naming_handler:get_identity(port), public_ip:get_public_ip()};
-    _ -> local_address()
-  end.
+  PID = naming_handler:get_identity(link_manager),
+  gen_server:call(PID, get_address, 10000).
 
 move_socket(Socket) ->
   PID = naming_handler:get_identity(link_manager),
@@ -108,6 +106,17 @@ handle_call({send, {Port, IP}, Message}, _From, State) ->
   {_, _, Params} = Message,
   Size = byte_size(list_to_binary(Params)),
   send(Port, IP, Message, State, Size);
+
+handle_call(get_address, _From, State) when State#state.ip == undefined ->
+  case application:get_env(echo_rd, ip) of
+    {ok, public} ->
+      IP = {naming_handler:get_identity(port), public_ip:get_public_ip()},
+      {reply, IP, State#state{ip = IP}};
+    _ -> {reply, local_address(), State#state{ip = local_address()}}
+  end;
+
+handle_call(get_address, _From, State) ->
+  {reply, State#state.ip, State};
 
 handle_call(Request, _From, State) ->
   io:format("LM: Unexpected call message: ~p~n", [Request]),
@@ -174,7 +183,7 @@ handle_info({tcp, Socket, Bin}, State) ->
 handle_info(startup, _State) ->
   naming_handler:wait_service(port),
   naming_handler:notify_identity(self(), link_manager),
-  {noreply, #state{connections = []}};
+  {noreply, #state{connections = [], ip = undefined}};
 
 handle_info(Info, State) ->
   io:format("LM: Unexpected ! message: ~p~n", [Info]),
