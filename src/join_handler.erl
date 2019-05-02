@@ -343,9 +343,9 @@ not_alone(cast, {ready_for_info, Address}, Session) ->
     _ when JoinerID > CurrID ->
       CurrAddr = Session#session.curr_addr,
       communication_manager:send_message_async(abort, ["Loss priority"],CurrAddr, no_alias),
-      DataInfo = [Session#session.nbits, Session#session.succ_list, Session#session.res],
+      DataInfo = [Session#session.nbits, stabilizer:get_successor_list(), Session#session.res],
       communication_manager:send_message_async(join_info, DataInfo, Address, no_alias),
-      {keep_state, Session, [{state_timeout, ?INTERVAL_JOIN, hard_stop}]}
+      {keep_state, Session#session{curr_addr = Address, curr_id = JoinerID}, [{state_timeout, ?INTERVAL_JOIN, hard_stop}]}
   end;
 
 
@@ -357,7 +357,7 @@ not_alone({call,From}, leave, Session) ->
   communication_manager:send_message_async(leave_info, application_manager:get_local_resources(all_res), Successor, no_alias),
   {next_state, leaving, Session#session{app_mngr = From}, [{state_timeout, ?INTERVAL_LEAVING, hard_stop}, Reply]};
 
-not_alone(cast, {ack_info,Address}, Session) ->
+not_alone(cast, {ack_info,Address}, Session) when Address =:= Session#session.curr_addr ->
   ok = handle(not_alone, init_provider),
   communication_manager:send_message_async(ack_join, [], Address, no_alias),
   application_manager:drop_many_resources(Session#session.curr_id),
