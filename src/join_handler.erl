@@ -364,6 +364,7 @@ not_alone(cast, {ack_info,Address}, Session) when Address =:= Session#session.cu
   ok = handle(not_alone, init_provider),
   communication_manager:send_message_async(ack_join, [], Address, no_alias),
   application_manager:drop_many_resources(Session#session.curr_id),
+  checker:get_pred(Address),
   {next_state, init_provider, reset_provider_session(Session)};
 
 not_alone(cast, {leave_info,Resources, Address}, Session) ->
