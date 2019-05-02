@@ -233,6 +233,7 @@ look(cast, {look_resp,Address}, Session) ->
 
 look(state_timeout, hard_stop, Session) ->
   ok = handle(look, init_joiner),
+  link_shutdown(),
   gen_statem:reply(Session#session.app_mngr, fail),
   {next_state, init_joiner, reset_session(Session)};
 
@@ -263,6 +264,7 @@ pre_join(cast, {abort, Reason}, Session) ->
 
 pre_join(state_timeout, hard_stop, Session) ->
   ok = handle(pre_join, init_joiner),
+  link_shutdown(),
   gen_statem:reply(Session#session.app_mngr, fail),
   {next_state, init_joiner, reset_session(Session)};
 
@@ -286,6 +288,7 @@ j_ready(cast, {abort, Reason}, Session) ->
 
 j_ready(state_timeout, hard_stop, Session) ->
   ok = handle(j_ready, init_joiner),
+  link_shutdown(),
   gen_statem:reply(Session#session.app_mngr, fail),
   {next_state, init_joiner, reset_session(Session)};
 
