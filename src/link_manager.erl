@@ -112,7 +112,6 @@ handle_call({send, {Port, IP}, Message}, _From, State) ->
 
 handle_call(Request, _From, State) ->
   lager:error("LM: Unexpected call message: ~p~n", [Request]),
-  io:format("LM: Unexpected call message: ~p~n", [Request]),
   {reply, ok, State}.
 
 %%--------------------------------------------------------------------
@@ -140,7 +139,6 @@ handle_cast({new_connection, Socket}, State) ->
 
 handle_cast(Request, State) ->
   lager:error("LM: Unexpected cast message: ~p~n", [Request]),
-  io:format("LM: Unexpected cast message: ~p~n", [Request]),
   {noreply, State}.
 
 
@@ -165,7 +163,6 @@ handle_info({'DOWN', Monitor, process, _PID, tcp_closed}, State) ->
 handle_info({'DOWN', Monitor, process, _PID, Reason}, State) ->
   Present = [X || {_, X, M} <- State#state.connections, M =:= Monitor],
   lager:error("LM: A handler failed: Address: ~p~nReason: ~p~n", [hd(Present), Reason]),
-  io:format("LM: A handler failed: Address: ~p~nReason: ~p~n", [hd(Present), Reason]),
   {noreply, #state{connections = [{P, A, M} || {P, A, M} <- State#state.connections, M =/= Monitor]}};
 
 handle_info({tcp, Socket, Bin}, State) ->
@@ -182,7 +179,6 @@ handle_info(startup, _State) ->
 
 handle_info(Info, State) ->
   lager:error("LM: Unexpected ! message: ~p~n", [Info]),
-  io:format("LM: Unexpected ! message: ~p~n", [Info]),
   {noreply, State}.
 
 %%--------------------------------------------------------------------

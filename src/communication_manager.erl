@@ -87,9 +87,7 @@ init([]) ->
 
 handle_call({send_msg, Method, Params, Address, Alias}, _From, State) ->
   case logging_policies:check_policy(?MODULE) of
-    able ->
-      lager:info("### OUT ###: Method:~p | Params:~p | Address:~p~n", [Method, Params, Address]),
-      io:format("### OUT ###: Method:~p | Params:~p | Address:~p~n", [Method, Params, Address]);
+    able -> lager:info("### OUT ###: Method:~p | Params:~p | Address:~p~n", [Method, Params, Address]);
     unable -> ok
   end,
   Translated = translate(Method),
@@ -105,7 +103,6 @@ handle_call({get_nbits, NBits}, _From, State) ->
 
 handle_call(Request, _From, State) ->
   lager:error("CM: Unexpected call message: ~p~n", [Request]),
-  io:format("CM: Unexpected call message: ~p~n", [Request]),
   {reply, ok, State}.
 
 %%--------------------------------------------------------------------
@@ -119,8 +116,7 @@ handle_call(Request, _From, State) ->
 handle_cast({send_msg, Method, Params, Address, Alias}, State) ->
   case logging_policies:check_policy(?MODULE) of
     able ->
-      lager:info("### OUT ###: Method:~p | Params:~p | Address:~p~n", [Method, Params, Address]),
-      io:format("### OUT ###: Method:~p | Params:~p | Address:~p~n", [Method, Params, Address]);
+      lager:info("### OUT ###: Method:~p | Params:~p | Address:~p~n", [Method, Params, Address]);
     unable -> ok
   end,
   Translated = translate(Method),
@@ -137,8 +133,7 @@ handle_cast({rcv_msg, Method, Address, Params}, State) ->
   DecodedParams = decode_params(back_translate(Method), Params, State#state.nbits),
   case logging_policies:check_policy(?MODULE) of
     able ->
-      lager:info("### IN ###: Method:~p | Params:~p | Address:~p~n", [BackTranslated, DecodedParams, Address]),
-      io:format("### IN ###: Method:~p | Params:~p | Address:~p~n", [BackTranslated, DecodedParams, Address]);
+      lager:info("### IN ###: Method:~p | Params:~p | Address:~p~n", [BackTranslated, DecodedParams, Address]);
     unable -> ok
   end,
   forward(BackTranslated, DecodedParams, Address),
@@ -146,7 +141,6 @@ handle_cast({rcv_msg, Method, Address, Params}, State) ->
 
 handle_cast(Request, State) ->
   lager:error("CM: Unexpected cast message: ~p~n", [Request]),
-  io:format("CM: Unexpected cast message: ~p~n", [Request]),
   {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -162,7 +156,6 @@ handle_cast(Request, State) ->
 
 handle_info(Info, State) ->
   lager:error("CM: Unexpected ! message: ~p~n", [Info]),
-  io:format("CM: Unexpected ! message: ~p~n", [Info]),
   {noreply, State}.
 
 %%--------------------------------------------------------------------
