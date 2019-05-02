@@ -112,7 +112,9 @@ handle_call({lookup, Requested}, From, State) ->
   ActualRequested = normalize_id(Requested, State#state.nbits),
   {SuccID, Succ} = stabilizer:get_successor(),
   case logging_policies:check_policy(?MODULE) of
-    able -> io:format("$$$ ROUTER $$$:~p~n", [ActualRequested]);
+    able ->
+      lager:info("$$$ ROUTER $$$:~p~n", [ActualRequested]),
+      io:format("$$$ ROUTER $$$:~p~n", [ActualRequested]);
     unable -> ok
   end,
   Next = check_if_next(ActualRequested, State#state.id, SuccID, State#state.nbits),
@@ -144,6 +146,7 @@ handle_call({normalize_pred, ID}, _From, State) ->
   {reply, adjust_predecessor(ID, State#state.id, State#state.nbits), State};
 
 handle_call(Request, _From, State) ->
+  lager:error("Router: Unexpected call message: ~p~n", [Request]),
   io:format("Router: Unexpected call message: ~p~n", [Request]),
   {reply, ok, State}.
 
@@ -161,13 +164,20 @@ handle_cast({update, Address, Theoretical}, State) ->
   Greater = [{Theo, R, A} || {Theo, R, A} <- Table, Theo > Theoretical],
   AdjustedID = adjust_successor(hash_f:get_hashed_addr(Address), ID, NBits),
   NewTable = lists:flatten([lists:reverse([{Theoretical, AdjustedID, Address} | lists:reverse(Less)]) | Greater]),
+
+  lager:info("Finger Table:~n
+  Theo | Real | Address~n"),
+  [lager:info("~p|~p|~p~n", [T, R, A]) || {T, R, A} <- State#state.finger_table],  %TODO: handle formatting
+
   {noreply, #state{finger_table = NewTable, nbits = State#state.nbits, id = State#state.id}};
 
 handle_cast({lookup, Alias, Requested}, State) ->
   ActualRequested = adjust_successor(Requested, State#state.id, State#state.nbits),
   {SuccID, Succ} = stabilizer:get_successor(),
   case logging_policies:check_policy(?MODULE) of
-    able -> io:format("$$$ ROUTER $$$:~p~n", [ActualRequested]);
+    able ->
+      lager:info("$$$ ROUTER $$$:~p~n", [ActualRequested]),
+      io:format("$$$ ROUTER $$$:~p~n", [ActualRequested]);
     unable -> ok
   end,
   Next = check_if_next(ActualRequested, State#state.id, SuccID, State#state.nbits),
@@ -188,6 +198,7 @@ handle_cast({lookup, Alias, Requested}, State) ->
   end;
 
 handle_cast(Request, State) ->
+  lager:error("Router: Unexpected cast message: ~p~n", [Request]),
   io:format("Router: Unexpected cast message: ~p~n", [Request]),
   {noreply, State}.
 
@@ -212,6 +223,7 @@ handle_info(startup, _State) ->
   {noreply, #state{finger_table = [HeadRoutingTable | TailRoutingTable], nbits = Nbits, id = ID}};
 
 handle_info(Info, State) ->
+  lager:error("Router: Unexpected ! message: ~p~n", [Info]),
   io:format("Router: Unexpected ! message: ~p~n", [Info]),
   {noreply, State}.
 %%--------------------------------------------------------------------
@@ -244,6 +256,7 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 
 show_finger_table(State) ->
+  %TODO manage lager logging
   io:format("Finger Table:~n
   Theo | Real | Address~n"),
   [io:format("~p|~p|~p~n", [T, R, A]) || {T, R, A} <- State#state.finger_table],  %TODO: handle formatting

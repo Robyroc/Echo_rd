@@ -69,6 +69,7 @@ init([]) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_call(Request, _From, State) ->
+  lager:error("Listen: Unexpected call message: ~p~n", [Request]),
   io:format("Listen: Unexpected call message: ~p~n", [Request]),
   {reply, ok, State}.
 
@@ -80,6 +81,7 @@ handle_call(Request, _From, State) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_cast(Request, State) ->
+  lager:error("Listen: Unexpected cast message: ~p~n", [Request]),
   io:format("Listen: Unexpected cast message: ~p~n", [Request]),
   {noreply, State}.
 
@@ -104,12 +106,14 @@ handle_info(startup, _State) ->
   naming_handler:wait_service(link_manager),
   Port = naming_handler:get_identity(port),
   {ok, Listen} = gen_tcp:listen(Port, [binary, {packet, 0}, {reuseaddr, true}, {active, true}]),
+  lager:info("Listening at port ~p~n", [Port]),
   io:format("Listening at port ~p~n", [Port]),
   naming_handler:notify_identity(self(), listener),
   erlang:send_after(10, self(), loop),
   {noreply, #state{socket = Listen}};
 
 handle_info(Info, State) ->
+  lager:error("Listen: Unexpected ! message: ~p~n", [Info]),
   io:format("Listen: Unexpected ! message: ~p~n", [Info]),
   {noreply, State}.
 
@@ -125,6 +129,7 @@ handle_info(Info, State) ->
 %% @end
 %%--------------------------------------------------------------------
 terminate(Reason, State) ->
+  lager:info("Listen terminate: ~p~n", [Reason]),
   io:format("Listen terminate: ~p~n", [Reason]),
   gen_tcp:close(State#state.socket),
   ok.
