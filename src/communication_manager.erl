@@ -130,8 +130,15 @@ handle_cast({send_msg, Method, Params, Address, Alias}, State) ->
 handle_cast({rcv_msg, Method, Address, Params}, State) ->
   BackTranslated = back_translate(Method),
   DecodedParams = decode_params(back_translate(Method), Params, State#state.nbits),
+  case DecodedParams of
+    badarg ->
+      io:format("àààààààààààààààà ~p ààààààààààààààààà~n", [Params]);
+    _ ->
+      ok
+  end,
   case logging_policies:check_policy(?MODULE) of
-    able -> io:format("### IN ###: Method:~p | Params:~p | Address:~p~n", [BackTranslated, DecodedParams, Address]);
+    able ->
+      io:format("### IN ###: Method:~p | Params:~p | Address:~p~n", [BackTranslated, DecodedParams, Address]);
     unable -> ok
   end,
   forward(BackTranslated, DecodedParams, Address),
