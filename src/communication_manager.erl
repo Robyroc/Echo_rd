@@ -72,10 +72,12 @@ receive_nbits(NBits) ->
 
 
 init([]) ->
-  %naming_handler:wait_service(params_handler),             %TODO check if these lines shall be removed
-  %NBits = params_handler:get_param(nbits),
+  case naming_handler:get_maybe_identity(params_handler) of
+    no_name_registered -> NBits = no_nbits;
+    _ -> NBits = params_handler:get_param(nbits)
+  end,
   naming_handler:notify_identity(self(), communication_manager),
-  {ok, #state{nbits = no_nbits}}.
+  {ok, #state{nbits = NBits}}.
 
 %%--------------------------------------------------------------------
 %% @private
