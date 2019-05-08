@@ -89,7 +89,7 @@ handle_call({send_msg, Method, Params, Address, Alias}, _From, State) ->
   case logging_policies:check_policy(?MODULE) of
     able_lager -> inout:info("### OUT ###: Method:~p | Params:~p | Address:~p \n", [Method, Params, Address]);
     able ->
-      inout:info("### OUT ###: Method:~p | Params:~p | Address:~p \n", [Method, Params, Address]),
+      inout:info("### OUT ###: Method:~p | Params:~p | Address:~p \n", [Method, Params, Address]);
       %lagerConsole:info("### OUT ###: Method:~p | Params:~p | Address:~p \n", [Method, Params, Address]);
     unable -> ok
   end,
@@ -119,7 +119,7 @@ handle_call(Request, _From, State) ->
 handle_cast({send_msg, Method, Params, Address, Alias}, State) ->
   case logging_policies:check_policy(?MODULE) of
     able ->
-      inout:info("### OUT ###: Method:~p | Params:~p | Address:~p~n", [Method, Params, Address]),
+      inout:info("### OUT ###: Method:~p | Params:~p | Address:~p~n", [Method, Params, Address]);
      %lagerConsole:info("### OUT ###: Method:~p | Params:~p | Address:~p~n", [Method, Params, Address]);
     able_lager -> inout:info("### OUT ###: Method:~p | Params:~p | Address:~p~n", [Method, Params, Address]);
     unable -> ok
