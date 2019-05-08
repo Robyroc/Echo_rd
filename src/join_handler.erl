@@ -255,7 +255,8 @@ pre_join(cast, {info,Address, Res, Succ, Nbits}, Session) ->
 
 pre_join(cast, {abort, Reason}, Session) ->
   ok = handle(pre_join, look),
-  joinerLager:error(" -- JOIN ABORTED -- Reason of abort: ~p~n", [Reason]),
+  %joinerLager:error(" -- JOIN ABORTED -- Reason of abort: ~p~n", [Reason]),
+  lager:error(" -- JOIN ABORTED -- Reason of abort: ~p~n", [Reason]),
   ProviderAddr = Session#session.provider_addr,
   timer:sleep(?SLEEP_INTERVAL),
   communication_manager:send_message_async(lookup_for_join, [], ProviderAddr, no_alias),
@@ -278,7 +279,8 @@ j_ready(cast, {ack_join, _Address}, Session) ->
 
 j_ready(cast, {abort, Reason}, Session) ->
   ok = handle(j_ready, look),
-  joinerLager:error("Reason of abort: ~p~n", [Reason]),
+  %joinerLager:error("Reason of abort: ~p~n", [Reason]),
+  lager:error("Reason of abort: ~p~n", [Reason]),
   ProviderAddr = Session#session.provider_addr,
   timer:sleep(?SLEEP_INTERVAL),
   communication_manager:send_message_async(lookup_for_join, [], ProviderAddr, no_alias),
@@ -479,7 +481,8 @@ handle(From, To) ->
   end.
 
 handle_generic_event({EventType, EventContent, Session}) ->
-  joinerLager:error("Event abnormal: ~p | ~p~n", [EventType, EventContent]),
+  %joinerLager:error("Event abnormal: ~p | ~p~n", [EventType, EventContent]),
+  lager:error("Event abnormal: ~p | ~p~n", [EventType, EventContent]),
   {keep_state, Session}.
 
 
