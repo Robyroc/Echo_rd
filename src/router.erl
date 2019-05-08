@@ -113,7 +113,7 @@ handle_call({lookup, Requested}, From, State) ->
   {SuccID, Succ} = stabilizer:get_successor(),
   case logging_policies:check_policy(?MODULE) of
     able ->
-      lager:info("$$$ ROUTER $$$:~p~n", [ActualRequested]),
+      lager:info("$$$ ROUTER $$$:~p~n", [ActualRequested]);
     unable -> ok
   end,
   Next = check_if_next(ActualRequested, State#state.id, SuccID, State#state.nbits),
@@ -169,7 +169,7 @@ handle_cast({lookup, Alias, Requested}, State) ->
   {SuccID, Succ} = stabilizer:get_successor(),
   case logging_policies:check_policy(?MODULE) of
     able ->
-      lager:info("$$$ ROUTER $$$:~p~n", [ActualRequested]),
+      lager:info("$$$ ROUTER $$$:~p~n", [ActualRequested]);
     unable -> ok
   end,
   Next = check_if_next(ActualRequested, State#state.id, SuccID, State#state.nbits),

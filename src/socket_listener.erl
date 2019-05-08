@@ -69,7 +69,7 @@ init([]) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_call(Request, _From, State) ->
-  lager:error("Listen: Unexpected call message: ~p~n", [Request])
+  lager:error("Listen: Unexpected call message: ~p~n", [Request]),
   {reply, ok, State}.
 
 %%--------------------------------------------------------------------
@@ -125,7 +125,7 @@ handle_info(Info, State) ->
 %% @end
 %%--------------------------------------------------------------------
 terminate(Reason, State) ->
-  lager:info("Listen terminate: ~p~n", [Reason])
+  lager:info("Listen terminate: ~p~n", [Reason]),
   gen_tcp:close(State#state.socket),
   ok.
 
