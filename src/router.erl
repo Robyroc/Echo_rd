@@ -145,7 +145,7 @@ handle_call({normalize_pred, ID}, _From, State) ->
   {reply, adjust_predecessor(ID, State#state.id, State#state.nbits), State};
 
 handle_call(Request, _From, State) ->
-  lager:error("Router: Unexpected call message: ~p~n", [Request]),
+  unexpected:error("Router: Unexpected call message: ~p~n", [Request]),
   {reply, ok, State}.
 
 %%--------------------------------------------------------------------
@@ -190,7 +190,7 @@ handle_cast({lookup, Alias, Requested}, State) ->
   end;
 
 handle_cast(Request, State) ->
-  lager:error("Router: Unexpected cast message: ~p~n", [Request]),
+  unexpected:error("Router: Unexpected cast message: ~p~n", [Request]),
   {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -214,7 +214,7 @@ handle_info(startup, _State) ->
   {noreply, #state{finger_table = [HeadRoutingTable | TailRoutingTable], nbits = Nbits, id = ID}};
 
 handle_info(Info, State) ->
-  lager:error("Router: Unexpected ! message: ~p~n", [Info]),
+  unexpected:error("Router: Unexpected ! message: ~p~n", [Info]),
   {noreply, State}.
 %%--------------------------------------------------------------------
 %% @private

@@ -78,7 +78,7 @@ handle_call({send, {Alias, Method, Params}}, _From, State) ->
   {reply, ok, State};
 
 handle_call(Request, _From, State) ->
-  lager:error("Handler: Unexpected call message: ~p~n", [Request]),
+  unexpected:error("Handler: Unexpected call message: ~p~n", [Request]),
   {reply, ok, State}.
 
 %%--------------------------------------------------------------------
@@ -89,7 +89,7 @@ handle_call(Request, _From, State) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_cast(Request, State) ->
-  lager:error("Handler: Unexpected cast message: ~p~n", [Request]),
+  unexpected:error("Handler: Unexpected cast message: ~p~n", [Request]),
   {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -134,7 +134,7 @@ handle_info({tcp_closed, Socket}, State) when Socket =:= State#state.socket ->
   {stop, closed_connection, State};
 
 handle_info(Info, State) ->
-  lager:error("Handler: Unexpected ! message: ~p~n", [Info]),
+  unexpected:error("Handler: Unexpected ! message: ~p~n", [Info]),
   {noreply, State}.
 %%--------------------------------------------------------------------
 %% @private

@@ -119,7 +119,7 @@ handle_call({reheir, NewManager}, _From, State) ->
   {reply, ok, State};
 
 handle_call(Request, _From, State) ->
-  lager:error("Naming Handler: Unexpected call message: ~p~n", [Request]),
+  unexpected:error("Naming Handler: Unexpected call message: ~p~n", [Request]),
   {reply, ok, State}.
 
 %%--------------------------------------------------------------------
@@ -130,7 +130,7 @@ handle_call(Request, _From, State) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_cast(Request, State) ->
-  lager:error("Naming Handler: Unexpected cast message: ~p~n", [Request]),
+  unexpected:error("Naming Handler: Unexpected cast message: ~p~n", [Request]),
   {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -153,7 +153,7 @@ handle_info({'ETS-TRANSFER', TableId, Pid, _Data}, State) ->
   {noreply, State};
 
 handle_info(Info, State) ->
-  lager:error("Naming Handler: Unexpected ! message: ~p~n", [Info]),
+  unexpected:error("Naming Handler: Unexpected ! message: ~p~n", [Info]),
   {noreply, State}.
 
 %%--------------------------------------------------------------------

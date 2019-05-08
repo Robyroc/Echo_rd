@@ -102,7 +102,7 @@ handle_call({get_nbits, NBits}, _From, State) ->
   {reply, ok, State#state{nbits = NBits}};
 
 handle_call(Request, _From, State) ->
-  lager:error("CM: Unexpected call message: ~p~n", [Request]),
+  unexpected:error("CM: Unexpected call message: ~p~n", [Request]),
   {reply, ok, State}.
 
 %%--------------------------------------------------------------------
@@ -140,7 +140,7 @@ handle_cast({rcv_msg, Method, Address, Params}, State) ->
   {noreply,State};
 
 handle_cast(Request, State) ->
-  lager:error("CM: Unexpected cast message: ~p~n", [Request]),
+  unexpected:error("CM: Unexpected cast message: ~p~n", [Request]),
   {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -155,7 +155,7 @@ handle_cast(Request, State) ->
 %%--------------------------------------------------------------------
 
 handle_info(Info, State) ->
-  lager:error("CM: Unexpected ! message: ~p~n", [Info]),
+  unexpected:error("CM: Unexpected ! message: ~p~n", [Info]),
   {noreply, State}.
 
 %%--------------------------------------------------------------------

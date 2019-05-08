@@ -69,7 +69,7 @@ init([]) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_call(Request, _From, State) ->
-  lager:error("Listen: Unexpected call message: ~p~n", [Request]),
+  unexpected:error("Listen: Unexpected call message: ~p~n", [Request]),
   {reply, ok, State}.
 
 %%--------------------------------------------------------------------
@@ -80,7 +80,7 @@ handle_call(Request, _From, State) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_cast(Request, State) ->
-  lager:error("Listen: Unexpected cast message: ~p~n", [Request]),
+  unexpected:error("Listen: Unexpected cast message: ~p~n", [Request]),
   {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -110,7 +110,7 @@ handle_info(startup, _State) ->
   {noreply, #state{socket = Listen}};
 
 handle_info(Info, State) ->
-  lager:error("Listen: Unexpected ! message: ~p~n", [Info]),
+  unexpected:error("Listen: Unexpected ! message: ~p~n", [Info]),
   {noreply, State}.
 
 %%--------------------------------------------------------------------

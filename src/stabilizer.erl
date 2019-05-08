@@ -111,7 +111,7 @@ handle_call(turn_on, _From, _State) ->
   {reply, ok, #state{op = no_operating}};
 
 handle_call(Request, _From, State) ->
-  lager:error("STABILIZER: Unexpected call message: ~p~n", [Request]),
+  unexpected:error("STABILIZER: Unexpected call message: ~p~n", [Request]),
   {reply, ok, State}.
 
 %%--------------------------------------------------------------------
@@ -129,7 +129,7 @@ handle_cast({stabilize_response, Predecessor, NewSuccList}, State) ->
   {noreply, State#state{succ_list = NewSuccessorList}};
 
 handle_cast(Request, State) ->
-  lager:error("STABILIZER: Unexpected cast message: ~p~n", [Request]),
+  unexpected:error("STABILIZER: Unexpected cast message: ~p~n", [Request]),
   {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -170,7 +170,7 @@ handle_info(stabilize, State) ->
   end;
 
 handle_info(Info, State) ->
-  lager:error("STABILIZER: Unexpected ! message: ~p~n", [Info]),
+  unexpected:error("STABILIZER: Unexpected ! message: ~p~n", [Info]),
   {noreply, State}.
 
 %%--------------------------------------------------------------------

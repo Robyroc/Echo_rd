@@ -88,7 +88,7 @@ handle_call(pred_id, _From, State) ->
   {reply, State#state.pred_id , State, ?INTERVAL};
 
 handle_call(Request, _From, State) ->
-  lager:error("CHECKER: Unexpected call message: ~p~n", [Request]),
+  unexpected:error("CHECKER: Unexpected call message: ~p~n", [Request]),
   {reply, ok, State}.
 
 %%--------------------------------------------------------------------
@@ -133,7 +133,7 @@ handle_cast({pred_find, Address}, State) ->
   end;
 
 handle_cast(Request, State) ->
-  lager:error("CHECKER: Unexpected cast message: ~p~n", [Request]),
+  unexpected:error("CHECKER: Unexpected cast message: ~p~n", [Request]),
   {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -160,7 +160,7 @@ handle_info(timeout, State) ->
   {noreply, State#state{pred = nil, pred_id = nil}};
 
 handle_info(Info, State) ->
-  lager:error("CHECKER: Unexpected ! message: ~p~n", [Info]),
+  unexpected:error("CHECKER: Unexpected ! message: ~p~n", [Info]),
   {noreply, State}.
 
 %%--------------------------------------------------------------------
