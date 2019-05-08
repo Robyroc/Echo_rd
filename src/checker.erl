@@ -116,7 +116,10 @@ handle_cast({pred_find, Address}, State) ->
       Index = hash_f:get_hashed_addr(Address),
       #state{pred = Predecessor, pred_id = PredID, own_id = OwnID, n_bits = NBits} = State,
       case logging_policies:check_policy(?MODULE) of
-        able -> lager:info("]]] CHECKER [[[: ~p~n", [PredID]);
+        able ->
+          lagerConsole:info("]]] CHECKER [[[: ~p~n", [PredID]),
+          checkerLager:info("]]] CHECKER [[[: ~p~n", [PredID]);
+        able_lager -> checkerLager:info("]]] CHECKER [[[: ~p~n", [PredID]);
         unable -> ok
       end,
       case Index of

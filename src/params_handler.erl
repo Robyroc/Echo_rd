@@ -72,7 +72,7 @@ handle_call({get_param, nbits}, _From, State) ->
   {reply, State#state.nbits, State};
 
 handle_call({get_param, Invalid}, _From, State) ->
-  lager:error("PARAMS HANDLER: Invalid Parameter has been requested: ~p~n", [Invalid]),
+  unexpected:error("PARAMS HANDLER: Invalid Parameter has been requested: ~p~n", [Invalid]),
   {reply, ok, State};
 
 handle_call(Request, _From, State) ->

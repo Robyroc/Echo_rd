@@ -96,7 +96,9 @@ handle_info(fix, State) ->
 %    rem round(math:pow(2, State#state.nbits)),     %TODO check if it can be removed
   case logging_policies:check_policy(?MODULE) of
     able ->
-      lager:info("%%% FIXER %%%: ~p~n", [Theo]);
+      lagerConsole:info("%%% FIXER %%%: ~p~n", [Theo]),
+      fixerLager:info("%%% FIXER %%%: ~p~n", [Theo]);
+    able_lager -> fixerLager:info("%%% FIXER %%%: ~p~n", [Theo]);
     unable -> ok
   end,
   {found, Address} = router:local_lookup(Theo),

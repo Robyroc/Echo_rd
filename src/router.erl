@@ -113,7 +113,9 @@ handle_call({lookup, Requested}, From, State) ->
   {SuccID, Succ} = stabilizer:get_successor(),
   case logging_policies:check_policy(?MODULE) of
     able ->
-      lager:info("$$$ ROUTER $$$:~p~n", [ActualRequested]);
+      lagerConsole:info("$$$ ROUTER $$$:~p~n", [ActualRequested]),
+      routerLager:info("$$$ ROUTER $$$:~p~n", [ActualRequested]);
+    able_lager -> routerLager:info("$$$ ROUTER $$$:~p~n", [ActualRequested]);
     unable -> ok
   end,
   Next = check_if_next(ActualRequested, State#state.id, SuccID, State#state.nbits),
@@ -169,7 +171,9 @@ handle_cast({lookup, Alias, Requested}, State) ->
   {SuccID, Succ} = stabilizer:get_successor(),
   case logging_policies:check_policy(?MODULE) of
     able ->
-      lager:info("$$$ ROUTER $$$:~p~n", [ActualRequested]);
+      lagerConsole:info("$$$ ROUTER $$$:~p~n", [ActualRequested]),
+      routerLager:info("$$$ ROUTER $$$:~p~n", [ActualRequested]);
+    able_lager -> routerLager:info("$$$ ROUTER $$$:~p~n", [ActualRequested]);
     unable -> ok
   end,
   Next = check_if_next(ActualRequested, State#state.id, SuccID, State#state.nbits),
@@ -246,9 +250,9 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 
 show_finger_table(State) ->
-  lager:info("Finger Table:~n
+  routerLager:info("Finger Table: \n
   Theo | Real | Address~n"),
-  [lager:info("~p|~p|~p~n", [T, R, A]) || {T, R, A} <- State#state.finger_table],  %TODO: handle formatting
+  [routerLager:info("~p|~p|~p~n", [T, R, A]) || {T, R, A} <- State#state.finger_table],  %TODO: handle formatting
   ok.
 
 lookup(Searched, ID, Table, NBits) when Searched < ID ->
