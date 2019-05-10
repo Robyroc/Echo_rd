@@ -210,6 +210,8 @@ translate(ask_pred) -> 10;
 translate(pred_reply) -> 11;
 translate(lookup) -> 12;
 translate(command) -> 13;
+translate(get_stats) -> 14;
+translate(stats) -> 15;
 translate(_) -> badarg.
 
 back_translate(1) -> lookup_for_join;
@@ -225,6 +227,8 @@ back_translate(10) -> ask_pred;
 back_translate(11) -> pred_reply;
 back_translate(12) -> lookup;
 back_translate(13) -> command;
+back_translate(14) -> get_stats;
+back_translate(15) -> stats;
 back_translate(_) -> badarg.
 
 encode_params(lookup_for_join, [], _NBits) -> [];
@@ -245,6 +249,8 @@ encode_params(pred_reply, [Pred, SL], NBits) -> [link_manager:address_to_binary(
 encode_params(lookup, _, no_nbits) -> badarg;
 encode_params(lookup, [ID], NBits) -> [encode_ID(ID, NBits)];
 encode_params(command, [Address,C], _NBits) -> [link_manager:address_to_binary(Address), C];
+encode_params(get_stats, [], _NBits) -> [];
+encode_params(stats, [{A, B, C, D}], _NBits) -> [<<A:16, B:16, C:16, D:16>>];
 encode_params(_, _, _) -> badarg.
 
 decode_params(lookup_for_join, [], _NBits) -> [];
@@ -263,8 +269,9 @@ decode_params(pred_reply, _, no_nbits) -> badarg;
 decode_params(pred_reply, [Pred, SL], NBits) -> [link_manager:binary_to_address(Pred), decode_successor_list(SL, NBits)];
 decode_params(lookup, [ID], _NBits) -> [decode_ID(ID)];
 decode_params(command, [A,C], _NBits) -> [link_manager:binary_to_address(A), C];
+decode_params(get_stats, [], _NBits) -> [];
+decode_params(stats, [Bin], _NBits) -> <<A:16, B:16, C:16, D:16>> = Bin, [{A, B, C, D}];
 decode_params(_, _, _) -> badarg.
-
 
 forward(lookup_for_join, [], From) -> router:lookup_for_join(From);
 forward(lookup_response, [ID, Addr], _From) -> request_gateway:lookup_response(ID, Addr), join_handler:look_response(Addr);
@@ -280,6 +287,8 @@ forward(ask_pred, [], From) -> checker:get_pred(From);
 forward(pred_reply, [Pred, SL], _From) -> stabilizer:notify_successor(Pred, SL);
 forward(lookup, [ID], From) -> router:remote_lookup(ID, From);
 forward(command, [A,C], _From) -> application_manager:receive_command(A,C);
+forward(get_stats, [], From) -> statistics:get_statistics(From);
+forward(stats, [S], From) -> statistics:incoming_statistics(From, S);
 forward(_, _, _) -> badarg.
 
 %TODO remove comment, it is just for testing
