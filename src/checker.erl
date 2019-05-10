@@ -4,7 +4,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, get_pred/1, get_pred_id/0, notify_lost_node/1]).
+-export([start_link/0, get_pred/1, get_pred_id/0, notify_lost_node/1, set_pred/1]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -43,6 +43,10 @@ get_pred(Address) ->
 get_pred_id() ->
   PID = naming_handler:get_identity(checker),
   gen_server:call(PID, pred_id).
+
+set_pred(Address) ->
+  PID = naming_handler:get_identity(checker),
+  gen_server:call(PID, {set_pred, Address}).
 
 notify_lost_node(Address) ->
   PID = naming_handler:get_identity(checker),
@@ -86,6 +90,10 @@ handle_call({lost, Address}, _From, State) ->
 
 handle_call(pred_id, _From, State) ->
   {reply, State#state.pred_id , State, ?INTERVAL};
+
+handle_call({set_pred, Address}, _From, State) ->
+  ID = router:normalize_as_predecessor(hash_f:get_hashed_addr(Address)),
+  {reply, ok, State#state{pred = Address, pred_id = ID}};
 
 handle_call(Request, _From, State) ->
   io:format("CHECKER: Unexpected call message: ~p~n", [Request]),

@@ -70,7 +70,8 @@ binary_address_size() ->
 
 get_own_address() ->
   case application:get_env(echo_rd, ip) of
-    {ok, public} -> {naming_handler:get_identity(port), public_ip:get_public_ip()};
+    {ok, public} ->
+      {naming_handler:get_identity(port), public_ip:get_public_ip()};
     _ -> local_address()
   end.
 

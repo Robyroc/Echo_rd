@@ -98,7 +98,8 @@ hash_name(Name) ->
   case HashF of
     no_name_registered -> out_of_network;
     _ ->
-      hash_f:get_hashed_name(Name)
+      naming_handler:wait_service(router),
+      router:normalize_as_predecessor(hash_f:get_hashed_name(Name))
   end.
 
 send_response(Message, Address) ->
@@ -120,6 +121,10 @@ send_response(Message, Address) ->
 %% @end
 %%--------------------------------------------------------------------
 init([]) ->
+  %TODO the following 3 lines are for testing lager
+  lager:info("~s is ~s!", [lager, cool]),
+  lager:warning("but pay ~s!", [attention]),
+  lager:error("there is always some ~s", [error]),
   naming_handler:notify_identity(self(), application_manager),
   {ok, #state{}}.
 

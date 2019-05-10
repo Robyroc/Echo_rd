@@ -15,6 +15,8 @@
 %%====================================================================
 
 start(_StartType, _StartArgs) ->
+  logger:remove_handler(default),
+  lager:start(),
   root_supervisor:start_link().
 
 %%--------------------------------------------------------------------

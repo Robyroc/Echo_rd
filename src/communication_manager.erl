@@ -72,10 +72,12 @@ receive_nbits(NBits) ->
 
 
 init([]) ->
-  %naming_handler:wait_service(params_handler),             %TODO check if these lines shall be removed
-  %NBits = params_handler:get_param(nbits),
+  case naming_handler:get_maybe_identity(params_handler) of
+    no_name_registered -> NBits = no_nbits;
+    _ -> NBits = params_handler:get_param(nbits)
+  end,
   naming_handler:notify_identity(self(), communication_manager),
-  {ok, #state{nbits = no_nbits}}.
+  {ok, #state{nbits = NBits}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -130,8 +132,15 @@ handle_cast({send_msg, Method, Params, Address, Alias}, State) ->
 handle_cast({rcv_msg, Method, Address, Params}, State) ->
   BackTranslated = back_translate(Method),
   DecodedParams = decode_params(back_translate(Method), Params, State#state.nbits),
+  case DecodedParams of
+    badarg ->
+      io:format("àààààààààààààààà ~p ààààààààààààààààà~n", [Params]);
+    _ ->
+      ok
+  end,
   case logging_policies:check_policy(?MODULE) of
-    able -> io:format("### IN ###: Method:~p | Params:~p | Address:~p~n", [BackTranslated, DecodedParams, Address]);
+    able ->
+      io:format("### IN ###: Method:~p | Params:~p | Address:~p~n", [BackTranslated, DecodedParams, Address]);
     unable -> ok
   end,
   forward(BackTranslated, DecodedParams, Address),
@@ -196,7 +205,7 @@ translate(ack_info) -> 5;
 translate(abort) -> 6;
 translate(ack_join) -> 7;
 translate(leave_info) -> 8;
-translate(leave_ack) -> 9;
+translate(ack_leave) -> 9;
 translate(ask_pred) -> 10;
 translate(pred_reply) -> 11;
 translate(lookup) -> 12;
@@ -211,7 +220,7 @@ back_translate(5) -> ack_info;
 back_translate(6) -> abort;
 back_translate(7) -> ack_join;
 back_translate(8) -> leave_info;
-back_translate(9) -> leave_ack;
+back_translate(9) -> ack_leave;
 back_translate(10) -> ask_pred;
 back_translate(11) -> pred_reply;
 back_translate(12) -> lookup;
@@ -228,8 +237,8 @@ encode_params(abort, [S], _NBits) -> [list_to_binary(S)];
 encode_params(ack_join, [], _NBits) -> [];
 encode_params(leave_info, _, no_nbits) -> badarg;
 encode_params(leave_info, [], _NBits) -> [];
-encode_params(leave_info, [Res], _NBits) -> [encode_resource(Res)];
-encode_params(leave_ack, [], _NBits) -> [];
+encode_params(leave_info, Res, _NBits) -> [encode_resource(Res)];
+encode_params(ack_leave, [], _NBits) -> [];
 encode_params(ask_pred, [], _NBits) -> [];
 encode_params(pred_reply, _, no_nbits) -> badarg;
 encode_params(pred_reply, [Pred, SL], NBits) -> [link_manager:address_to_binary(Pred), encode_successor_list(SL, NBits)];
@@ -248,7 +257,7 @@ decode_params(ack_join, [], _NBits) -> [];
 decode_params(leave_info, _, no_nbits) -> badarg;
 decode_params(leave_info, [], _NBits) -> [];
 decode_params(leave_info, [Res], _NBits) -> [decode_resource(Res)];
-decode_params(leave_ack, [], _NBits) -> [];
+decode_params(ack_leave, [], _NBits) -> [];
 decode_params(ask_pred, [], _NBits) -> [];
 decode_params(pred_reply, _, no_nbits) -> badarg;
 decode_params(pred_reply, [Pred, SL], NBits) -> [link_manager:binary_to_address(Pred), decode_successor_list(SL, NBits)];
@@ -266,7 +275,7 @@ forward(abort, [S], _From) -> join_handler:abort(S);
 forward(ack_join, [], From) -> join_handler:ack_join(From);
 forward(leave_info, [], From) -> join_handler:leave_info([], From);
 forward(leave_info, [Res], From) -> join_handler:leave_info(Res, From);
-forward(leave_ack, [], From) -> join_handler:ack_leave(From);
+forward(ack_leave, [], From) -> join_handler:ack_leave(From);
 forward(ask_pred, [], From) -> checker:get_pred(From);
 forward(pred_reply, [Pred, SL], _From) -> stabilizer:notify_successor(Pred, SL);
 forward(lookup, [ID], From) -> router:remote_lookup(ID, From);
@@ -296,7 +305,7 @@ encode_resource([]) -> <<>>;
 
 encode_resource(Resources) ->              % Resources are in the form of {Name, <<Bin>>}
   N = length(Resources),
-  DimOfN = ceil(ceil(math:log2(N))/8),
+  DimOfN = ceil(ceil(math:log2(N + 1))/8),
   Names = [X || {X, _} <- Resources],
   PaddedNames = lists:map(
     fun (X) ->
@@ -309,8 +318,8 @@ encode_resource(Resources) ->              % Resources are in the form of {Name,
   Binaries = [X || {_, X} <- Resources],
   Lengths = [byte_size(X) || X <- Binaries],       %NBits due to index
   MaxDim = lists:foldl(fun(Elem, Acc) -> max(Elem, Acc) end, 0, Lengths),
-  BitsForDim = ceil(math:log2(MaxDim)),
-  EncodedLengths = list_to_binary([encode_ID(X, ceil(math:log2(MaxDim))) || X <- Lengths]),
+  BitsForDim = ceil(math:log2(MaxDim + 1)),
+  EncodedLengths = list_to_binary([encode_ID(X, ceil(math:log2(MaxDim + 1))) || X <- Lengths]),
   BinaryResource = list_to_binary(Binaries),
   BinDimOfN = <<N:(DimOfN*8)>>,
   <<DimOfN:8, BinDimOfN/binary, EncodedNames/binary, (ceil(BitsForDim / 8)):8, EncodedLengths/binary ,BinaryResource/binary>>.
@@ -322,8 +331,8 @@ decode_resource(Bin) ->
   BitDim = (DimOfN*8),
   <<N:BitDim/integer, Rest/binary>> = Bin2,
   {Names, Remaining} = extract_names(N, Rest),
-  <<BitsForDim:8/integer, LengthsAndBins/binary>> = Remaining,
-  {Lengths, Resources} = extract_integer(N, BitsForDim, LengthsAndBins),
+  <<ByteForDim:8/integer, LengthsAndBins/binary>> = Remaining,
+  {Lengths, Resources} = extract_integer(N, ByteForDim, LengthsAndBins),
   {RevResult, <<>>} = lists:foldl(
     fun(Elem, Acc) ->
       {Result, RestBin} = Acc,

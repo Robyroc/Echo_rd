@@ -15,8 +15,8 @@ Interface
 The library allows to abstract the location of a service and distribute it. All the commands of the service are not changed by Echo_rd, it just routes them to the node handling it correctly.
 
 The application can send messages to the library with the following atoms: 
-- create, will create a new Chord network. Needs also a parameter to specify the number of bits of the indexes of the network.
-- join, will enter a network. Needs also an address of a node part of the interested network.
+- create, will create a new Chord network. It needs two parameters, i.e. the number of bits of the indexes of the network and the port number. The default port number is 6543.
+- join, will enter a network. Needs also the port number and an address of a node part of the interested network. The default port number is 6543.
 - leave, will leave (softly) the network.
 - service_command, will perform a command on a resource. Needs the index of the resource and the complete command that can be handled by the service. 
 
@@ -64,36 +64,49 @@ Truth-Table of the CM's state machine
 -----
 
 
-| ID | Curr_State    | Action      | Re-Action                 | New_State     | 
-|----|---------------|-------------|---------------------------|---------------| 
-| a  | init_joiner   | join        | look_for_join             | look          | 
-| b  | init_joiner   | create      |               | init_provider | 
-| c  | look          | look_resp   | ready_for_info            | pre_join      | 
-| c1 | look          | timeout     | hard_abort                | init_joiner   | 
-| d  | pre_join      | info        | ack_info                  | j_ready       | 
-| e  | pre_join      | abort       | look_for_join             | pre_join      | 
-| e1 | pre_join      | timeout     | hard_abort                | init_joiner   | 
-| f  | j_ready       | ack_join    | start                     | init_provider | 
-| g  | j_ready       | abort                 | look_for_join             | look          | 
-| g1 | j_ready       | timeout               | hard_abort                | init_joiner   | 
-| h  | init_provider | ready_for_info        | info                      | not_alone     | 
-| i  | init_provider | no_priority | abort                     | init_provider | 
-| j  | init_provider | leave_info  | ack_leave                       | init_provider | 
-| k  | init_provider | leave       | leave_info                   | leaving   | 
-| i  | not_alone     | no_priority | abort                     | not_alone     | 
-| l  | not_alone     | priority    | abort(curr), info(joiner) | not_alone     | 
-| m  | not_alone     | ack_info    | ack_join, drop                  | init_provider | 
-| n  | not_alone     | leave       | abort(curr), leave_info         | leaving   | 
-| n1 | not_alone     | timeout     | hard_abort                | init_provider   | 
-| o  | not_alone     | leave_info  | abort(curr), ack_leave    | init_provider |
-| p  | leaving       | ack_leave   | drop, kill(router)    | init_joiner |
-| p1 | leaving       | timeout  | hard_abort    | init_joiner |
+| ID | Curr_State    | Action         | Re-Action                      | New_State     | 
+|----|---------------|----------------|--------------------------------|---------------| 
+| a  | init_joiner   | join           | lookup_for_join                | look          | 
+| b  | init_joiner   | create         | start                          | init_provider | 
+| c  | look          | look_resp      | ready_for_info                 | pre_join      |
+| d  | look          | join           |                                | look          | 
+| ti | look          | timeout        | hard_stop                      | init_joiner   | 
+| e  | pre_join      | info           | ack_info                       | j_ready       | 
+| f  | pre_join      | abort          | lookup_for_join                | look          | 
+| ti | pre_join      | timeout        | hard_stop                      | init_joiner   | 
+| g  | j_ready       | ack_join       | start                          | init_provider | 
+| h  | j_ready       | abort          | lookup_for_join                | look          | 
+| ti | j_ready       | timeout        | hard_stop                      | init_joiner   | 
+| i1 | init_provider | ready_for_info | join_info                      | not_alone     |
+| i2 | init_provider | ready_for_info | abort                          | init_provider |  
+| j  | init_provider | leave_info     | ack_leave                      | init_provider |
+| k  | init_provider | look_resp      |                                | init_provider | 
+| l  | init_provider | leave          | leave_info                     | leaving       | 
+| m1 | not_alone     | ready_for_info | abort                          | not_alone     | 
+| m2 | not_alone     | ready_for_info | abort(curr), join_info(joiner) | not_alone     | 
+| n  | not_alone     | ack_info       | ack_join, drop_many_resources  | init_provider | 
+| o  | not_alone     | leave          | abort(curr), leave_info        | leaving       |
+| p  | not_alone     | leave_info     | abort(curr), ack_leave         | init_provider | 
+| q  | not_alone     | look_resp      |                                | not_alone     |
+| tj | not_alone     | timeout        | hard_stop                      | init_provider | 
+| r  | leaving       | ack_leave      | stop                           | init_joiner   |
+| s  | leaving       | leave          |                                | init_joiner   |
+| u  | leaving       | look_resp      |                                | leaving       |
+| v  | leaving       | ready_for_info | abort                          | leaving       |
+| tl | leaving       | timeout        | hard_stop                      | init_joiner   |
 
 Where:
 - The **ID** field column the id of the event
 - The **Curr_State** column represents the current state, i.e. the state from which the transition comes from
-- The **Action** column represents the incoming request (for the timeout scenarios is used the notation id1)
+- The **Action** column represents the incoming request 
 - The **Re-Action** column represents the state-machine’s response w.r.t. the corresponding action
 - The **New_State** column represents the new state after the event
+
+*Observation*:
+* For the id of the timeout scenarios is used the following notation:
+    * **ti** for the default interval
+    * **tj** for the join interval
+    * **tl** for the leaving interval
+* For the ready_for_info message we have the IDs i1,i2 and m1,m2 according to the priority of the joiner who has to be served.
 
 TO BE REVISITED HEAVILY
