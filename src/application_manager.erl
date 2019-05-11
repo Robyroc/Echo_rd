@@ -17,7 +17,11 @@
   create_p/2,
   connect/1,
   hash_name/1,
-  send_response/2]).
+  send_response/2,
+  get_successor_list/0,
+  show_finger_table/0,
+  get_predecessor/0,
+  get_own_id/0]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -101,6 +105,18 @@ hash_name(Name) ->
       naming_handler:wait_service(router),
       router:normalize_as_predecessor(hash_f:get_hashed_name(Name))
   end.
+
+get_successor_list() ->
+  stabilizer:get_successor_list().
+
+show_finger_table() ->
+  router:show_table().
+
+get_predecessor() ->
+  checker:get_pred(local_address).
+
+get_own_id() ->
+  router:show_id().
 
 send_response(Message, Address) ->
   communication_manager:send_message_async(command, [Address, Message], Address, no_alias).
