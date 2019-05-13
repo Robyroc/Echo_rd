@@ -47,7 +47,7 @@
 -define(INTERVAL_LEAVING, 20000).
 -define(INTERVAL_JOIN, 20000).
 
--record(session, {provider_addr, succ_addr, res, succ_list, nbits, app_mngr, curr_addr, curr_id, superv, stabilizer}).
+-record(session, {provider_addr, succ_addr, res, succ_list, nbits, app_mngr, curr_addr, curr_id, superv, stabilizer, time}).
 
 %%%===================================================================
 %%% API
@@ -189,6 +189,7 @@ format_status(_Opt, [_PDict, _StateName, _State]) ->
 %% @end
 %%--------------------------------------------------------------------
 init_joiner({call, From}, {join, OwnPort, Address}, Session) ->
+  Time = erlang:timestamp(),
   ok = handle(init_joiner, look),
   case socket_listener:check_availability(OwnPort) of
     ok ->
@@ -197,7 +198,7 @@ init_joiner({call, From}, {join, OwnPort, Address}, Session) ->
       Answer = communication_manager:send_message_sync(lookup_for_join, [], Address, no_alias),
       case Answer of
         ok ->
-          {next_state, look, Session#session{app_mngr = From, provider_addr = Address},
+          {next_state, look, Session#session{app_mngr = From, provider_addr = Address, time = Time},
             [{state_timeout, ?INTERVAL, hard_stop}]};
         Error ->
           link_shutdown(),
@@ -214,7 +215,7 @@ init_joiner({call, From}, {create, OwnPort, Nbits}, Session) ->
       naming_handler:notify_identity(OwnPort, port),
       naming_handler:wait_service(listener),
       NewSession = Session#session{nbits = Nbits, succ_list = [], succ_addr = link_manager:get_own_address(),
-        res = [], app_mngr = From},
+        res = [], app_mngr = From, time = erlang:timestamp()},
       ok = start(NewSession),
       {next_state, init_provider, NewSession, []};
     Error ->
@@ -233,11 +234,9 @@ look(cast, {look_resp,Address}, Session) ->
 
 look(state_timeout, hard_stop, Session) ->
   ok = handle(look, init_joiner),
+  link_shutdown(),
   gen_statem:reply(Session#session.app_mngr, fail),
   {next_state, init_joiner, reset_session(Session)};
-
-look({call, _From}, {join, _Port, _Address}, Session) ->
-  {keep_state, Session};
 
 look(EventType, EventContent, Session) ->
   ok = handle(look, look),
@@ -264,6 +263,7 @@ pre_join(cast, {abort, Reason}, Session) ->
 
 pre_join(state_timeout, hard_stop, Session) ->
   ok = handle(pre_join, init_joiner),
+  link_shutdown(),
   gen_statem:reply(Session#session.app_mngr, fail),
   {next_state, init_joiner, reset_session(Session)};
 
@@ -288,6 +288,7 @@ j_ready(cast, {abort, Reason}, Session) ->
 
 j_ready(state_timeout, hard_stop, Session) ->
   ok = handle(j_ready, init_joiner),
+  link_shutdown(),
   gen_statem:reply(Session#session.app_mngr, fail),
   {next_state, init_joiner, reset_session(Session)};
 
@@ -320,11 +321,10 @@ init_provider(cast, {leave_info,Resources, Address}, Session) ->
 
 init_provider({call,From}, leave, Session) ->
   ok = handle(init_provider, leaving),
-  Reply = postpone,
   Res = application_manager:get_local_resources(all_res),
   {_, Successor} = stabilizer:get_successor(),
   communication_manager:send_message_async(leave_info, Res, Successor, no_alias),
-  {next_state, leaving, Session#session{app_mngr = From}, [{state_timeout, ?INTERVAL_LEAVING, hard_stop}, Reply]};
+  {next_state, leaving, Session#session{app_mngr = From}, [{state_timeout, ?INTERVAL_LEAVING, hard_stop}]};
 
 init_provider(cast, {look_resp,_Address}, Session) ->
   {keep_state, Session};
@@ -345,24 +345,24 @@ not_alone(cast, {ready_for_info, Address}, Session) ->
     _ when JoinerID > CurrID ->
       CurrAddr = Session#session.curr_addr,
       communication_manager:send_message_async(abort, ["Loss priority"],CurrAddr, no_alias),
-      DataInfo = [Session#session.nbits, Session#session.succ_list, Session#session.res],
+      DataInfo = [Session#session.nbits, stabilizer:get_successor_list(), Session#session.res],
       communication_manager:send_message_async(join_info, DataInfo, Address, no_alias),
-      {keep_state, Session, [{state_timeout, ?INTERVAL_JOIN, hard_stop}]}
+      {keep_state, Session#session{curr_addr = Address, curr_id = JoinerID}, [{state_timeout, ?INTERVAL_JOIN, hard_stop}]}
   end;
 
 
 not_alone({call,From}, leave, Session) ->
-  Reply = postpone,
   ok = handle(not_alone, leaving),
   communication_manager:send_message_async(abort, ["Successor is leaving"], Session#session.curr_addr, no_alias),
   {_, Successor} = stabilizer:get_successor(),
   communication_manager:send_message_async(leave_info, application_manager:get_local_resources(all_res), Successor, no_alias),
-  {next_state, leaving, Session#session{app_mngr = From}, [{state_timeout, ?INTERVAL_LEAVING, hard_stop}, Reply]};
+  {next_state, leaving, Session#session{app_mngr = From}, [{state_timeout, ?INTERVAL_LEAVING, hard_stop}]};
 
-not_alone(cast, {ack_info,Address}, Session) ->
+not_alone(cast, {ack_info,Address}, Session) when Address =:= Session#session.curr_addr ->
   ok = handle(not_alone, init_provider),
   communication_manager:send_message_async(ack_join, [], Address, no_alias),
   application_manager:drop_many_resources(Session#session.curr_id),
+  checker:set_pred(Address),
   {next_state, init_provider, reset_provider_session(Session)};
 
 not_alone(cast, {leave_info,Resources, Address}, Session) ->
@@ -402,9 +402,6 @@ leaving(state_timeout, hard_stop, Session) ->
   {_, SuccAddress} = stabilizer:get_successor(),
   stop(Session, SuccAddress),
   {next_state, init_joiner, reset_session(Session)};
-
-leaving({call, _From}, leave, Session) ->
-  {keep_state, Session};
 
 leaving(cast, {look_resp,_Address}, Session) ->
   {keep_state, Session};
@@ -492,7 +489,7 @@ start(Session) ->
     Pid -> stabilizer:turn_on(Pid)
   end,
   #session{nbits = Nbits, succ_list = SuccList, succ_addr = SuccAddr, res = Resources,
-    superv = Supervisor, app_mngr = AM} = Session,
+    superv = Supervisor, app_mngr = AM, time = Time} = Session,
   ParamsHandler = {params_handler, {params_handler, start_link, [SuccAddr, SuccList, Nbits]},
     temporary, 2000, worker, [params_handler]},
   supervisor:start_child(Supervisor, ParamsHandler),
@@ -501,6 +498,10 @@ start(Session) ->
     [] -> ok;
     _ -> application_manager:add_many_resources(Resources)
   end,
+  Curr = erlang:timestamp(),
+  Diff = timer:now_diff(Curr, Time) div 1000,
+  naming_handler:wait_service(statistics),
+  statistics:notify_join_time(Diff),
   gen_statem:reply(AM, ok).
 
 reset_session(Session) ->
