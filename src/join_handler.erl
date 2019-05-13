@@ -47,7 +47,7 @@
 -define(INTERVAL_LEAVING, 20000).
 -define(INTERVAL_JOIN, 20000).
 
--record(session, {provider_addr, succ_addr, res, succ_list, nbits, app_mngr, curr_addr, curr_id, superv, stabilizer}).
+-record(session, {provider_addr, succ_addr, res, succ_list, nbits, app_mngr, curr_addr, curr_id, superv, stabilizer, time}).
 
 %%%===================================================================
 %%% API
@@ -189,6 +189,7 @@ format_status(_Opt, [_PDict, _StateName, _State]) ->
 %% @end
 %%--------------------------------------------------------------------
 init_joiner({call, From}, {join, OwnPort, Address}, Session) ->
+  Time = erlang:timestamp(),
   ok = handle(init_joiner, look),
   case socket_listener:check_availability(OwnPort) of
     ok ->
@@ -197,7 +198,7 @@ init_joiner({call, From}, {join, OwnPort, Address}, Session) ->
       Answer = communication_manager:send_message_sync(lookup_for_join, [], Address, no_alias),
       case Answer of
         ok ->
-          {next_state, look, Session#session{app_mngr = From, provider_addr = Address},
+          {next_state, look, Session#session{app_mngr = From, provider_addr = Address, time = Time},
             [{state_timeout, ?INTERVAL, hard_stop}]};
         Error ->
           link_shutdown(),
@@ -216,6 +217,7 @@ init_joiner({call, From}, {create, OwnPort, Nbits}, Session) ->
       NewSession = Session#session{nbits = Nbits, succ_list = [], succ_addr = link_manager:get_own_address(),
         res = [], app_mngr = From},
       ok = start(NewSession),
+      statistics:notify_join_time(0),
       {next_state, init_provider, NewSession, []};
     Error ->
       {keep_state, Session, [{reply, From, Error}]}
@@ -490,7 +492,7 @@ start(Session) ->
     Pid -> stabilizer:turn_on(Pid)
   end,
   #session{nbits = Nbits, succ_list = SuccList, succ_addr = SuccAddr, res = Resources,
-    superv = Supervisor, app_mngr = AM} = Session,
+    superv = Supervisor, app_mngr = AM, time = Time} = Session,
   ParamsHandler = {params_handler, {params_handler, start_link, [SuccAddr, SuccList, Nbits]},
     temporary, 2000, worker, [params_handler]},
   supervisor:start_child(Supervisor, ParamsHandler),
@@ -499,6 +501,10 @@ start(Session) ->
     [] -> ok;
     _ -> application_manager:add_many_resources(Resources)
   end,
+  Curr = erlang:timestamp(),
+  Diff = timer:now_diff(Time, Curr) div 1000,
+  naming_handler:wait_service(statistics),
+  statistics:notify_join_time(Diff),
   gen_statem:reply(AM, ok).
 
 reset_session(Session) ->

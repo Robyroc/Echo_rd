@@ -16,7 +16,7 @@
 
 -define(SERVER, ?MODULE).
 
--record(state, {requested, from, list, type}).
+-record(state, {requested, from, list, type, time}).
 
 %%%===================================================================
 %%% API
@@ -53,8 +53,9 @@ notify_lost_node(PID, Address) ->
 %% @end
 %%--------------------------------------------------------------------
 init([Requested, From, List, ListType]) ->
+  Time = erlang:timestamp(),
   erlang:send_after(10, self(), next),
-  {ok, #state{requested = Requested, from = From, list = List, type = ListType}};
+  {ok, #state{requested = Requested, from = From, list = List, type = ListType, time = Time}};
 
 init(_) ->
   {stop, badarg}.
@@ -83,6 +84,9 @@ handle_call(Request, _From, State) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_cast({response, Address}, State) ->
+  Time = erlang:timestamp(),
+  Diff = timer:now_diff(State#state.time, Time) div 1000,
+  statistics:notify_lookup_time(Diff),
   gen_server:reply(State#state.from, {found, Address}),
   {stop, normal, State};
 
@@ -104,6 +108,7 @@ handle_info(next, State) ->
   NewState = next_message(State),
   case NewState of
     terminate ->
+      statistics:notify_lookup_time(timeout),
       {stop, not_reachable, State};
     _ ->
       erlang:send_after(1500, self(), next),

@@ -17,7 +17,7 @@
 
 -define(SERVER, ?MODULE).
 
--record(state, {finger_table, nbits, id}).
+-record(state, {finger_table, nbits, id, time}).
 
 %%%===================================================================
 %%% API
@@ -135,7 +135,8 @@ handle_call({lost, Address}, _From, State) ->
       end
     end,
   NewTable = lists:map(Fun, Table),
-  {reply, ok, State#state{finger_table = NewTable}};
+  Time = erlang:timestamp(),
+  {reply, ok, State#state{finger_table = NewTable, time = Time}};
 
 handle_call({normalize_succ, ID}, _From, State) ->
   {reply, adjust_successor(ID, State#state.id, State#state.nbits), State};
@@ -161,6 +162,19 @@ handle_cast({update, Address, Theoretical}, State) ->
   Greater = [{Theo, R, A} || {Theo, R, A} <- Table, Theo > Theoretical],
   AdjustedID = adjust_successor(hash_f:get_hashed_addr(Address), ID, NBits),
   NewTable = lists:flatten([lists:reverse([{Theoretical, AdjustedID, Address} | lists:reverse(Less)]) | Greater]),
+  EmptyLinesBefore = [Theo || {Theo, _, no_address} <- Table],
+  EmptyLinesAfter = [Theo || {Theo, _, no_address} <- NewTable],
+  case EmptyLinesAfter of
+    [] ->
+      case EmptyLinesBefore of
+        [_|_] ->
+          Time = erlang:timestamp(),
+          Diff = timer:now_diff(State#state.time, Time) div 1000,
+          statistics:notify_finger_table_completion(Diff);
+        _ -> ok
+      end;
+    _ -> ok
+  end,
   {noreply, #state{finger_table = NewTable, nbits = State#state.nbits, id = State#state.id}};
 
 handle_cast({lookup, Alias, Requested}, State) ->
@@ -209,7 +223,8 @@ handle_info(startup, _State) ->
   TailRoutingTable = [{ID + round(math:pow(2, Exp)), no_real, no_address} || Exp <- lists:seq(1, Nbits - 1)],
   HeadRoutingTable = {ID + 1, SuccId, Succ},
   naming_handler:notify_identity(self(), router),
-  {noreply, #state{finger_table = [HeadRoutingTable | TailRoutingTable], nbits = Nbits, id = ID}};
+  Time = erlang:timestamp(),
+  {noreply, #state{finger_table = [HeadRoutingTable | TailRoutingTable], nbits = Nbits, id = ID, time = Time}};
 
 handle_info(Info, State) ->
   io:format("Router: Unexpected ! message: ~p~n", [Info]),
