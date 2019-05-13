@@ -117,12 +117,18 @@ handle_call(Request, _From, State) ->
 %%--------------------------------------------------------------------
 
 handle_cast({send_msg, Method, Params, Address, Alias}, State) ->
-  case logging_policies:check_policy(?MODULE) of
-    able ->
-      inout:info("### OUT ###: Method:~p | Params:~p | Address:~p~n", [Method, Params, Address]),
-      lagerConsole:info("### OUT ###: Method:~p | Params:~p | Address:~p~n", [Method, Params, Address]);
-    able_lager -> inout:info("### OUT ###: Method:~p | Params:~p | Address:~p~n", [Method, Params, Address]);
-    unable -> ok
+  case Method of
+    join_info -> ok;
+    leave_info -> ok;
+    command -> ok;
+    _ ->
+      case logging_policies:check_policy(?MODULE) of
+        able ->
+          inout:info("### OUT ###: Method:~p | Params:~p | Address:~p~n", [Method, Params, Address]),
+          lagerConsole:info("### OUT ###: Method:~p | Params:~p | Address:~p~n", [Method, Params, Address]);
+        able_lager -> inout:info("### OUT ###: Method:~p | Params:~p | Address:~p~n", [Method, Params, Address]);
+        unable -> ok
+      end
   end,
   Translated = translate(Method),
   Encoded = encode_params(Method, Params, State#state.nbits),
@@ -136,12 +142,18 @@ handle_cast({send_msg, Method, Params, Address, Alias}, State) ->
 handle_cast({rcv_msg, Method, Address, Params}, State) ->
   BackTranslated = back_translate(Method),
   DecodedParams = decode_params(back_translate(Method), Params, State#state.nbits),
-  case logging_policies:check_policy(?MODULE) of
-    able ->
-      lagerConsole:info("### IN ###: Method:~p | Params:~p | Address:~p~n", [BackTranslated, DecodedParams, Address]),
-      inout:info("### IN ###: Method:~p | Params:~p | Address:~p~n", [BackTranslated, DecodedParams, Address]);
-    able_lager -> inout:info("### IN ###: Method:~p | Params:~p | Address:~p~n", [BackTranslated, DecodedParams, Address]);
-    unable -> ok
+  case Method of
+    join_info -> ok;
+    leave_info -> ok;
+    command -> ok;
+    _ ->
+      case logging_policies:check_policy(?MODULE) of
+        able ->
+          lagerConsole:info("### IN ###: Method:~p | Params:~p | Address:~p~n", [BackTranslated, DecodedParams, Address]),
+          inout:info("### IN ###: Method:~p | Params:~p | Address:~p~n", [BackTranslated, DecodedParams, Address]);
+        able_lager -> inout:info("### IN ###: Method:~p | Params:~p | Address:~p~n", [BackTranslated, DecodedParams, Address]);
+        unable -> ok
+      end
   end,
   forward(BackTranslated, DecodedParams, Address),
   {noreply,State};
