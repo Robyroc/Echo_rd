@@ -72,11 +72,11 @@ handle_call({get_param, nbits}, _From, State) ->
   {reply, State#state.nbits, State};
 
 handle_call({get_param, Invalid}, _From, State) ->
-  io:format("PARAMS HANDLER: Invalid Parameter has been requested: ~p~n", [Invalid]),
+  unexpected:error("PARAMS HANDLER: Invalid Parameter has been requested: ~p~n", [Invalid]),
   {reply, ok, State};
 
 handle_call(Request, _From, State) ->
-  io:format("PARAMS HANDLER: Unexpected call message: ~p~n", [Request]),
+  unexpected:error("PARAMS HANDLER: Unexpected call message: ~p~n", [Request]),
   {reply, ok, State}.
 
 %%--------------------------------------------------------------------
@@ -87,7 +87,7 @@ handle_call(Request, _From, State) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_cast(Request, State) ->
-  io:format("PARAMS HANDLER: Unexpected cast message: ~p~n", [Request]),
+  unexpected:error("PARAMS HANDLER: Unexpected cast message: ~p~n", [Request]),
   {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -101,7 +101,7 @@ handle_cast(Request, State) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_info(Info, State) ->
-  io:format("PARAMS HANDLER: Unexpected ! message: ~p~n", [Info]),
+  unexpected:error("PARAMS HANDLER: Unexpected ! message: ~p~n", [Info]),
   {noreply, State}.
 
 %%--------------------------------------------------------------------

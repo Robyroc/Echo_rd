@@ -59,7 +59,7 @@ init([]) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_call(Request, _From, State) ->
-  io:format("FIX: Unexpected call message: ~p~n", [Request]),
+  unexpected:error("FIX: Unexpected call message: ~p~n", [Request]),
   {reply, ok, State}.
 
 %%--------------------------------------------------------------------
@@ -70,7 +70,7 @@ handle_call(Request, _From, State) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_cast(Request, State) ->
-  io:format("FIX: Unexpected cast message: ~p~n", [Request]),
+  unexpected:error("FIX: Unexpected cast message: ~p~n", [Request]),
   {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -95,7 +95,10 @@ handle_info(fix, State) ->
   Theo = (State#state.id + round(math:pow(2, State#state.index))),
 %    rem round(math:pow(2, State#state.nbits)),     %TODO check if it can be removed
   case logging_policies:check_policy(?MODULE) of
-    able -> io:format("%%% FIXER %%%: ~p~n", [Theo]);
+    able ->
+      lagerConsole:info("%%% FIXER %%%: ~p~n", [Theo]),
+      fixerLager:info("%%% FIXER %%%: ~p~n", [Theo]);
+    able_lager -> fixerLager:info("%%% FIXER %%%: ~p~n", [Theo]);
     unable -> ok
   end,
   {found, Address} = router:local_lookup(Theo),
@@ -104,7 +107,7 @@ handle_info(fix, State) ->
   {noreply, iterate_state(State)};
 
 handle_info(Info, State) ->
-  io:format("FIX: Unexpected ! message: ~p~n", [Info]),
+  unexpected:error("FIX: Unexpected ! message: ~p~n", [Info]),
   {noreply, State}.
 
 %%--------------------------------------------------------------------

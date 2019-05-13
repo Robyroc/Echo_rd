@@ -86,7 +86,7 @@ handle_call({lost, Address}, _From, State) ->
   {reply, ok, State};
 
 handle_call(Request, _From, State) ->
-  io:format("R. Gateway: Unexpected call message: ~p~n", [Request]),
+  unexpected:error("R. Gateway: Unexpected call message: ~p~n", [Request]),
   {reply, ok, State}.
 
 %%--------------------------------------------------------------------
@@ -101,7 +101,7 @@ handle_cast({response, Requested, Address}, State) ->
   {noreply, State};
 
 handle_cast(Request, State) ->
-  io:format("R. Gateway: Unexpected cast message: ~p~n", [Request]),
+  unexpected:error("R. Gateway: Unexpected cast message: ~p~n", [Request]),
   {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -123,11 +123,11 @@ handle_info({'DOWN', Monitor, process, _PID, normal}, State) ->
 
 handle_info({'DOWN', Monitor, process, _PID, Reason}, State) ->
   Present = [X || {_, X, M} <- State#state.requests, M =:= Monitor],
-  io:format("R. Gateway: A request failed: Requested: ~p~nReason: ~p~n", [hd(Present), Reason]),
+  lager:error("R. Gateway: A request failed: Requested: ~p~nReason: ~p~n", [hd(Present), Reason]),
   {noreply, #state{requests = [{P, R, M} || {P, R, M} <- State#state.requests, M =/= Monitor]}};
 
 handle_info(Info, State) ->
-  io:format("R. Gateway: Unexpected ! message: ~p~n", [Info]),
+  unexpected:error("R. Gateway: Unexpected ! message: ~p~n", [Info]),
   {noreply, State}.
 
 %%--------------------------------------------------------------------

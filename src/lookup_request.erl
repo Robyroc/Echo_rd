@@ -73,7 +73,7 @@ handle_call({lost, Address}, _From, State) ->
   {reply, ok, State#state{list = CleanedList}};
 
 handle_call(Request, _From, State) ->
-  io:format("Request: Unexpected call message: ~p~n", [Request]),
+  unexpected:error("Request: Unexpected call message: ~p~n", [Request]),
   {reply, ok, State}.
 
 %%--------------------------------------------------------------------
@@ -91,7 +91,7 @@ handle_cast({response, Address}, State) ->
   {stop, normal, State};
 
 handle_cast(Request, State) ->
-  io:format("Request: Unexpected cast message: ~p~n", [Request]),
+  unexpected:error("Request: Unexpected cast message: ~p~n", [Request]),
   {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -116,7 +116,7 @@ handle_info(next, State) ->
   end;
 
 handle_info(Info, State) ->
-  io:format("Request: Unexpected ! message: ~p~n", [Info]),
+  unexpected:error("Request: Unexpected ! message: ~p~n", [Info]),
   {noreply, State}.
 
 %%--------------------------------------------------------------------

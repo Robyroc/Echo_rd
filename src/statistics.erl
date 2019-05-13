@@ -84,7 +84,7 @@ init([]) ->
   {stop, Reason :: term(), Reply :: term(), NewState :: #state{}} |
   {stop, Reason :: term(), NewState :: #state{}}).
 handle_call(Request, _From, State) ->
-  io:format("STATISTICS: Unexpected call message: ~p~n", [Request]),
+  lager:error("STATISTICS: Unexpected call message: ~p~n", [Request]),
   {reply, ok, State}.
 
 -spec(handle_cast(Request :: term(), State :: #state{}) ->
@@ -104,7 +104,7 @@ handle_cast(gather, State) ->
 handle_cast({show_stats, Address, Stats}, State) ->
   {JoinTime, HighLookupTime, LookupDrop, FtableTimings} = Stats,
   ID = hash_f:get_hashed_addr(Address),
-  io:format("^^^^^ STATS ^^^^^~n ID: ~p~n IP: ~p~n Join time: ~p~n Highest lookup time: ~p~n Number of lookup timeouts: ~p~n FTable last refresh timings: ~p~n~n",
+  lager:info("^^^^^ STATS ^^^^^~n ID: ~p~n IP: ~p~n Join time: ~p~n Highest lookup time: ~p~n Number of lookup timeouts: ~p~n FTable last refresh timings: ~p~n~n",
     [ID, Address, JoinTime, HighLookupTime, LookupDrop, FtableTimings]),
   {noreply, State};
 
@@ -139,7 +139,7 @@ handle_cast({finger_completion, Time}, State) ->
   {noreply, State#state{ftable_timing = Time}};
 
 handle_cast(Request, State) ->
-  io:format("STATISTICS: Unexpected cast message: ~p~n", [Request]),
+  lager:error("STATISTICS: Unexpected cast message: ~p~n", [Request]),
   {noreply, State}.
 
 -spec(handle_info(Info :: timeout() | term(), State :: #state{}) ->
@@ -152,7 +152,7 @@ handle_info(startup, State) ->
   {noreply, State};
 
 handle_info(Info, State) ->
-  io:format("STATISTICS: Unexpected ! message: ~p~n", [Info]),
+  lager:error("STATISTICS: Unexpected ! message: ~p~n", [Info]),
   {noreply, State}.
 
 %%--------------------------------------------------------------------

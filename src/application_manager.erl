@@ -141,10 +141,6 @@ statistics_gather() ->
 %% @end
 %%--------------------------------------------------------------------
 init([]) ->
-  %TODO the following 3 lines are for testing lager
-  lager:info("~s is ~s!", [lager, cool]),
-  lager:warning("but pay ~s!", [attention]),
-  lager:error("there is always some ~s", [error]),
   naming_handler:notify_identity(self(), application_manager),
   {ok, #state{}}.
 
