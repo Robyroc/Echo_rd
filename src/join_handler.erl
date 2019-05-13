@@ -215,9 +215,8 @@ init_joiner({call, From}, {create, OwnPort, Nbits}, Session) ->
       naming_handler:notify_identity(OwnPort, port),
       naming_handler:wait_service(listener),
       NewSession = Session#session{nbits = Nbits, succ_list = [], succ_addr = link_manager:get_own_address(),
-        res = [], app_mngr = From},
+        res = [], app_mngr = From, time = erlang:timestamp()},
       ok = start(NewSession),
-      statistics:notify_join_time(0),
       {next_state, init_provider, NewSession, []};
     Error ->
       {keep_state, Session, [{reply, From, Error}]}
@@ -238,9 +237,6 @@ look(state_timeout, hard_stop, Session) ->
   link_shutdown(),
   gen_statem:reply(Session#session.app_mngr, fail),
   {next_state, init_joiner, reset_session(Session)};
-
-look({call, _From}, {join, _Port, _Address}, Session) ->
-  {keep_state, Session};
 
 look(EventType, EventContent, Session) ->
   ok = handle(look, look),
@@ -323,11 +319,10 @@ init_provider(cast, {leave_info,Resources, Address}, Session) ->
 
 init_provider({call,From}, leave, Session) ->
   ok = handle(init_provider, leaving),
-  Reply = postpone,
   Res = application_manager:get_local_resources(all_res),
   {_, Successor} = stabilizer:get_successor(),
   communication_manager:send_message_async(leave_info, Res, Successor, no_alias),
-  {next_state, leaving, Session#session{app_mngr = From}, [{state_timeout, ?INTERVAL_LEAVING, hard_stop}, Reply]};
+  {next_state, leaving, Session#session{app_mngr = From}, [{state_timeout, ?INTERVAL_LEAVING, hard_stop}]};
 
 init_provider(cast, {look_resp,_Address}, Session) ->
   {keep_state, Session};
@@ -355,12 +350,11 @@ not_alone(cast, {ready_for_info, Address}, Session) ->
 
 
 not_alone({call,From}, leave, Session) ->
-  Reply = postpone,
   ok = handle(not_alone, leaving),
   communication_manager:send_message_async(abort, ["Successor is leaving"], Session#session.curr_addr, no_alias),
   {_, Successor} = stabilizer:get_successor(),
   communication_manager:send_message_async(leave_info, application_manager:get_local_resources(all_res), Successor, no_alias),
-  {next_state, leaving, Session#session{app_mngr = From}, [{state_timeout, ?INTERVAL_LEAVING, hard_stop}, Reply]};
+  {next_state, leaving, Session#session{app_mngr = From}, [{state_timeout, ?INTERVAL_LEAVING, hard_stop}]};
 
 not_alone(cast, {ack_info,Address}, Session) when Address =:= Session#session.curr_addr ->
   ok = handle(not_alone, init_provider),
@@ -406,9 +400,6 @@ leaving(state_timeout, hard_stop, Session) ->
   {_, SuccAddress} = stabilizer:get_successor(),
   stop(Session, SuccAddress),
   {next_state, init_joiner, reset_session(Session)};
-
-leaving({call, _From}, leave, Session) ->
-  {keep_state, Session};
 
 leaving(cast, {look_resp,_Address}, Session) ->
   {keep_state, Session};
@@ -502,7 +493,7 @@ start(Session) ->
     _ -> application_manager:add_many_resources(Resources)
   end,
   Curr = erlang:timestamp(),
-  Diff = timer:now_diff(Time, Curr) div 1000,
+  Diff = timer:now_diff(Curr, Time) div 1000,
   naming_handler:wait_service(statistics),
   statistics:notify_join_time(Diff),
   gen_statem:reply(AM, ok).

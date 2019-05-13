@@ -21,7 +21,8 @@
   get_successor_list/0,
   show_finger_table/0,
   get_predecessor/0,
-  get_own_id/0]).
+  get_own_id/0,
+  statistics_gather/0]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -120,6 +121,9 @@ get_own_id() ->
 
 send_response(Message, Address) ->
   communication_manager:send_message_async(command, [Address, Message], Address, no_alias).
+
+statistics_gather() ->
+  statistics:gather().
 
 %%%===================================================================
 %%% gen_server callbacks

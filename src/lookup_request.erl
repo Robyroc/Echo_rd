@@ -85,7 +85,7 @@ handle_call(Request, _From, State) ->
 %%--------------------------------------------------------------------
 handle_cast({response, Address}, State) ->
   Time = erlang:timestamp(),
-  Diff = timer:now_diff(State#state.time, Time) div 1000,
+  Diff = timer:now_diff(Time, State#state.time) div 1000,
   statistics:notify_lookup_time(Diff),
   gen_server:reply(State#state.from, {found, Address}),
   {stop, normal, State};

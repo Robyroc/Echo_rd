@@ -169,13 +169,13 @@ handle_cast({update, Address, Theoretical}, State) ->
       case EmptyLinesBefore of
         [_|_] ->
           Time = erlang:timestamp(),
-          Diff = timer:now_diff(State#state.time, Time) div 1000,
+          Diff = timer:now_diff(Time, State#state.time) div 1000,
           statistics:notify_finger_table_completion(Diff);
         _ -> ok
       end;
     _ -> ok
   end,
-  {noreply, #state{finger_table = NewTable, nbits = State#state.nbits, id = State#state.id}};
+  {noreply, State#state{finger_table = NewTable, nbits = State#state.nbits, id = State#state.id}};
 
 handle_cast({lookup, Alias, Requested}, State) ->
   ActualRequested = adjust_successor(Requested, State#state.id, State#state.nbits),

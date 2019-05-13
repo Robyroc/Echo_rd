@@ -65,7 +65,7 @@ notify_finger_table_completion(Time) ->
   {ok, State :: #state{}} | {ok, State :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term()} | ignore).
 init([]) ->
-  self ! startup,
+  self() ! startup,
   {ok, #state{max_lookup_time = 0, lookup_drop = 0}}.
 
 %%--------------------------------------------------------------------
