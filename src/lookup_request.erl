@@ -149,19 +149,15 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 
 
-next_message(State) ->
-  next_message(State#state.requested, State#state.list, State#state.type, State#state.from).
-
-
-next_message(_Requested, [], succ, _From) ->
+next_message(State) when State#state.list =:= [] and State#state.type =:= succ ->
   terminate;
 
-next_message(Requested, [], finger, From) ->
+next_message(State) when State#state.list =:= [] and State#state.type =:= finger ->
   List = stabilizer:get_successor_list(),
   AList = [X || {_, X} <- List],
-  next_message(Requested, AList, succ, From);
+  next_message(State#state{list = AList, type = succ});
 
-next_message(Requested, List, Type, From) ->
-  Address = hd(List),
-  communication_manager:send_message_async(lookup, [Requested], Address, link_manager:get_own_address()),
-  #state{requested = Requested, list = tl(List), type = Type, from = From}.
+next_message(State) ->
+  Address = hd(State#state.list),
+  communication_manager:send_message_async(lookup, [State#state.requested], Address, link_manager:get_own_address()),
+  State#state{list = tl(State#state.list)}.
