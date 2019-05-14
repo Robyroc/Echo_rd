@@ -149,10 +149,10 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 
 
-next_message(State) when State#state.list =:= [] and State#state.type =:= succ ->
+next_message(State) when ((State#state.list =:= []) and (State#state.type =:= succ)) ->
   terminate;
 
-next_message(State) when State#state.list =:= [] and State#state.type =:= finger ->
+next_message(State) when ((State#state.list =:= []) and (State#state.type =:= finger)) ->
   List = stabilizer:get_successor_list(),
   AList = [X || {_, X} <- List],
   next_message(State#state{list = AList, type = succ});
