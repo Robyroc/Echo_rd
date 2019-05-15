@@ -2,17 +2,20 @@
 -author("robyroc").
 
 -behaviour(gen_server).
+-behavior(gen_app).
 
 %% API
 -export([start_link/0,
-  join/1,
-  create/1,
-  leave/0,
-  issue_command/2,
   receive_command/2,
   add_many_resources/1,
   get_local_resources/1,
-  drop_many_resources/1,
+  drop_many_resources/1]).
+
+%% gen_app callbacks
+-export([join/1,
+  create/1,
+  leave/0,
+  issue_command/2,
   join_p/2,
   create_p/2,
   connect/1,
