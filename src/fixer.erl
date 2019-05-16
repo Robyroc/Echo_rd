@@ -93,7 +93,6 @@ handle_info(startup, _State) ->
 
 handle_info(fix, State) ->
   Theo = (State#state.id + round(math:pow(2, State#state.index))),
-%    rem round(math:pow(2, State#state.nbits)),     %TODO check if it can be removed
   case logging_policies:check_policy(?MODULE) of
     able ->
       lagerConsole:info("%%% FIXER %%%: ~p~n", [Theo]),

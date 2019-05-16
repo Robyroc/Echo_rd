@@ -6,8 +6,20 @@
 %% API
 -export([start_link/0, send_message_async/4, receive_message/1, receive_nbits/1, send_message_sync/4]).
 
-%TODO remove me when done debugging
--export([encode_resource/1, decode_resource/1, encode_ID/2, decode_ID/1, encode_successor_list/2, decode_successor_list/2, encode_nbits_successor_and_resources/1, decode_nbits_successor_and_resources/1]).
+% In order to test encoding/decoding functions, uncomment the following export statement and run one of the following commands.
+%-export([encode_resource/1,
+%  decode_resource/1,
+%  encode_ID/2,
+%  decode_ID/1,
+%  encode_successor_list/2,
+%  decode_successor_list/2,
+%  encode_nbits_successor_and_resources/1,
+%  decode_nbits_successor_and_resources/1]).
+%
+% communication_manager:decode_ID(communication_manager:encode_ID(-17, 9), 9).
+% communication_manager:decode_resource(communication_manager:encode_resource([{"pippo", <<"dwin">>}, {"pluto", <<"abcdefghijklmnopqrstuvwxyz">>}])).
+% communication_manager:decode_nbits_successor_and_resources(communication_manager:encode_nbits_successor_and_resources([12, [{1, {2, {1,2,3,4}}}, {7, {743, {6,9,5,2}}}], [{"pippo", <<"dwin">>}, {"pluto", <<"abcdefghijklmnopqrstuvwxyz">>}]])).
+% communication_manager:decode_successor_list(communication_manager:encode_successor_list([{1, {2, {1,2,3,4}}}, {7, {743, {6,9,5,2}}}], 7), 7).
 
 %% gen_server callbacks
 -export([init/1,
@@ -36,8 +48,6 @@
 start_link() ->
   gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
-%TODO remove comment, it is just for testing
-%communication_manager:send_message(lookup,["K20"],{6543,{192,168,1,98}},no_alias).
 send_message_async(Method, Params, Address, Alias) ->
   PID = naming_handler:get_identity(communication_manager),
   gen_server:cast(PID, {send_msg, Method, Params, Address, Alias}).
@@ -305,8 +315,6 @@ forward(get_stats, [], From) -> statistics:get_statistics(From);
 forward(stats, [S], From) -> statistics:incoming_statistics(From, S);
 forward(_, _, _) -> badarg.
 
-%TODO remove comment, it is just for testing
-% communication_manager:decode_ID(communication_manager:encode_ID(-17, 9), 9).
 
 encode_ID(ID, NBits) ->
   NBytes = ceil(NBits / 8),
@@ -320,9 +328,6 @@ decode_ID(Bin, Acc) ->
   NewAcc = Acc bsl 8,
   <<Int:8/integer, Rest/binary>> = Bin,
   decode_ID(Rest, NewAcc + Int).
-
-%TODO remove comment, it is just for testing
-% communication_manager:decode_resource(communication_manager:encode_resource([{"pippo", <<"dwin">>}, {"pluto", <<"abcdefghijklmnopqrstuvwxyz">>}])).
 
 encode_resource([]) -> <<>>;
 
@@ -365,9 +370,6 @@ decode_resource(Bin) ->
   Result = lists:reverse(RevResult),
   lists:zip(Names, Result).
 
-%TODO remove comment, it is just for testing
-% communication_manager:decode_nbits_successor_and_resources(communication_manager:encode_nbits_successor_and_resources([12, [{1, {2, {1,2,3,4}}}, {7, {743, {6,9,5,2}}}], [{"pippo", <<"dwin">>}, {"pluto", <<"abcdefghijklmnopqrstuvwxyz">>}]])).
-
 encode_nbits_successor_and_resources([NBits, List, Res]) ->
   list_to_binary([<<NBits:8>>, encode_successor_list(List, NBits), encode_resource(Res)]).
 
@@ -380,9 +382,6 @@ decode_nbits_successor_and_resources(Bin) ->
   BytePerList = BitsPerList div 8,
   <<List:BytePerList/binary, Res/binary>> = Rest,
   [NBits, decode_successor_list(List, NBits), decode_resource(Res)].
-
-%TODO remove comment, it is just for testing
-% communication_manager:decode_successor_list(communication_manager:encode_successor_list([{1, {2, {1,2,3,4}}}, {7, {743, {6,9,5,2}}}], 7), 7).
 
 encode_successor_list(List, NBits) ->
   N = length(List),

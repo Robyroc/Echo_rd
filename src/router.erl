@@ -267,8 +267,8 @@ code_change(_OldVsn, State, _Extra) ->
 show_finger_table(State) ->
   %TODO check if the finger table has to be in the .log file or printed in console
   routerLager:info("Finger Table: \n
-  Theo | Real | Address~n"),
-  [routerLager:info("~p|~p|~p~n", [T, R, A]) || {T, R, A} <- State#state.finger_table],  %TODO: handle formatting
+  Theo\t| Real\t| Address~n"),
+  [routerLager:info("~p\t| ~p\t| ~p~n", [T, R, A]) || {T, R, A} <- State#state.finger_table],  %TODO: check formatting
   ok.
 
 lookup(Searched, ID, Table, NBits) when Searched < ID ->
