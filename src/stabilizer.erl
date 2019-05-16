@@ -160,6 +160,7 @@ handle_info(startup, _State) ->
   {noreply, #state{counter = 0, succ_list = NewList, id = ID, nbits = NBits, op = operating}};
 
 handle_info(stabilize, State) when State#state.counter > ?THRESHOLD ->
+  io:format("Dropped\n"),
   case State#state.op of
     operating ->
       case tl(State#state.succ_list) of
