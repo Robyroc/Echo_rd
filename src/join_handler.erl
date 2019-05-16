@@ -41,7 +41,7 @@
   init_joiner/3,
   look/3, pre_join/3, j_ready/3, init_provider/3, not_alone/3, leaving/3]).
 
--define(SLEEP_INTERVAL, 1000).
+-define(SLEEP_INTERVAL, 5000).
 -define(SERVER, ?MODULE).
 -define(INTERVAL, 10000).
 -define(INTERVAL_LEAVING, 20000).
