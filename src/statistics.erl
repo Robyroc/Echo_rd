@@ -66,7 +66,7 @@ notify_finger_table_completion(Time) ->
   {stop, Reason :: term()} | ignore).
 init([]) ->
   self() ! startup,
-  {ok, #state{max_lookup_time = 0, lookup_drop = 0}}.
+  {ok, #state{max_lookup_time = 0, lookup_drop = 0, join_time = 0, ftable_timing = 0}}.
 
 %%--------------------------------------------------------------------
 %% @private
