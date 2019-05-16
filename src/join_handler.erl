@@ -341,7 +341,7 @@ not_alone(cast, {ready_for_info, Address}, Session) ->
   case JoinerID of
     _ when JoinerID =< CurrID ->
       communication_manager:send_message_async(abort, ["No priority"],Address, no_alias),
-      {keep_state, Session, [{state_timeout, ?INTERVAL_JOIN, hard_stop}]};
+      {keep_state, Session};
     _ when JoinerID > CurrID ->
       CurrAddr = Session#session.curr_addr,
       communication_manager:send_message_async(abort, ["Loss priority"],CurrAddr, no_alias),
