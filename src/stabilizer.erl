@@ -169,7 +169,7 @@ handle_info(stabilize, State) when State#state.counter > ?THRESHOLD ->
           self() ! stabilize,
           {noreply, State#state{counter = 0, succ_list = [{AdjOwnId, OwnAddress}]}};
         _ ->
-          self ! stabilize,
+          self() ! stabilize,
           {noreply, State#state{counter = 0, succ_list = tl(State#state.succ_list)}}
       end;
     no_operating ->

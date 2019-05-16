@@ -167,7 +167,9 @@ handle_cast({rcv_msg, Method, Address, Params}, State) ->
         unable -> ok
       end
   end,
-  forward(BackTranslated, DecodedParams, Address),
+  {Modules, Call} = forward(BackTranslated, DecodedParams, Address),
+  [naming_handler:wait_service(Service) || Service <- Modules],
+  Call(),
   {noreply,State};
 
 handle_cast(Request, State) ->
@@ -297,23 +299,23 @@ decode_params(get_stats, [], _NBits) -> [];
 decode_params(stats, [Bin], _NBits) -> <<A:16, B:16, C:16, D:16>> = Bin, [{A, B, C, D}];
 decode_params(_, _, _) -> badarg.
 
-forward(lookup_for_join, [], From) -> router:lookup_for_join(From);
-forward(lookup_response, [ID, Addr], _From) -> request_gateway:lookup_response(ID, Addr), join_handler:look_response(Addr);
-forward(ready_for_info, [], From) -> join_handler:ready_for_info(From);
-forward(join_info, [NBits, LS, R], From) -> join_handler:info(From, R, LS, NBits);
-forward(ack_info, [], From) -> join_handler:ack_info(From);
-forward(abort, [S], _From) -> join_handler:abort(S);
-forward(ack_join, [], From) -> join_handler:ack_join(From);
-forward(leave_info, [], From) -> join_handler:leave_info([], From);
-forward(leave_info, [Res], From) -> join_handler:leave_info(Res, From);
-forward(ack_leave, [], From) -> join_handler:ack_leave(From);
-forward(ask_pred, [], From) -> checker:get_pred(From);
-forward(pred_reply, [Pred, SL], _From) -> stabilizer:notify_successor(Pred, SL);
-forward(lookup, [ID], From) -> router:remote_lookup(ID, From);
-forward(command, [A,C], _From) -> application_manager:receive_command(A,C);
-forward(get_stats, [], From) -> statistics:get_statistics(From);
-forward(stats, [S], From) -> statistics:incoming_statistics(From, S);
-forward(_, _, _) -> badarg.
+forward(lookup_for_join, [], From) -> {[router], fun() -> router:lookup_for_join(From) end};
+forward(lookup_response, [ID, Addr], _From) -> {[request_gateway, join_handler], fun() -> request_gateway:lookup_response(ID, Addr), join_handler:look_response(Addr) end};
+forward(ready_for_info, [], From) -> {[join_handler], fun() -> join_handler:ready_for_info(From) end};
+forward(join_info, [NBits, LS, R], From) -> {[join_handler], fun() -> join_handler:info(From, R, LS, NBits) end};
+forward(ack_info, [], From) -> {[join_handler], fun() -> join_handler:ack_info(From) end};
+forward(abort, [S], _From) -> {[join_handler], fun() -> join_handler:abort(S) end};
+forward(ack_join, [], From) -> {[join_handler], fun() -> join_handler:ack_join(From) end};
+forward(leave_info, [], From) -> {[join_handler], fun() -> join_handler:leave_info([], From) end};
+forward(leave_info, [Res], From) -> {[join_handler], fun() -> join_handler:leave_info(Res, From) end};
+forward(ack_leave, [], From) -> {[join_handler], fun() -> join_handler:ack_leave(From) end};
+forward(ask_pred, [], From) -> {[checker], fun() -> checker:get_pred(From) end};
+forward(pred_reply, [Pred, SL], _From) -> {[stabilizer], fun() -> stabilizer:notify_successor(Pred, SL) end};
+forward(lookup, [ID], From) -> {[router], fun() -> router:remote_lookup(ID, From) end};
+forward(command, [A,C], _From) -> {[application_manager], fun() -> application_manager:receive_command(A,C) end};
+forward(get_stats, [], From) -> {[statistics], fun() -> statistics:get_statistics(From) end};
+forward(stats, [S], From) -> {[statistics], fun() -> statistics:incoming_statistics(From, S) end};
+forward(_, _, _) -> {[], fun() -> ok end}.
 
 
 encode_ID(ID, NBits) ->
