@@ -15,10 +15,11 @@
   terminate/2,
   code_change/3]).
 
+-define(THRESHOLD, 20).
 -define(SERVER, ?MODULE).
 -define(INTERVAL, 5000).
 
--record(state, {succ_list, id, nbits, op}).
+-record(state, {counter, succ_list, id, nbits, op}).
 
 %%%===================================================================
 %%% API
@@ -104,11 +105,11 @@ handle_call({lost, Address}, _From, State) ->
   end;
 
 handle_call(turn_off, _From, _State) ->
-  {reply, ok, #state{succ_list = undefined, nbits = undefined, id = undefined, op = no_operating}};
+  {reply, ok, #state{counter = 0, succ_list = undefined, nbits = undefined, id = undefined, op = no_operating}};
 
 handle_call(turn_on, _From, _State) ->
   self() ! startup,
-  {reply, ok, #state{op = no_operating}};
+  {reply, ok, #state{counter = 0, op = no_operating}};
 
 handle_call(Request, _From, State) ->
   unexpected:error("STABILIZER: Unexpected call message: ~p~n", [Request]),
@@ -126,7 +127,7 @@ handle_cast({stabilize_response, Predecessor, NewSuccList}, State) ->
   HeadIndex = hd([I || {I, _} <- State#state.succ_list]),
   #state{succ_list = OwnSuccessorList, id = ID, nbits = NBits} = State,
   NewSuccessorList = handle_pred_tell(PredIndex, ID, HeadIndex, NewSuccList, OwnSuccessorList, Predecessor, NBits),
-  {noreply, State#state{succ_list = NewSuccessorList}};
+  {noreply, State#state{counter = 0, succ_list = NewSuccessorList}};
 
 handle_cast(Request, State) ->
   unexpected:error("STABILIZER: Unexpected cast message: ~p~n", [Request]),
@@ -156,7 +157,24 @@ handle_info(startup, _State) ->
   NewList = update_successor_list(lists:sort(Corrected), {SuccID, Successor}, NBits),
   naming_handler:notify_identity(self(), stabilizer),
   erlang:send_after(?INTERVAL, self(), stabilize),
-  {noreply, #state{succ_list = NewList, id = ID, nbits = NBits, op = operating}};
+  {noreply, #state{counter = 0, succ_list = NewList, id = ID, nbits = NBits, op = operating}};
+
+handle_info(stabilize, State) when State#state.counter > ?THRESHOLD ->
+  case State#state.op of
+    operating ->
+      case tl(State#state.succ_list) of
+        [] ->
+          OwnAddress = link_manager:get_own_address(),
+          AdjOwnId = adjust_successor(State#state.id, State#state.id, State#state.nbits),
+          self() ! stabilize,
+          {noreply, State#state{counter = 0, succ_list = [{AdjOwnId, OwnAddress}]}};
+        _ ->
+          self ! stabilize,
+          {noreply, State#state{counter = 0, succ_list = tl(State#state.succ_list)}}
+      end;
+    no_operating ->
+      {noreply, State}
+  end;
 
 handle_info(stabilize, State) ->
   case State#state.op of
@@ -164,7 +182,7 @@ handle_info(stabilize, State) ->
       Successor = hd([Addr || {_, Addr} <- State#state.succ_list]),
       communication_manager:send_message_async(ask_pred, [], Successor, no_alias),
       erlang:send_after(?INTERVAL, self(), stabilize),
-      {noreply, State};
+      {noreply, State#state{counter = State#state.counter + 1}};
     no_operating ->
       {noreply, State}
   end;
