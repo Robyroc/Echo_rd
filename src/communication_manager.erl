@@ -276,7 +276,7 @@ encode_params(lookup, _, no_nbits) -> badarg;
 encode_params(lookup, [ID], NBits) -> [encode_ID(ID, NBits)];
 encode_params(command, [Address,C], _NBits) -> [link_manager:address_to_binary(Address), C];
 encode_params(get_stats, [], _NBits) -> [];
-encode_params(stats, [{A, B, C, D}], _NBits) -> [<<A:16, B:16, C:16, D:16>>];
+encode_params(stats, [{A, B, C, D}], _NBits) -> [<<A:32, B:32, C:32, D:32>>];
 encode_params(_, _, _) -> badarg.
 
 decode_params(lookup_for_join, [], _NBits) -> [];
@@ -296,7 +296,7 @@ decode_params(pred_reply, [Pred, SL], NBits) -> [link_manager:binary_to_address(
 decode_params(lookup, [ID], _NBits) -> [decode_ID(ID)];
 decode_params(command, [A,C], _NBits) -> [link_manager:binary_to_address(A), C];
 decode_params(get_stats, [], _NBits) -> [];
-decode_params(stats, [Bin], _NBits) -> <<A:16, B:16, C:16, D:16>> = Bin, [{A, B, C, D}];
+decode_params(stats, [Bin], _NBits) -> <<A:32, B:32, C:32, D:32>> = Bin, [{A, B, C, D}];
 decode_params(_, _, _) -> badarg.
 
 forward(lookup_for_join, [], From) -> {[router], fun() -> router:lookup_for_join(From) end};

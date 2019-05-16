@@ -123,8 +123,8 @@ handle_call(Request, _From, State) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_cast({stabilize_response, Predecessor, NewSuccList}, State) ->
-  PredIndex = router:normalize_as_predecessor(hash_f:get_hashed_addr(Predecessor)),
-  HeadIndex = hd([I || {I, _} <- State#state.succ_list]),
+  PredIndex = router:normalize_as_successor_including(hash_f:get_hashed_addr(Predecessor)),
+  HeadIndex = router:normalize_as_successor(hd([I || {I, _} <- State#state.succ_list])),
   #state{succ_list = OwnSuccessorList, id = ID, nbits = NBits} = State,
   NewSuccessorList = handle_pred_tell(PredIndex, ID, HeadIndex, NewSuccList, OwnSuccessorList, Predecessor, NBits),
   {noreply, State#state{counter = 0, succ_list = NewSuccessorList}};
@@ -237,8 +237,8 @@ handle_pred_tell(PredID, ID, _HeadID, NewSuccList, OwnSuccList, _Pred, NBits) wh
   Succ = hd(OwnSuccList),
   update_successor_list(NewSuccList, Succ, NBits);
 
-handle_pred_tell(PredID, ID, HeadID, SuccList, OwnSuccList, Pred, NBits) when PredID < ID ->
-  handle_pred_tell(PredID + round(math:pow(2, NBits)), ID, HeadID, SuccList, OwnSuccList, Pred, NBits).
+handle_pred_tell(_PredID, _ID, _HeadID, _NewSuccList, OwnSuccList, _Pred, _NBits) ->
+  OwnSuccList.
 
 update_successor_list(SuccessorList, NewElem, NBits) ->
   Cut = cut_last_element(SuccessorList, NBits),

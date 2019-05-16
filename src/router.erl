@@ -5,7 +5,7 @@
 
 %% API
 -export([start_link/0, show_table/0, local_lookup/1, update_finger_table/2, remote_lookup/2, lookup_for_join/1, notify_lost_node/1, show_id/0]).
--export([normalize_id/2, normalize_as_successor/1, normalize_as_predecessor/1]).
+-export([normalize_id/2, normalize_as_successor/1, normalize_as_predecessor/1, normalize_as_successor_including/1]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -70,6 +70,10 @@ notify_lost_node(Address) ->
 normalize_as_successor(ID) ->
   PID = naming_handler:get_identity(router),
   gen_server:call(PID, {normalize_succ, ID}).
+
+normalize_as_successor_including(ID) ->
+  PID = naming_handler:get_identity(router),
+  gen_server:call(PID, {normalize_succ_including, ID}).
 
 normalize_as_predecessor(ID) ->
   PID = naming_handler:get_identity(router),
@@ -143,6 +147,9 @@ handle_call({lost, Address}, _From, State) ->
 
 handle_call({normalize_succ, ID}, _From, State) ->
   {reply, adjust_successor(ID, State#state.id, State#state.nbits), State};
+
+handle_call({normalize_succ_including, ID}, _From, State) ->
+  {reply, adjust_successor_including(ID, State#state.id, State#state.nbits), State};
 
 handle_call({normalize_pred, ID}, _From, State) ->
   {reply, adjust_predecessor(ID, State#state.id, State#state.nbits), State};
@@ -289,6 +296,9 @@ check_if_next(_, _, _, _) ->
 
 adjust_successor(ID, OwnId, _NBits) when ID > OwnId -> ID;
 adjust_successor(ID, OwnId, NBits) -> adjust_successor(ID + round(math:pow(2, NBits)), OwnId, NBits).
+
+adjust_successor_including(ID, OwnId, _NBits) when ID >= OwnId -> ID;
+adjust_successor_including(ID, OwnId, NBits) -> adjust_successor_including(ID + round(math:pow(2, NBits)), OwnId, NBits).
 
 adjust_predecessor(ID, OwnId, _NBits) when not (ID > OwnId) -> ID;
 adjust_predecessor(ID, OwnId, NBits) -> adjust_predecessor(ID - round(math:pow(2, NBits)), OwnId, NBits).
