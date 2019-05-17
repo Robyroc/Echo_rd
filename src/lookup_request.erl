@@ -15,7 +15,7 @@
   code_change/3]).
 
 -define(LAST_TIMEOUT, 10000).
--define(TIMEOUT, 1500).
+-define(TIMEOUT, 1500).           %TODO tune this parameter accordingly
 -define(SERVER, ?MODULE).
 
 -record(state, {requested, from, list, type, time}).
@@ -111,7 +111,7 @@ handle_info(next, State) ->
   NewState = next_message(State),
   case NewState of
     terminate ->
-      statistics:notify_lookup_time(timeout),               %TODO deal with request not waiting enough.
+      statistics:notify_lookup_time(timeout),
       {stop, not_reachable, State};
     NS when ((NS#state.list =:= []) and (NS#state.type =:= succ)) ->
       erlang:send_after(?LAST_TIMEOUT, self(), next),
