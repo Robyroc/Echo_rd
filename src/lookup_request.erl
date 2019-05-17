@@ -14,8 +14,7 @@
   terminate/2,
   code_change/3]).
 
--define(LAST_TIMEOUT, 10000).
--define(TIMEOUT, 5000).           %TODO tune this parameter accordingly
+-define(TIMEOUT, 3000).           %TODO tune this parameter accordingly
 -define(SERVER, ?MODULE).
 
 -record(state, {requested, from, list, type, time}).
@@ -56,9 +55,8 @@ notify_lost_node(PID, Address) ->
 %%--------------------------------------------------------------------
 init([Requested, From, List, ListType]) ->
   Time = erlang:timestamp(),
-  CompressedList = remove_duplicates(List),
   erlang:send_after(10, self(), next),
-  {ok, #state{requested = Requested, from = From, list = CompressedList, type = ListType, time = Time}};
+  {ok, #state{requested = Requested, from = From, list = List, type = ListType, time = Time}};
 
 init(_) ->
   {stop, badarg}.
@@ -114,7 +112,8 @@ handle_info(next, State) ->
       statistics:notify_lookup_time(timeout),
       {stop, not_reachable, State};
     NS when ((NS#state.list =:= []) and (NS#state.type =:= succ)) ->
-      erlang:send_after(?LAST_TIMEOUT, self(), next),
+      Time = statistics:get_average_lookup_time(),
+      erlang:send_after(Time, self(), next),
       {noreply, NewState};
     _ ->
       erlang:send_after(?TIMEOUT, self(), next),
@@ -161,14 +160,9 @@ next_message(State) when ((State#state.list =:= []) and (State#state.type =:= su
 next_message(State) when ((State#state.list =:= []) and (State#state.type =:= finger)) ->
   List = stabilizer:get_successor_list(),
   AList = [X || {_, X} <- List],
-  CompressedList = remove_duplicates(AList),
-  next_message(State#state{list = CompressedList, type = succ});
+  next_message(State#state{list = AList, type = succ});
 
 next_message(State) ->
   Address = hd(State#state.list),
   communication_manager:send_message_async(lookup, [State#state.requested], Address, link_manager:get_own_address()),
   State#state{list = tl(State#state.list)}.
-
-remove_duplicates(Any) -> Any;    %Simply ignore remotion of duplicates
-remove_duplicates([]) -> [];
-remove_duplicates([H|T]) -> [H | [X || X <- remove_duplicates(T), X /= H]].

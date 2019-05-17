@@ -34,7 +34,8 @@ start_link() ->
 local_lookup(ID) ->
   PID = naming_handler:get_identity(router),
   Nbits = params_handler:get_param(nbits),
-  gen_server:call(PID, {lookup, ID}, Nbits*2000).                   %TODO tune timeout here accordingly
+  Time = statistics:get_average_lookup_time(),
+  gen_server:call(PID, {lookup, ID}, Nbits*3000 + Time).                   %TODO tune timeout here accordingly
 
 update_finger_table(Address, Theoretical) ->
   PID = naming_handler:get_identity(router),
@@ -125,15 +126,6 @@ handle_call({lost, Address}, _From, State) ->
   Time = erlang:timestamp(),
   {reply, ok, State#state{finger_table = NewTable, time = Time}};
 
-handle_call({normalize_succ, ID}, _From, State) ->
-  {reply, adjust_successor(ID, State#state.id, State#state.nbits), State};
-
-handle_call({normalize_succ_including, ID}, _From, State) ->
-  {reply, adjust_successor_including(ID, State#state.id, State#state.nbits), State};
-
-handle_call({normalize_pred, ID}, _From, State) ->
-  {reply, adjust_predecessor(ID, State#state.id, State#state.nbits), State};
-
 handle_call(Request, _From, State) ->
   unexpected:error("Router: Unexpected call message: ~p~n", [Request]),
   {reply, ok, State}.
@@ -209,7 +201,7 @@ handle_cast(Request, State) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_info(startup, _State) ->
-  naming_handler:wait_service(stabilizer),
+  naming_handler:wait_service(statistics),
   {SuccId, Succ} = stabilizer:get_successor(),
   ID = hash_f:get_hashed_addr(link_manager:get_own_address()),
   Nbits = params_handler:get_param(nbits),
@@ -276,9 +268,3 @@ check_if_next(_, _, _, _) ->
 
 adjust_successor(ID, OwnId, _NBits) when ID > OwnId -> ID;
 adjust_successor(ID, OwnId, NBits) -> adjust_successor(ID + round(math:pow(2, NBits)), OwnId, NBits).
-
-adjust_successor_including(ID, OwnId, _NBits) when ID >= OwnId -> ID;
-adjust_successor_including(ID, OwnId, NBits) -> adjust_successor_including(ID + round(math:pow(2, NBits)), OwnId, NBits).
-
-adjust_predecessor(ID, OwnId, _NBits) when not (ID > OwnId) -> ID;
-adjust_predecessor(ID, OwnId, NBits) -> adjust_predecessor(ID - round(math:pow(2, NBits)), OwnId, NBits).

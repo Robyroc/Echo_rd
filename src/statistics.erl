@@ -4,7 +4,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, gather/0, incoming_statistics/2, get_statistics/1, notify_join_time/1, notify_lookup_time/1, notify_finger_table_completion/1]).
+-export([start_link/0, gather/0, incoming_statistics/2, get_statistics/1, notify_join_time/1, notify_lookup_time/1, notify_finger_table_completion/1, get_average_lookup_time/0]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -15,8 +15,9 @@
   code_change/3]).
 
 -define(SERVER, ?MODULE).
+-define(SIZE, 51).
 
--record(state, {join_time, max_lookup_time, lookup_drop, ftable_timing}).
+-record(state, {join_time, max_lookup_time, lookup_drop, ftable_timing, lookup_times}).
 
 %%%===================================================================
 %%% API
@@ -57,6 +58,10 @@ notify_finger_table_completion(Time) ->
   PID = naming_handler:get_identity(statistics),
   gen_server:cast(PID, {finger_completion, Time}).
 
+get_average_lookup_time() ->
+  PID = naming_handler:get_identity(statistics),
+  gen_server:call(PID, avg_time).
+
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
@@ -66,7 +71,7 @@ notify_finger_table_completion(Time) ->
   {stop, Reason :: term()} | ignore).
 init([]) ->
   self() ! startup,
-  {ok, #state{max_lookup_time = 0, lookup_drop = 0, join_time = 0, ftable_timing = 0}}.
+  {ok, #state{max_lookup_time = 0, lookup_drop = 0, join_time = 0, ftable_timing = 0, lookup_times = [1000]}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -83,6 +88,10 @@ init([]) ->
   {noreply, NewState :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term(), Reply :: term(), NewState :: #state{}} |
   {stop, Reason :: term(), NewState :: #state{}}).
+handle_call(avg_time, _From, State) ->
+  Sum = lists:sum(State#state.lookup_times),
+  {reply, Sum div length(State#state.lookup_times), State};
+
 handle_call(Request, _From, State) ->
   lager:error("STATISTICS: Unexpected call message: ~p~n", [Request]),
   {reply, ok, State}.
@@ -127,13 +136,16 @@ handle_cast({join_time, Time}, State) ->
   {noreply, State#state{join_time = Time}};
 
 handle_cast({lookup_time, timeout}, State) ->
-  {noreply, State#state{lookup_drop = State#state.lookup_drop + 1}};
+  NewList = lists:map(fun(X) -> X * 2 end, State#state.lookup_times),
+  {noreply, State#state{lookup_drop = State#state.lookup_drop + 1, lookup_times = NewList}};
 
 handle_cast({lookup_time, Time}, State) when Time > State#state.max_lookup_time ->
-  {noreply, State#state{max_lookup_time = Time}};
+  NewList = add_time(Time, State#state.lookup_times),
+  {noreply, State#state{max_lookup_time = Time, lookup_times = NewList}};
 
-handle_cast({lookup_time, _Time}, State) ->
-  {noreply, State};
+handle_cast({lookup_time, Time}, State) ->
+  NewList = add_time(Time, State#state.lookup_times),
+  {noreply, State#state{lookup_times = NewList}};
 
 handle_cast({finger_completion, Time}, State) ->
   {noreply, State#state{ftable_timing = Time}};
@@ -188,3 +200,9 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+
+add_time(Time, List) ->
+  case length([Time | List]) of
+    ?SIZE -> [Time | lists:reverse(tl(lists:reverse(List)))];
+    _ -> [Time | List]
+  end.
