@@ -169,5 +169,6 @@ next_message(State) ->
   communication_manager:send_message_async(lookup, [State#state.requested], Address, link_manager:get_own_address()),
   State#state{list = tl(State#state.list)}.
 
+remove_duplicates(Any) -> Any;    %Simply ignore remotion of duplicates
 remove_duplicates([]) -> [];
 remove_duplicates([H|T]) -> [H | [X || X <- remove_duplicates(T), X /= H]].
