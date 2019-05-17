@@ -147,8 +147,7 @@ handle_info(Info, State) ->
 %% @spec terminate(Reason, State) -> void()
 %% @end
 %%--------------------------------------------------------------------
-terminate(_Reason, State) ->
-  gen_tcp:close(State#state.socket),
+terminate(_Reason, _State) ->
   ok.
 
 %%--------------------------------------------------------------------
