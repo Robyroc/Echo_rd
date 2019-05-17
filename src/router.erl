@@ -5,7 +5,6 @@
 
 %% API
 -export([start_link/0, show_table/0, local_lookup/1, update_finger_table/2, remote_lookup/2, lookup_for_join/1, notify_lost_node/1, show_id/0]).
--export([normalize_id/2, normalize_as_successor/1, normalize_as_predecessor/1, normalize_as_successor_including/1]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -56,28 +55,9 @@ show_id() ->
   PID = naming_handler:get_identity(router),
   gen_server:call(PID, show_id).
 
-normalize_id(ID, NBits) ->
-  ActualID = ID rem round(math:pow(2, NBits)),
-  case ActualID of
-    _ when ActualID >= 0 -> ActualID;
-    _ when ActualID < 0 -> ActualID + round(math:pow(2, NBits))
-  end.
-
 notify_lost_node(Address) ->
   PID = naming_handler:get_identity(router),
   gen_server:call(PID, {lost, Address}).
-
-normalize_as_successor(ID) ->
-  PID = naming_handler:get_identity(router),
-  gen_server:call(PID, {normalize_succ, ID}).
-
-normalize_as_successor_including(ID) ->
-  PID = naming_handler:get_identity(router),
-  gen_server:call(PID, {normalize_succ_including, ID}).
-
-normalize_as_predecessor(ID) ->
-  PID = naming_handler:get_identity(router),
-  gen_server:call(PID, {normalize_pred, ID}).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -113,7 +93,7 @@ handle_call(show_id, _From, State) ->
   {reply, State#state.id, State};
 
 handle_call({lookup, Requested}, From, State) ->
-  ActualRequested = normalize_id(Requested, State#state.nbits),
+  ActualRequested = normalizer:normalize_id(Requested, State#state.nbits),
   {SuccID, Succ} = stabilizer:get_successor(),
   case logging_policies:check_policy(?MODULE) of
     able ->

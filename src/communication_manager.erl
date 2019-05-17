@@ -320,7 +320,7 @@ forward(_, _, _) -> {[], fun() -> ok end}.
 
 encode_ID(ID, NBits) ->
   NBytes = ceil(NBits / 8),
-  ActualID = router:normalize_id(ID, NBits),
+  ActualID = normalizer:normalize_id(ID, NBits),
   <<ActualID:(NBytes * 8)/integer>>.
 
 decode_ID(Bin) -> decode_ID(Bin, 0).

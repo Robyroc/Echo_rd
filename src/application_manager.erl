@@ -107,7 +107,7 @@ hash_name(Name) ->
     no_name_registered -> out_of_network;
     _ ->
       naming_handler:wait_service(router),
-      router:normalize_as_predecessor(hash_f:get_hashed_name(Name))
+      normalizer:normalize_as_predecessor(hash_f:get_hashed_name(Name))
   end.
 
 get_successor_list() ->

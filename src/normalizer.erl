@@ -1,10 +1,22 @@
--module(lookup_request).
--author("robyroc").
+%%%-------------------------------------------------------------------
+%%% @author mrbo9
+%%% @copyright (C) 2019, <COMPANY>
+%%% @doc
+%%%
+%%% @end
+%%% Created : 17. May 2019 10:42
+%%%-------------------------------------------------------------------
+-module(normalizer).
+-author("mrbo9").
 
 -behaviour(gen_server).
 
 %% API
--export([start_link/4, respond/2, notify_lost_node/2]).
+-export([start_link/0,
+  normalize_id/2,
+  normalize_as_successor/1,
+  normalize_as_successor_including/1,
+  normalize_as_predecessor/1]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -14,11 +26,9 @@
   terminate/2,
   code_change/3]).
 
--define(LAST_TIMEOUT, 10000).
--define(TIMEOUT, 1500).
 -define(SERVER, ?MODULE).
 
--record(state, {requested, from, list, type, time}).
+-record(state, {nbits, id}).
 
 %%%===================================================================
 %%% API
@@ -30,14 +40,27 @@
 %%
 %% @end
 %%--------------------------------------------------------------------
-start_link(Requested, From, List, ListType) ->
-  gen_server:start_link(?MODULE, [Requested, From, List, ListType], []).
+start_link() ->
+  gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
-respond(PID, Address) ->
-  gen_server:cast(PID, {response, Address}).
+normalize_id(ID, NBits) ->
+  ActualID = ID rem round(math:pow(2, NBits)),
+  case ActualID of
+    _ when ActualID >= 0 -> ActualID;
+    _ when ActualID < 0 -> ActualID + round(math:pow(2, NBits))
+  end.
 
-notify_lost_node(PID, Address) ->
-  gen_server:call(PID, {lost, Address}).
+normalize_as_successor(ID) ->
+  PID = naming_handler:get_identity(normalizer),
+  gen_server:call(PID, {normalize_succ, ID}).
+
+normalize_as_successor_including(ID) ->
+  PID = naming_handler:get_identity(normalizer),
+  gen_server:call(PID, {normalize_succ_including, ID}).
+
+normalize_as_predecessor(ID) ->
+  PID = naming_handler:get_identity(normalizer),
+  gen_server:call(PID, {normalize_pred, ID}).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -54,14 +77,9 @@ notify_lost_node(PID, Address) ->
 %%                     {stop, Reason}
 %% @end
 %%--------------------------------------------------------------------
-init([Requested, From, List, ListType]) ->
-  Time = erlang:timestamp(),
-  CompressedList = remove_duplicates(List),
-  erlang:send_after(10, self(), next),
-  {ok, #state{requested = Requested, from = From, list = CompressedList, type = ListType, time = Time}};
-
-init(_) ->
-  {stop, badarg}.
+init([]) ->
+  self() ! startup,
+  {ok, #state{}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -70,13 +88,17 @@ init(_) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
-handle_call({lost, Address}, _From, State) ->
-  List = State#state.list,
-  CleanedList = [X || X <- List, X =/= Address],
-  {reply, ok, State#state{list = CleanedList}};
+handle_call({normalize_succ, ID}, _From, State) ->
+  {reply, adjust_successor(ID, State#state.id, State#state.nbits), State};
+
+handle_call({normalize_succ_including, ID}, _From, State) ->
+  {reply, adjust_successor_including(ID, State#state.id, State#state.nbits), State};
+
+handle_call({normalize_pred, ID}, _From, State) ->
+  {reply, adjust_predecessor(ID, State#state.id, State#state.nbits), State};
 
 handle_call(Request, _From, State) ->
-  unexpected:error("Request: Unexpected call message: ~p~n", [Request]),
+  unexpected:error("Normalizer: Unexpected call message: ~p~n", [Request]),
   {reply, ok, State}.
 
 %%--------------------------------------------------------------------
@@ -86,15 +108,8 @@ handle_call(Request, _From, State) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
-handle_cast({response, Address}, State) ->
-  Time = erlang:timestamp(),
-  Diff = timer:now_diff(Time, State#state.time) div 1000,
-  statistics:notify_lookup_time(Diff),
-  gen_server:reply(State#state.from, {found, Address}),
-  {stop, normal, State};
-
 handle_cast(Request, State) ->
-  unexpected:error("Request: Unexpected cast message: ~p~n", [Request]),
+  unexpected:error("Normalizer: Unexpected cast message: ~p~n", [Request]),
   {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -107,22 +122,15 @@ handle_cast(Request, State) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_info(next, State) ->
-  NewState = next_message(State),
-  case NewState of
-    terminate ->
-      statistics:notify_lookup_time(timeout),               %TODO deal with request not waiting enough.
-      {stop, not_reachable, State};
-    NS when ((NS#state.list =:= []) and (NS#state.type =:= succ)) ->
-      erlang:send_after(?LAST_TIMEOUT, self(), next),
-      {noreply, NewState};
-    _ ->
-      erlang:send_after(?TIMEOUT, self(), next),
-      {noreply, NewState}
-  end;
+handle_info(startup, State) ->
+  naming_handler:wait_service(hash_f),
+  ID = hash_f:get_hashed_addr(link_manager:get_own_address()),
+  NBits = params_handler:get_param(nbits),
+  naming_handler:notify_identity(self(), normalizer),
+  {noreply, State#state{nbits = NBits, id = ID}};
 
 handle_info(Info, State) ->
-  unexpected:error("Request: Unexpected ! message: ~p~n", [Info]),
+  unexpected:error("Normalizer: Unexpected ! message: ~p~n", [Info]),
   {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -154,20 +162,11 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
+adjust_successor(ID, OwnId, _NBits) when ID > OwnId -> ID;
+adjust_successor(ID, OwnId, NBits) -> adjust_successor(ID + round(math:pow(2, NBits)), OwnId, NBits).
 
-next_message(State) when ((State#state.list =:= []) and (State#state.type =:= succ)) ->
-  terminate;
+adjust_successor_including(ID, OwnId, _NBits) when ID >= OwnId -> ID;
+adjust_successor_including(ID, OwnId, NBits) -> adjust_successor_including(ID + round(math:pow(2, NBits)), OwnId, NBits).
 
-next_message(State) when ((State#state.list =:= []) and (State#state.type =:= finger)) ->
-  List = stabilizer:get_successor_list(),
-  AList = [X || {_, X} <- List],
-  CompressedList = remove_duplicates(AList),
-  next_message(State#state{list = CompressedList, type = succ});
-
-next_message(State) ->
-  Address = hd(State#state.list),
-  communication_manager:send_message_async(lookup, [State#state.requested], Address, link_manager:get_own_address()),
-  State#state{list = tl(State#state.list)}.
-
-remove_duplicates([]) -> [];
-remove_duplicates([H|T]) -> [H | [X || X <- remove_duplicates(T), X /= H]].
+adjust_predecessor(ID, OwnId, _NBits) when not (ID > OwnId) -> ID;
+adjust_predecessor(ID, OwnId, NBits) -> adjust_predecessor(ID - round(math:pow(2, NBits)), OwnId, NBits).

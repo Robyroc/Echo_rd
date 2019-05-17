@@ -123,8 +123,8 @@ handle_call(Request, _From, State) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_cast({stabilize_response, Predecessor, NewSuccList}, State) ->
-  PredIndex = router:normalize_as_successor_including(hash_f:get_hashed_addr(Predecessor)),
-  HeadIndex = router:normalize_as_successor(hd([I || {I, _} <- State#state.succ_list])),
+  PredIndex = normalizer:normalize_as_successor_including(hash_f:get_hashed_addr(Predecessor)),
+  HeadIndex = normalizer:normalize_as_successor(hd([I || {I, _} <- State#state.succ_list])),
   #state{succ_list = OwnSuccessorList, id = ID, nbits = NBits} = State,
   NewSuccessorList = handle_pred_tell(PredIndex, ID, HeadIndex, NewSuccList, OwnSuccessorList, Predecessor, NBits),
   {noreply, State#state{counter = 0, succ_list = NewSuccessorList}};
