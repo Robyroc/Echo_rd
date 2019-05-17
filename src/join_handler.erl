@@ -130,7 +130,6 @@ start_link(Pid) ->
 %% @end
 %%--------------------------------------------------------------------
 init([Pid]) ->
-  Nome = "joiner" ++
   lager_app:configure_sink(
 
     lagerConsole_lager_event,
