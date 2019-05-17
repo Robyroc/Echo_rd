@@ -242,7 +242,7 @@ look(EventType, EventContent, Session) ->
   ok = handle(look, look),
   handle_generic_event({EventType, EventContent, Session}).
 
-pre_join(cast, {info,Address, Res, Succ, Nbits}, Session) ->
+pre_join(cast, {info, Address, Res, Succ, Nbits}, Session) ->
   ok = handle(pre_join, j_ready),
   SuccAddr = Session#session.succ_addr,
   case Address of

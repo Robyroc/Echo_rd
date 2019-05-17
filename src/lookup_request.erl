@@ -15,7 +15,7 @@
   code_change/3]).
 
 -define(LAST_TIMEOUT, 10000).
--define(TIMEOUT, 1500).           %TODO tune this parameter accordingly
+-define(TIMEOUT, 5000).           %TODO tune this parameter accordingly
 -define(SERVER, ?MODULE).
 
 -record(state, {requested, from, list, type, time}).
