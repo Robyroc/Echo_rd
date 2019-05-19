@@ -186,7 +186,9 @@ handle_info(stabilize, State) ->
       communication_manager:send_message_async(ask_pred, [], Successor, no_alias),
       erlang:send_after(get_timing(State), self(), stabilize),
       {noreply, State#state{last_sent = erlang:timestamp()}};
-    _ -> {noreply, State#state{fail_counter = State#state.fail_counter + 1}}
+    _ ->
+      erlang:send_after(get_timing(State), self(), stabilize),
+      {noreply, State#state{fail_counter = State#state.fail_counter + 1}}
   end;
 
 handle_info(Info, State) ->
