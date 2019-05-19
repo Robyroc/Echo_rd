@@ -257,4 +257,5 @@ add_time(Time, List) ->
 
 get_timing(State) ->
   Sum = lists:sum(State#state.times),
-  (Sum div length(State#state.times)) * ?MULT.
+  AvgTime = (Sum div length(State#state.times)) * ?MULT,
+  max(AvgTime, ?INTERVAL).
