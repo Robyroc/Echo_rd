@@ -306,14 +306,16 @@ j_ready(EventType, EventContent, Session) ->
 
 init_provider(cast, {ready_for_info, Address}, Session) ->
   PredecessorID = checker:get_pred_id(),
-  JoinerID = adjust_predecessor(hash_f:get_hashed_addr(Address), hash_f:get_hashed_addr(link_manager:get_own_address()), Session#session.nbits),
+  OwnId = hash_f:get_hashed_addr(link_manager:get_own_address()),
+  JoinerID = adjust_predecessor(hash_f:get_hashed_addr(Address), OwnId, Session#session.nbits),
+  SelfAsPredecessor = adjust_predecessor(OwnId, OwnId, Session#session.nbits),
   case JoinerID of
-    _ when JoinerID < PredecessorID ->
-      communication_manager:send_message_async(abort, ["Not updated"],Address, no_alias),
+    SelfAsPredecessor ->
+      communication_manager:send_message_async(abort, ["Used ID"],Address, no_alias),
       handle(init_provider, init_provider),
       {keep_state, Session};
-    _ when JoinerID =:= PredecessorID ->
-      communication_manager:send_message_async(abort, ["Used ID"],Address, no_alias),
+    _ when JoinerID < PredecessorID ->
+      communication_manager:send_message_async(abort, ["Not updated"],Address, no_alias),
       handle(init_provider, init_provider),
       {keep_state, Session};
     _ when JoinerID > PredecessorID ->
@@ -348,8 +350,14 @@ init_provider(EventType, EventContent, Session) ->
 not_alone(cast, {ready_for_info, Address}, Session) ->
   ok = handle(not_alone, not_alone),
   CurrID = Session#session.curr_id,
-  JoinerID = adjust_predecessor(hash_f:get_hashed_addr(Address), hash_f:get_hashed_addr(link_manager:get_own_address()), Session#session.nbits),
+  OwnId = hash_f:get_hashed_addr(link_manager:get_own_address()),
+  JoinerID = adjust_predecessor(hash_f:get_hashed_addr(Address), OwnId, Session#session.nbits),
+  SelfAsPredecessor = adjust_predecessor(OwnId, OwnId, Session#session.nbits),
   case JoinerID of
+    SelfAsPredecessor ->
+      communication_manager:send_message_async(abort, ["Used ID"],Address, no_alias),
+      handle(init_provider, init_provider),
+      {keep_state, Session};
     _ when JoinerID =< CurrID ->
       communication_manager:send_message_async(abort, ["No priority"],Address, no_alias),
       {keep_state, Session};
