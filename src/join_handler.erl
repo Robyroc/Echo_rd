@@ -252,6 +252,13 @@ pre_join(cast, {info, Address, Res, Succ, Nbits}, Session) ->
     _ -> {keep_state, Session, [{state_timeout, ?INTERVAL, hard_stop}]}
   end;
 
+pre_join(cast, {abort, "Used ID"}, Session) ->
+  ok = handle(pre_join, init_joiner),
+  lager:error(" -- JOIN ABORTED -- Reason of abort: Used ID~n"),
+  link_shutdown(),
+  gen_statem:reply(Session#session.app_mngr, fail),
+  {next_state, init_joiner, reset_session(Session)};
+
 pre_join(cast, {abort, Reason}, Session) ->
   ok = handle(pre_join, look),
   %joinerLager:error(" -- JOIN ABORTED -- Reason of abort: ~p~n", [Reason]),
@@ -301,8 +308,12 @@ init_provider(cast, {ready_for_info, Address}, Session) ->
   PredecessorID = checker:get_pred_id(),
   JoinerID = adjust_predecessor(hash_f:get_hashed_addr(Address), hash_f:get_hashed_addr(link_manager:get_own_address()), Session#session.nbits),
   case JoinerID of
-    _ when JoinerID =< PredecessorID ->
+    _ when JoinerID < PredecessorID ->
       communication_manager:send_message_async(abort, ["Not updated"],Address, no_alias),
+      handle(init_provider, init_provider),
+      {keep_state, Session};
+    _ when JoinerID =:= PredecessorID ->
+      communication_manager:send_message_async(abort, ["Used ID"],Address, no_alias),
       handle(init_provider, init_provider),
       {keep_state, Session};
     _ when JoinerID > PredecessorID ->
@@ -337,7 +348,7 @@ init_provider(EventType, EventContent, Session) ->
 not_alone(cast, {ready_for_info, Address}, Session) ->
   ok = handle(not_alone, not_alone),
   CurrID = Session#session.curr_id,
-  JoinerID = hash_f:get_hashed_addr(Address),
+  JoinerID = adjust_predecessor(hash_f:get_hashed_addr(Address), hash_f:get_hashed_addr(link_manager:get_own_address()), Session#session.nbits),
   case JoinerID of
     _ when JoinerID =< CurrID ->
       communication_manager:send_message_async(abort, ["No priority"],Address, no_alias),
