@@ -130,24 +130,30 @@ start_link(Pid) ->
 %% @end
 %%--------------------------------------------------------------------
 init([Pid]) ->
-  lager_app:configure_sink(
+%%%%  {ok, Directory} = file:get_cwd(),
+%%%%  ResPath = Directory ++ "/" ++ integer_to_list(port) ++ "_resources",
+%%  A = naming_handler:get_identity(port),
+%%  io:format("################ ~p #######################~n", [A]),
+%%  lager_app:configure_sink(
+%%
+%%    lagerConsole_lager_event,
+%%      [{handlers,
+%%        [
+%%          {lager_console_backend, [{level, info}]}
+%%        ]
+%%      }]
+%%  ),
+%%  lager_app:configure_sink(
+%%    joinerLager_lager_event,
+%%      [{handlers,
+%%        [
+%%          {lager_console_backend, [{level, error}]},
+%%          {lager_file_backend, [{file, A}, {level, info}, {formatter, lager_default_formatter},
+%%            {formatter_config, [time," [",severity,"] ",pid, " ", message, "\n"]}]}
+%%        ]
+%%      }]
 
-    lagerConsole_lager_event,
-      [{handlers,
-        [
-          {lager_console_backend, [{level, info}]}
-        ]
-      }]
-  ),
-  lager_app:configure_sink(
-    joinerLager_lager_event,
-      [{handlers,
-        [
-          {lager_console_backend, [{level, error}]},
-          {lager_file_backend, [{file, "joiner.log"}, {level, info}, {formatter, lager_default_formatter},
-            {formatter_config, [time," [",severity,"] ",pid, " ", message, "\n"]}]}
-        ]
-      }]
+
 
 %%    },
 %%
@@ -159,7 +165,7 @@ init([Pid]) ->
 %%            {formatter_config, [time," [",severity,"] ",pid, " ", message, "\n"]}]}
 %%        ]
 %%      }]
-    ),
+ %%   ),
   naming_handler:notify_identity(self(), join_handler),
   ok = handle(init,init_joiner),
   {ok, init_joiner, #session{provider_addr = undefined, succ_addr = undefined,
