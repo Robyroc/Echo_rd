@@ -16,6 +16,7 @@
 
 -define(TIMEOUT, 3000).           %TODO tune this parameter accordingly
 -define(SERVER, ?MODULE).
+-define(MIN_WAIT_TIME, 10000).
 
 -record(state, {requested, from, list, type, time}).
 
@@ -113,7 +114,7 @@ handle_info(next, State) ->
       {stop, not_reachable, State};
     NS when ((NS#state.list =:= []) and (NS#state.type =:= succ)) ->
       Time = statistics:get_average_lookup_time(),
-      erlang:send_after(Time, self(), next),
+      erlang:send_after(max(Time,?MIN_WAIT_TIME), self(), next),
       {noreply, NewState};
     _ ->
       erlang:send_after(?TIMEOUT, self(), next),
