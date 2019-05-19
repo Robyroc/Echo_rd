@@ -176,10 +176,10 @@ handle_info(stabilize, State) when State#state.fail_counter > ?THRESHOLD ->
       OwnAddress = link_manager:get_own_address(),
       AdjOwnId = adjust_successor(State#state.id, State#state.id, State#state.nbits),
       self() ! stabilize,
-      {noreply, State#state{fail_counter = 0, succ_list = [{AdjOwnId, OwnAddress}]}};
+      {noreply, State#state{fail_counter = 0, succ_list = [{AdjOwnId, OwnAddress}], last_sent = not_sent}};
     _ ->
       self() ! stabilize,
-      {noreply, State#state{fail_counter = 0, succ_list = tl(State#state.succ_list)}}
+      {noreply, State#state{fail_counter = 0, succ_list = tl(State#state.succ_list), last_sent = not_sent}}
   end;
 
 handle_info(stabilize, State) ->
