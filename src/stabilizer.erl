@@ -124,6 +124,9 @@ handle_call(Request, _From, State) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
+handle_cast({stabilize_response, _Predecessor, _NewSuccList}, State) when State#state.last_sent =:= not_sent ->
+  {noreply, State};
+
 handle_cast({stabilize_response, Predecessor, NewSuccList}, State) ->
   PredIndex = normalizer:normalize_as_successor_including(hash_f:get_hashed_addr(Predecessor)),
   HeadIndex = normalizer:normalize_as_successor(hd([I || {I, _} <- State#state.succ_list])),
