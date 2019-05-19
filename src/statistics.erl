@@ -4,7 +4,14 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, gather/0, incoming_statistics/2, get_statistics/1, notify_join_time/1, notify_lookup_time/1, notify_finger_table_completion/1, get_average_lookup_time/0]).
+-export([start_link/0,
+  gather/0,
+  incoming_statistics/2,
+  get_statistics/1,
+  notify_join_time/1,
+  notify_lookup_time/1,
+  notify_finger_table_completion/1,
+  get_average_lookup_time/0]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -60,7 +67,7 @@ notify_finger_table_completion(Time) ->
 
 get_average_lookup_time() ->
   PID = naming_handler:get_identity(statistics),
-  gen_server:call(PID, avg_time).
+  gen_server:call(PID, avg_lookup_time).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -88,7 +95,7 @@ init([]) ->
   {noreply, NewState :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term(), Reply :: term(), NewState :: #state{}} |
   {stop, Reason :: term(), NewState :: #state{}}).
-handle_call(avg_time, _From, State) ->
+handle_call(avg_lookup_time, _From, State) ->
   Sum = lists:sum(State#state.lookup_times),
   {reply, Sum div length(State#state.lookup_times), State};
 
