@@ -111,7 +111,7 @@ handle_call({send, {Port, IP}, Message}, _From, State) ->
   send(Port, IP, Message, State, Size);
 
 handle_call(Request, _From, State) ->
-  case logging_policies:check_policy(?MODULE) of
+  case logging_policies:check_lager_policy(?MODULE) of
     lager_on -> lager:error("LM: Unexpected call message: ~p~n", [Request]);
     _ -> ok
   end,
@@ -141,7 +141,7 @@ handle_cast({new_connection, Socket}, State) ->
   end;
 
 handle_cast(Request, State) ->
-  case logging_policies:check_policy(?MODULE) of
+  case logging_policies:check_lager_policy(?MODULE) of
     lager_on -> lager:error("LM: Unexpected cast message: ~p~n", [Request]);
     _ -> ok
   end,
@@ -168,7 +168,7 @@ handle_info({'DOWN', Monitor, process, _PID, tcp_closed}, State) ->
 
 handle_info({'DOWN', Monitor, process, _PID, Reason}, State) ->
   Present = [X || {_, X, M} <- State#state.connections, M =:= Monitor],
-  case logging_policies:check_policy(?MODULE) of
+  case logging_policies:check_lager_policy(?MODULE) of
     lager_on -> lager:error("LM: A handler failed: Address: ~p~nReason: ~p~n", [hd(Present), Reason]);
     _ -> ok
   end,
@@ -187,7 +187,7 @@ handle_info(startup, _State) ->
   {noreply, #state{connections = []}};
 
 handle_info(Info, State) ->
-  case logging_policies:check_policy(?MODULE) of
+  case logging_policies:check_lager_policy(?MODULE) of
     lager_on -> lager:error("LM: Unexpected ! message: ~p~n", [Info]);
     _ -> ok
   end,

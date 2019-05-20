@@ -254,7 +254,7 @@ pre_join(cast, {info,Address, Res, Succ, Nbits}, Session) ->
 
 pre_join(cast, {abort, Reason}, Session) ->
   ok = handle(pre_join, look),
-  case logging_policies:check_policy(?MODULE) of
+  case logging_policies:check_lager_policy(?MODULE) of
     lager_on -> lager:error(" -- JOIN ABORTED -- Reason of abort: ~p~n", [Reason]);
     _ -> ok
   end,
@@ -281,7 +281,7 @@ j_ready(cast, {ack_join, _Address}, Session) ->
 
 j_ready(cast, {abort, Reason}, Session) ->
   ok = handle(j_ready, look),
-  case logging_policies:check_policy(?MODULE) of
+  case logging_policies:check_lager_policy(?MODULE) of
     lager_on -> lager:error("Reason of abort: ~p~n", [Reason]);
     _-> ok
   end,
@@ -473,7 +473,7 @@ code_change(_OldVsn, StateName, State, _Extra) ->
 %%%===================================================================
 
 handle(From, To) ->
-  case logging_policies:check_policy(?MODULE) of
+  case logging_policies:check_lager_policy(?MODULE) of
     lager_on ->
       case logging_policies:check_policy(?MODULE) of
         able ->
@@ -486,7 +486,7 @@ handle(From, To) ->
   end.
 
 handle_generic_event({EventType, EventContent, Session}) ->
-  case logging_policies:check_policy(?MODULE) of
+  case logging_policies:check_lager_policy(?MODULE) of
     lager_on ->
       lager:error("Event abnormal: ~p | ~p~n", [EventType, EventContent]);
     _ -> ok

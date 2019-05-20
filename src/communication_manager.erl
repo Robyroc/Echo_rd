@@ -98,7 +98,7 @@ init([]) ->
 %%--------------------------------------------------------------------
 
 handle_call({send_msg, Method, Params, Address, Alias}, _From, State) ->
-  case logging_policies:check_policy(?MODULE) of
+  case logging_policies:check_lager_policy(?MODULE) of
     lager_on ->
       case logging_policies:check_policy(?MODULE) of
         able_lager -> inout:info("### OUT ###: Method:~p | Params:~p | Address:~p \n", [Method, Params, Address]);
@@ -121,7 +121,7 @@ handle_call({get_nbits, NBits}, _From, State) ->
   {reply, ok, State#state{nbits = NBits}};
 
 handle_call(Request, _From, State) ->
-  case logging_policies:check_policy(?MODULE) of
+  case logging_policies:check_lager_policy(?MODULE) of
     lager_on -> lager:error("CM: Unexpected call message: ~p~n", [Request]);
     _ -> ok
   end,
@@ -141,7 +141,7 @@ handle_cast({send_msg, Method, Params, Address, Alias}, State) ->
     leave_info -> ok;
     command -> ok;
     _ ->
-      case logging_policies:check_policy(?MODULE) of
+      case logging_policies:check_lager_policy(?MODULE) of
         lager_on ->
           case logging_policies:check_policy(?MODULE) of
             able ->
@@ -170,7 +170,7 @@ handle_cast({rcv_msg, Method, Address, Params}, State) ->
     leave_info -> ok;
     command -> ok;
     _ ->
-      case logging_policies:check_policy(?MODULE) of
+      case logging_policies:check_lager_policy(?MODULE) of
         lager_on ->
           case logging_policies:check_policy(?MODULE) of
             able ->
@@ -186,7 +186,7 @@ handle_cast({rcv_msg, Method, Address, Params}, State) ->
   {noreply,State};
 
 handle_cast(Request, State) ->
-  case logging_policies:check_policy(?MODULE) of
+  case logging_policies:check_lager_policy(?MODULE) of
     lager_on -> lager:error("CM: Unexpected cast message: ~p~n", [Request]);
     _ -> ok
   end,
@@ -204,7 +204,7 @@ handle_cast(Request, State) ->
 %%--------------------------------------------------------------------
 
 handle_info(Info, State) ->
-  case logging_policies:check_policy(?MODULE) of
+  case logging_policies:check_lager_policy(?MODULE) of
     lager_on -> lager:error("CM: Unexpected ! message: ~p~n", [Info]);
     _ -> ok
   end,

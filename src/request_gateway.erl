@@ -86,7 +86,7 @@ handle_call({lost, Address}, _From, State) ->
   {reply, ok, State};
 
 handle_call(Request, _From, State) ->
-  case logging_policies:check_policy(?MODULE) of
+  case logging_policies:check_lager_policy(?MODULE) of
     lager_on -> lager:error("R. Gateway: Unexpected call message: ~p~n", [Request]);
     _ -> ok
   end,
@@ -104,7 +104,7 @@ handle_cast({response, Requested, Address}, State) ->
   {noreply, State};
 
 handle_cast(Request, State) ->
-  case logging_policies:check_policy(?MODULE) of
+  case logging_policies:check_lager_policy(?MODULE) of
     lager_on -> lager:error("R. Gateway: Unexpected cast message: ~p~n", [Request]);
     _ -> ok
   end,
@@ -129,14 +129,14 @@ handle_info({'DOWN', Monitor, process, _PID, normal}, State) ->
 
 handle_info({'DOWN', Monitor, process, _PID, Reason}, State) ->
   Present = [X || {_, X, M} <- State#state.requests, M =:= Monitor],
-  case logging_policies:check_policy(?MODULE) of
+  case logging_policies:check_lager_policy(?MODULE) of
     lager_on -> lager:error("R. Gateway: A request failed: Requested: ~p~nReason: ~p~n", [hd(Present), Reason]);
     _ -> ok
   end,
   {noreply, #state{requests = [{P, R, M} || {P, R, M} <- State#state.requests, M =/= Monitor]}};
 
 handle_info(Info, State) ->
-  case logging_policies:check_policy(?MODULE) of
+  case logging_policies:check_lager_policy(?MODULE) of
     lager_on -> lager:error("R. Gateway: Unexpected ! message: ~p~n", [Info]);
     _ -> ok
   end,

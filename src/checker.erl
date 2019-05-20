@@ -96,7 +96,7 @@ handle_call({set_pred, Address}, _From, State) ->
   {reply, ok, State#state{pred = Address, pred_id = ID}};
 
 handle_call(Request, _From, State) ->
-  case logging_policies:check_policy(?MODULE) of
+  case logging_policies:check_lager_policy(?MODULE) of
     lager_on -> lager:error("CHECKER: Unexpected call message: ~p~n", [Request]);
     _ -> ok
   end,
@@ -126,7 +126,7 @@ handle_cast({pred_find, Address}, State) ->
     Predecessor ->
       Index = hash_f:get_hashed_addr(Address),
       #state{pred = Predecessor, pred_id = PredID, own_id = OwnID, n_bits = NBits} = State,
-      case logging_policies:check_policy(?MODULE) of
+      case logging_policies:check_lager_policy(?MODULE) of
         lager_on ->
           case logging_policies:check_policy(?MODULE) of
             able ->
@@ -151,7 +151,7 @@ handle_cast({pred_find, Address}, State) ->
   end;
 
 handle_cast(Request, State) ->
-  case logging_policies:check_policy(?MODULE) of
+  case logging_policies:check_lager_policy(?MODULE) of
     lager_on -> lager:error("CHECKER: Unexpected cast message: ~p~n", [Request]);
     _ -> ok
   end,
@@ -181,7 +181,7 @@ handle_info(timeout, State) ->
   {noreply, State#state{pred = nil, pred_id = nil}};
 
 handle_info(Info, State) ->
-  case logging_policies:check_policy(?MODULE) of
+  case logging_policies:check_lager_policy(?MODULE) of
     lager_on -> lager:error("CHECKER: Unexpected ! message: ~p~n", [Info]);
     _ -> ok
   end,

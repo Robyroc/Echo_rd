@@ -84,7 +84,7 @@ init([]) ->
   {stop, Reason :: term(), Reply :: term(), NewState :: #state{}} |
   {stop, Reason :: term(), NewState :: #state{}}).
 handle_call(Request, _From, State) ->
-  case logging_policies:check_policy(?MODULE) of
+  case logging_policies:check_lager_policy(?MODULE) of
     lager_on -> lager:error("STATISTICS: Unexpected call message: ~p~n", [Request]);
     _ -> ok
   end,
@@ -107,7 +107,7 @@ handle_cast(gather, State) ->
 handle_cast({show_stats, Address, Stats}, State) ->
   {JoinTime, HighLookupTime, LookupDrop, FtableTimings} = Stats,
   ID = hash_f:get_hashed_addr(Address),
-  case logging_policies:check_policy(?MODULE) of
+  case logging_policies:check_lager_policy(?MODULE) of
     lager_on ->
       lager:info("^^^^^ STATS ^^^^^~n ID: ~p~n IP: ~p~n Join time: ~p~n
       Highest lookup time: ~p~n Number of lookup timeouts: ~p~n FTable last refresh timings: ~p~n~n",
@@ -147,7 +147,7 @@ handle_cast({finger_completion, Time}, State) ->
   {noreply, State#state{ftable_timing = Time}};
 
 handle_cast(Request, State) ->
-  case logging_policies:check_policy(?MODULE) of
+  case logging_policies:check_lager_policy(?MODULE) of
     lager_on -> lager:error("STATISTICS: Unexpected cast message: ~p~n", [Request]);
     _ -> ok
   end,
@@ -163,7 +163,7 @@ handle_info(startup, State) ->
   {noreply, State};
 
 handle_info(Info, State) ->
-  case logging_policies:check_policy(?MODULE) of
+  case logging_policies:check_lager_policy(?MODULE) of
     lager_on -> lager:error("STATISTICS: Unexpected ! message: ~p~n", [Info]);
     _ -> ok
   end,

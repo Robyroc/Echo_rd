@@ -111,7 +111,7 @@ handle_call(turn_on, _From, _State) ->
   {reply, ok, #state{op = no_operating}};
 
 handle_call(Request, _From, State) ->
-  case logging_policies:check_policy(?MODULE) of
+  case logging_policies:check_lager_policy(?MODULE) of
     lager_on -> lager:error("STABILIZER: Unexpected call message: ~p~n", [Request]);
     _ -> ok
   end,
@@ -132,7 +132,7 @@ handle_cast({stabilize_response, Predecessor, NewSuccList}, State) ->
   {noreply, State#state{succ_list = NewSuccessorList}};
 
 handle_cast(Request, State) ->
-  case logging_policies:check_policy(?MODULE) of
+  case logging_policies:check_lager_policy(?MODULE) of
     lager_on -> lager:error("STABILIZER: Unexpected cast message: ~p~n", [Request]);
     _ -> ok
   end,
@@ -176,7 +176,7 @@ handle_info(stabilize, State) ->
   end;
 
 handle_info(Info, State) ->
-  case logging_policies:check_policy(?MODULE) of
+  case logging_policies:check_lager_policy(?MODULE) of
     lager_on -> lager:error("STABILIZER: Unexpected ! message: ~p~n", [Info]);
     _ -> ok
   end,

@@ -2,7 +2,7 @@
 -author("mrbo9").
 
 %% API
--export([check_policy/1]).
+-export([check_policy/1, check_lager_policy/1]).
 
 check_policy(Module) ->
   Policy = application:get_env(echo_rd, log),
@@ -11,6 +11,12 @@ check_policy(Module) ->
     {ok, Profile} -> check_profile(Module, Profile)
   end.
 
+check_lager_policy(Module) ->
+  LagerPolicy = application:get_env(echo_rd, lager_log),
+  case LagerPolicy of
+    undefined -> unable;
+    {ok, Profile} -> check_profile(Module, Profile)
+  end.
 
 check_profile(communication_manager, all) -> able;
 check_profile(communication_manager, lager_only) -> able_lager;

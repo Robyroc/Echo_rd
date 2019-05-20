@@ -59,7 +59,7 @@ init([]) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_call(Request, _From, State) ->
-  case logging_policies:check_policy(?MODULE) of
+  case logging_policies:check_lager_policy(?MODULE) of
     lager_on -> lager:error("FIX: Unexpected call message: ~p~n", [Request]);
     _ -> ok
   end,
@@ -73,7 +73,7 @@ handle_call(Request, _From, State) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_cast(Request, State) ->
-  case logging_policies:check_policy(?MODULE) of
+  case logging_policies:check_lager_policy(?MODULE) of
     lager_on -> lager:error("FIX: Unexpected cast message: ~p~n", [Request]);
     _ -> ok
   end,
@@ -99,7 +99,7 @@ handle_info(startup, _State) ->
 
 handle_info(fix, State) ->
   Theo = (State#state.id + round(math:pow(2, State#state.index))),
-  case logging_policies:check_policy(?MODULE) of
+  case logging_policies:check_lager_policy(?MODULE) of
     lager_on ->
       case logging_policies:check_policy(?MODULE) of
         able ->
@@ -116,7 +116,7 @@ handle_info(fix, State) ->
   {noreply, iterate_state(State)};
 
 handle_info(Info, State) ->
-  case logging_policies:check_policy(?MODULE) of
+  case logging_policies:check_lager_policy(?MODULE) of
     lager_on -> lager:error("FIX: Unexpected ! message: ~p~n", [Info]);
     _ -> ok
   end,

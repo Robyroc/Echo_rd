@@ -172,8 +172,12 @@ handle_info(startup, _State) ->
   Port = naming_handler:get_identity(port),
   {ok, Directory} = file:get_cwd(),
   Path = Directory ++ "/log/" ++ integer_to_list(Port) ++ "_logging",
+
+  %TODO check if these 3 lines are useful
   application:set_env(lager, log_root, Path),
-  application:set_env(echor_rd, log, lager_on),                         %TODO check if this line is useful
+  application:set_env(echor_rd, lager_log, lager_on),
+  application:set_env(echo_rd, log, all),
+
   naming_handler:notify_identity(self(), lager_sinks_handler),
   {noreply, #state{path = Path}}.
 

@@ -70,7 +70,7 @@ init([Supervisor]) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_call(Request, _From, State) ->
-  case logging_policies:check_policy(?MODULE) of
+  case logging_policies:check_lager_policy(?MODULE) of
     lager_on -> lager:error("NAMING MANAGER: Unexpected call message: ~p~n", [Request]);
     _ -> ok
   end,
@@ -84,7 +84,7 @@ handle_call(Request, _From, State) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_cast(Request, State) ->
-  case logging_policies:check_policy(?MODULE) of
+  case logging_policies:check_lager_policy(?MODULE) of
     lager_on -> lager:error("NAMING MANAGER: Unexpected cast message: ~p~n", [Request]);
     _ -> ok
   end,
@@ -115,7 +115,7 @@ handle_info({startup, Supervisor}, State) ->
   {noreply, State#state{}};
 
 handle_info({'ETS-TRANSFER', TableId, Pid, Data}, State) ->
-  case logging_policies:check_policy(?MODULE) of
+  case logging_policies:check_lager_policy(?MODULE) of
     lager_on ->
       case logging_policies:check_policy(?MODULE) of
         able ->
@@ -131,7 +131,7 @@ handle_info({'ETS-TRANSFER', TableId, Pid, Data}, State) ->
   {noreply, State#state{}};
 
 handle_info(Info, State) ->
-  case logging_policies:check_policy(?MODULE) of
+  case logging_policies:check_lager_policy(?MODULE) of
     lager_on -> lager:error("NAMING MANAGER: Unexpected ! message: ~p~n", [Info]);
     _ -> ok
   end,

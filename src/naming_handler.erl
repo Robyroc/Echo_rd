@@ -25,7 +25,7 @@
 
 notify_identity(PID, Identity) ->
   try
-    case logging_policies:check_policy(?MODULE) of
+    case logging_policies:check_lager_policy(?MODULE) of
       lager_on ->
         case logging_policies:check_policy(?MODULE) of
           able -> lager:info("=== NEW ENTRY === Name:~p ===~n", [Identity]);
@@ -114,7 +114,7 @@ handle_call(delete, _From, State) ->
   {reply, ok, State};
 
 handle_call({reheir, NewManager}, _From, State) ->
-  case logging_policies:check_policy(?MODULE) of
+  case logging_policies:check_lager_policy(?MODULE) of
     lager_on ->
       case logging_policies:check_policy(?MODULE) of
         able ->
@@ -127,7 +127,7 @@ handle_call({reheir, NewManager}, _From, State) ->
   {reply, ok, State};
 
 handle_call(Request, _From, State) ->
-  case logging_policies:check_policy(?MODULE) of
+  case logging_policies:check_lager_policy(?MODULE) of
     lager_on -> lager:error("Naming Handler: Unexpected call message: ~p~n", [Request]);
     _ -> ok
   end,
@@ -141,7 +141,7 @@ handle_call(Request, _From, State) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_cast(Request, State) ->
-  case logging_policies:check_policy(?MODULE) of
+  case logging_policies:check_lager_policy(?MODULE) of
     lager_on -> lager:error("Naming Handler: Unexpected cast message: ~p~n", [Request]);
     _ -> ok
   end,
@@ -159,7 +159,7 @@ handle_cast(Request, State) ->
 %%--------------------------------------------------------------------
 handle_info({'ETS-TRANSFER', TableId, Pid, _Data}, State) ->
   ets:insert(naming_db, {naming_handler, self()}),
-  case logging_policies:check_policy(?MODULE) of
+  case logging_policies:check_lager_policy(?MODULE) of
     lager_on ->
       case logging_policies:check_policy(?MODULE) of
         able ->
@@ -171,7 +171,7 @@ handle_info({'ETS-TRANSFER', TableId, Pid, _Data}, State) ->
   {noreply, State};
 
 handle_info(Info, State) ->
-  case logging_policies:check_policy(?MODULE) of
+  case logging_policies:check_lager_policy(?MODULE) of
     lager_on -> lager:error("Naming Handler: Unexpected ! message: ~p~n", [Info]);
     _ -> ok
   end,
@@ -189,7 +189,7 @@ handle_info(Info, State) ->
 %% @end
 %%--------------------------------------------------------------------
 terminate(_Reason, _State) ->
-  case logging_policies:check_policy(?MODULE) of
+  case logging_policies:check_lager_policy(?MODULE) of
     lager_on -> lager:info("Naming Handler is terminating");
     _ -> ok
   end,

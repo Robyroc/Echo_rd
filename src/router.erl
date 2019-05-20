@@ -111,7 +111,7 @@ handle_call(show_id, _From, State) ->
 handle_call({lookup, Requested}, From, State) ->
   ActualRequested = normalize_id(Requested, State#state.nbits),
   {SuccID, Succ} = stabilizer:get_successor(),
-  case logging_policies:check_policy(?MODULE) of
+  case logging_policies:check_lager_policy(?MODULE) of
     lager_on ->
       case logging_policies:check_policy(?MODULE) of
       able ->
@@ -152,7 +152,7 @@ handle_call({normalize_pred, ID}, _From, State) ->
   {reply, adjust_predecessor(ID, State#state.id, State#state.nbits), State};
 
 handle_call(Request, _From, State) ->
-  case logging_policies:check_policy(?MODULE) of
+  case logging_policies:check_lager_policy(?MODULE) of
     lager_on -> lager:error("Router: Unexpected call message: ~p~n", [Request]);
     _ -> ok
   end,
@@ -190,7 +190,7 @@ handle_cast({update, Address, Theoretical}, State) ->
 handle_cast({lookup, Alias, Requested}, State) ->
   ActualRequested = adjust_successor(Requested, State#state.id, State#state.nbits),
   {SuccID, Succ} = stabilizer:get_successor(),
-  case logging_policies:check_policy(?MODULE) of
+  case logging_policies:check_lager_policy(?MODULE) of
     lager_on ->
       case logging_policies:check_policy(?MODULE) of
         able ->
@@ -219,7 +219,7 @@ handle_cast({lookup, Alias, Requested}, State) ->
   end;
 
 handle_cast(Request, State) ->
-  case logging_policies:check_policy(?MODULE) of
+  case logging_policies:check_lager_policy(?MODULE) of
     lager_on -> lager:error("Router: Unexpected cast message: ~p~n", [Request]);
     _ -> ok
   end,
@@ -247,7 +247,7 @@ handle_info(startup, _State) ->
   {noreply, #state{finger_table = [HeadRoutingTable | TailRoutingTable], nbits = Nbits, id = ID, time = Time}};
 
 handle_info(Info, State) ->
-  case logging_policies:check_policy(?MODULE) of
+  case logging_policies:check_lager_policy(?MODULE) of
     lager_on -> lager:error("Router: Unexpected ! message: ~p~n", [Info]);
     _ -> ok
   end,
@@ -283,7 +283,7 @@ code_change(_OldVsn, State, _Extra) ->
 
 show_finger_table(State) ->
   %TODO check if the finger table has to be in the .log file or printed in console
-  case logging_policies:check_policy(?MODULE) of
+  case logging_policies:check_lager_policy(?MODULE) of
     lager_on ->
       routerLager:info("Finger Table: \n
       Theo\t| Real\t| Address~n"),
