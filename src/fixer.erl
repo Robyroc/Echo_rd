@@ -15,8 +15,8 @@
   code_change/3]).
 
 -define(SERVER, ?MODULE).
--define(INTERVAL, 6000).
-
+-define(MIN_FIX_TIME, 6000).
+-define(MULT, 6).
 -record(state, {id, nbits, index}).
 
 %%%===================================================================
@@ -88,7 +88,7 @@ handle_info(startup, _State) ->
   ID = hash_f:get_hashed_addr(link_manager:get_own_address()),
   NBits = params_handler:get_param(nbits),
   naming_handler:notify_identity(self(), fixer),
-  erlang:send_after(?INTERVAL, self(), fix),                    %TODO tune parameters accordingly
+  erlang:send_after(?MIN_FIX_TIME, self(), fix),                    %TODO tune parameters accordingly
   {noreply, #state{id = ID, nbits = NBits, index = 0}};
 
 handle_info(fix, State) ->
@@ -102,7 +102,7 @@ handle_info(fix, State) ->
   end,
   {found, Address} = router:local_lookup(Theo),
   router:update_finger_table(Address, Theo),
-  erlang:send_after(?INTERVAL, self(), fix),
+  erlang:send_after(max(?MIN_FIX_TIME, statistics:get_average_lookup_time * ?MULT), self(), fix),
   {noreply, iterate_state(State)};
 
 handle_info(Info, State) ->
