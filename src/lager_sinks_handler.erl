@@ -141,7 +141,7 @@ handle_cast({create_console_sink, Name, Level}, State) ->
   {noreply,State};
 
 
-handle_cast(create_chord_sink, State) ->
+handle_cast(create_chord_sinks, State) ->
   create_log_sink(joinerLager,info, "joiner"),
   create_log_sink(inout,info, "inout"),
   create_log_sink(fixerLager,info, "fixer"),
