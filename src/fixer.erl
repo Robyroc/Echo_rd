@@ -102,7 +102,7 @@ handle_info(fix, State) ->
   end,
   {found, Address} = router:local_lookup(Theo),
   router:update_finger_table(Address, Theo),
-  erlang:send_after(max(?MIN_FIX_TIME, statistics:get_average_lookup_time * ?MULT), self(), fix),
+  erlang:send_after(max(?MIN_FIX_TIME, statistics:get_average_lookup_time() * ?MULT), self(), fix),
   {noreply, iterate_state(State)};
 
 handle_info(Info, State) ->
