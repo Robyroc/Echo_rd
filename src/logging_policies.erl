@@ -34,4 +34,5 @@ check_profile(naming_handler, naming_only) -> able;
 
 check_profile(naming_manager, Policy) -> check_profile(naming_handler, Policy);
 
+check_profile(_, lager_on) -> lager_on;
 check_profile(_, _) -> unable.

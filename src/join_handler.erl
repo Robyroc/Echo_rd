@@ -254,8 +254,10 @@ pre_join(cast, {info,Address, Res, Succ, Nbits}, Session) ->
 
 pre_join(cast, {abort, Reason}, Session) ->
   ok = handle(pre_join, look),
-  %joinerLager:error(" -- JOIN ABORTED -- Reason of abort: ~p~n", [Reason]),
-  lager:error(" -- JOIN ABORTED -- Reason of abort: ~p~n", [Reason]),
+  case logging_policies:check_policy(?MODULE) of
+    lager_on -> lager:error(" -- JOIN ABORTED -- Reason of abort: ~p~n", [Reason]);
+    _ -> ok
+  end,
   ProviderAddr = Session#session.provider_addr,
   timer:sleep(?SLEEP_INTERVAL),
   communication_manager:send_message_async(lookup_for_join, [], ProviderAddr, no_alias),
@@ -279,8 +281,10 @@ j_ready(cast, {ack_join, _Address}, Session) ->
 
 j_ready(cast, {abort, Reason}, Session) ->
   ok = handle(j_ready, look),
-  %joinerLager:error("Reason of abort: ~p~n", [Reason]),
-  lager:error("Reason of abort: ~p~n", [Reason]),
+  case logging_policies:check_policy(?MODULE) of
+    lager_on -> lager:error("Reason of abort: ~p~n", [Reason]);
+    _-> ok
+  end,
   ProviderAddr = Session#session.provider_addr,
   timer:sleep(?SLEEP_INTERVAL),
   communication_manager:send_message_async(lookup_for_join, [], ProviderAddr, no_alias),
@@ -470,16 +474,23 @@ code_change(_OldVsn, StateName, State, _Extra) ->
 
 handle(From, To) ->
   case logging_policies:check_policy(?MODULE) of
-    able ->
-      lagerConsole:info("+++ JOINER +++ ~p ---> ~p +++~n", [From, To]),
-      joinerLager:info("+++ JOINER +++ ~p ---> ~p +++~n", [From, To]);
-    able_lager -> joinerLager:info("+++ JOINER +++ ~p ---> ~p +++~n", [From, To]);
-    unable -> ok
+    lager_on ->
+      case logging_policies:check_policy(?MODULE) of
+        able ->
+          lagerConsole:info("+++ JOINER +++ ~p ---> ~p +++~n", [From, To]),
+          joinerLager:info("+++ JOINER +++ ~p ---> ~p +++~n", [From, To]);
+        able_lager -> joinerLager:info("+++ JOINER +++ ~p ---> ~p +++~n", [From, To]);
+        unable -> ok
+      end;
+    _ -> ok
   end.
 
 handle_generic_event({EventType, EventContent, Session}) ->
-  %joinerLager:error("Event abnormal: ~p | ~p~n", [EventType, EventContent]),
-  lager:error("Event abnormal: ~p | ~p~n", [EventType, EventContent]),
+  case logging_policies:check_policy(?MODULE) of
+    lager_on ->
+      lager:error("Event abnormal: ~p | ~p~n", [EventType, EventContent]);
+    _ -> ok
+  end,
   {keep_state, Session}.
 
 

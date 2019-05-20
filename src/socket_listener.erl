@@ -69,7 +69,10 @@ init([]) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_call(Request, _From, State) ->
-  unexpected:error("Listen: Unexpected call message: ~p~n", [Request]),
+  case logging_policies:check_policy(?MODULE) of
+    lager_on -> lager:error("Listen: Unexpected call message: ~p~n", [Request]);
+    _ -> ok
+  end,
   {reply, ok, State}.
 
 %%--------------------------------------------------------------------
@@ -80,7 +83,10 @@ handle_call(Request, _From, State) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_cast(Request, State) ->
-  unexpected:error("Listen: Unexpected cast message: ~p~n", [Request]),
+  case logging_policies:check_policy(?MODULE) of
+    lager_on -> lager:error("Listen: Unexpected cast message: ~p~n", [Request]);
+    _ -> ok
+  end,
   {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -104,13 +110,19 @@ handle_info(startup, _State) ->
   naming_handler:wait_service(link_manager),
   Port = naming_handler:get_identity(port),
   {ok, Listen} = gen_tcp:listen(Port, [binary, {packet, 0}, {reuseaddr, true}, {active, true}]),
-  lager:info("Listening at port ~p~n", [Port]),
+  case logging_policies:check_policy(?MODULE) of
+    lager_on -> lager:info("Listening at port ~p~n", [Port]);
+    _ -> io:format("Listening at port ~p~n", [Port])
+  end,
   naming_handler:notify_identity(self(), listener),
   erlang:send_after(10, self(), loop),
   {noreply, #state{socket = Listen}};
 
 handle_info(Info, State) ->
-  unexpected:error("Listen: Unexpected ! message: ~p~n", [Info]),
+  case logging_policies:check_policy(?MODULE) of
+    lager_on -> lager:error("Listen: Unexpected ! message: ~p~n", [Info]);
+    _ -> ok
+  end,
   {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -125,7 +137,10 @@ handle_info(Info, State) ->
 %% @end
 %%--------------------------------------------------------------------
 terminate(Reason, State) ->
-  lager:info("Listen terminate: ~p~n", [Reason]),
+  case logging_policies:check_policy(?MODULE) of
+    lager_on -> lager:info("Listen terminate: ~p~n", [Reason]);
+    _ -> ok
+  end,
   gen_tcp:close(State#state.socket),
   ok.
 

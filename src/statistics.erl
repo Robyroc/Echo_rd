@@ -84,7 +84,10 @@ init([]) ->
   {stop, Reason :: term(), Reply :: term(), NewState :: #state{}} |
   {stop, Reason :: term(), NewState :: #state{}}).
 handle_call(Request, _From, State) ->
-  lager:error("STATISTICS: Unexpected call message: ~p~n", [Request]),
+  case logging_policies:check_policy(?MODULE) of
+    lager_on -> lager:error("STATISTICS: Unexpected call message: ~p~n", [Request]);
+    _ -> ok
+  end,
   {reply, ok, State}.
 
 -spec(handle_cast(Request :: term(), State :: #state{}) ->
@@ -104,8 +107,13 @@ handle_cast(gather, State) ->
 handle_cast({show_stats, Address, Stats}, State) ->
   {JoinTime, HighLookupTime, LookupDrop, FtableTimings} = Stats,
   ID = hash_f:get_hashed_addr(Address),
-  lager:info("^^^^^ STATS ^^^^^~n ID: ~p~n IP: ~p~n Join time: ~p~n Highest lookup time: ~p~n Number of lookup timeouts: ~p~n FTable last refresh timings: ~p~n~n",
-    [ID, Address, JoinTime, HighLookupTime, LookupDrop, FtableTimings]),
+  case logging_policies:check_policy(?MODULE) of
+    lager_on ->
+      lager:info("^^^^^ STATS ^^^^^~n ID: ~p~n IP: ~p~n Join time: ~p~n
+      Highest lookup time: ~p~n Number of lookup timeouts: ~p~n FTable last refresh timings: ~p~n~n",
+        [ID, Address, JoinTime, HighLookupTime, LookupDrop, FtableTimings]);
+    _ -> ok
+  end,
   {noreply, State};
 
 handle_cast({get_stats, Address}, State) ->
@@ -139,7 +147,10 @@ handle_cast({finger_completion, Time}, State) ->
   {noreply, State#state{ftable_timing = Time}};
 
 handle_cast(Request, State) ->
-  lager:error("STATISTICS: Unexpected cast message: ~p~n", [Request]),
+  case logging_policies:check_policy(?MODULE) of
+    lager_on -> lager:error("STATISTICS: Unexpected cast message: ~p~n", [Request]);
+    _ -> ok
+  end,
   {noreply, State}.
 
 -spec(handle_info(Info :: timeout() | term(), State :: #state{}) ->
@@ -152,7 +163,10 @@ handle_info(startup, State) ->
   {noreply, State};
 
 handle_info(Info, State) ->
-  lager:error("STATISTICS: Unexpected ! message: ~p~n", [Info]),
+  case logging_policies:check_policy(?MODULE) of
+    lager_on -> lager:error("STATISTICS: Unexpected ! message: ~p~n", [Info]);
+    _ -> ok
+  end,
   {noreply, State}.
 
 %%--------------------------------------------------------------------

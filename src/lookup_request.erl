@@ -73,7 +73,10 @@ handle_call({lost, Address}, _From, State) ->
   {reply, ok, State#state{list = CleanedList}};
 
 handle_call(Request, _From, State) ->
-  unexpected:error("Request: Unexpected call message: ~p~n", [Request]),
+  case logging_policies:check_policy(?MODULE) of
+    lager_on -> lager:error("Request: Unexpected call message: ~p~n", [Request]);
+    _ -> ok
+  end,
   {reply, ok, State}.
 
 %%--------------------------------------------------------------------
@@ -91,7 +94,10 @@ handle_cast({response, Address}, State) ->
   {stop, normal, State};
 
 handle_cast(Request, State) ->
-  unexpected:error("Request: Unexpected cast message: ~p~n", [Request]),
+  case logging_policies:check_policy(?MODULE) of
+    lager_on -> lager:error("Request: Unexpected cast message: ~p~n", [Request]);
+    _ -> ok
+  end,
   {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -116,7 +122,10 @@ handle_info(next, State) ->
   end;
 
 handle_info(Info, State) ->
-  unexpected:error("Request: Unexpected ! message: ~p~n", [Info]),
+  case logging_policies:check_policy(?MODULE) of
+    lager_on -> lager:error("Request: Unexpected ! message: ~p~n", [Info]);
+    _ -> ok
+  end,
   {noreply, State}.
 
 %%--------------------------------------------------------------------

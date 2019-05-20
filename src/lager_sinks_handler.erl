@@ -12,8 +12,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, create_log_sink/3, create_console_sink/2]).
--export([test_file/0, test_console_error/0, test_logging/0, test_console_info/0]).
+-export([start_link/0, create_log_sink/3, create_console_sink/2, create_chord_sinks/0]).
 %% gen_server callbacks
 -export([init/1,
   handle_call/3,
@@ -49,21 +48,12 @@ create_console_sink(Name, Level) ->
   PID = naming_handler:get_identity(lager_sinks_handler),
   gen_server:cast(PID, {create_console_sink, Name, Level}).
 
-test_file() ->
-  PID = naming_handler:get_identity(lager_sinks_handler),
-  gen_server:cast(PID, test_file).
 
-test_logging() ->
+create_chord_sinks() ->
   PID = naming_handler:get_identity(lager_sinks_handler),
-  gen_server:cast(PID, test_loggisacng).
+  gen_server:cast(PID, create_chord_sinks).
 
-test_console_info() ->
-  PID = naming_handler:get_identity(lager_sinks_handler),
-  gen_server:cast(PID, test_console_info).
 
-test_console_error() ->
-  PID = naming_handler:get_identity(lager_sinks_handler),
-  gen_server:cast(PID, test_console_info).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -117,24 +107,6 @@ handle_call(_Request, _From, State) ->
 %%  {noreply, NewState :: #state{}, timeout() | hibernate} |
 %%  {stop, Reason :: term(), NewState :: #state{}}).
 
-%TODO these following 4 cast have to been deleted, used for testing
-handle_cast(test_file, State) ->
-  provaLog:info("Questa è una prova info"),
-  {noreply,State};
-handle_cast(test_logging, State) ->
-  create_log_sink(testLog, error, "prova2"),
-  testLog:error("Questa è una prova error"),
-  {noreply,State};
-handle_cast(test_console_error, State) ->
-  create_console_sink(testLog, error),
-  provaConsoleError:error("Prova error Console"),
-  {noreply,State};
-handle_cast(test_console_info, State) ->
-  create_console_sink(testLog, info),
-  provaConsoleInfo:info("Prova info Console"),
-  {noreply,State};
-
-
 handle_cast({create_log_sink, Name, Level, FileName}, State) ->
   case check_level(Level) of
       ok ->
@@ -166,7 +138,18 @@ handle_cast({create_console_sink, Name, Level}, State) ->
       );
     _ -> undefined_level
   end,
+  {noreply,State};
+
+
+handle_cast(create_chord_sink, State) ->
+  create_log_sink(joinerLager,info, "joiner"),
+  create_log_sink(inout,info, "inout"),
+  create_log_sink(fixerLager,info, "fixer"),
+  create_log_sink(checkerLager,info, "checker"),
+  create_log_sink(routerLager,info, "router"),
+  create_console_sink(lagerConsole, info),
   {noreply,State}.
+
 
 
 
@@ -190,6 +173,7 @@ handle_info(startup, _State) ->
   {ok, Directory} = file:get_cwd(),
   Path = Directory ++ "/log/" ++ integer_to_list(Port) ++ "_logging",
   application:set_env(lager, log_root, Path),
+  application:set_env(echor_rd, log, lager_on),                         %TODO check if this line is useful
   naming_handler:notify_identity(self(), lager_sinks_handler),
   {noreply, #state{path = Path}}.
 
