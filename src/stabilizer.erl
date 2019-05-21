@@ -132,7 +132,7 @@ handle_cast({stabilize_response, Predecessor, NewSuccList}, State) ->
   HeadIndex = normalizer:normalize_as_successor(hd([I || {I, _} <- State#state.succ_list])),
   #state{succ_list = OwnSuccessorList, id = ID, nbits = NBits} = State,
   NewSuccessorList = handle_pred_tell(PredIndex, ID, HeadIndex, NewSuccList, OwnSuccessorList, Predecessor, NBits),
-  Time = timer:now_diff(erlang:timestamp(), State#state.last_sent),
+  Time = timer:now_diff(erlang:timestamp(), State#state.last_sent) div 1000,
   NewList = add_time(Time, State#state.times),
   {noreply, State#state{fail_counter = 0, succ_list = NewSuccessorList, last_sent = not_sent, times = NewList}};
 
