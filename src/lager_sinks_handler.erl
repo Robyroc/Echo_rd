@@ -175,7 +175,7 @@ handle_info(startup, _State) ->
 
   %TODO check if these 3 lines are useful
   application:set_env(lager, log_root, Path),
-  application:set_env(echor_rd, lager_log, lager_on),
+  application:set_env(echo_rd, lager_log, lager_on),
   application:set_env(echo_rd, log, all),
 
   naming_handler:notify_identity(self(), lager_sinks_handler),
@@ -221,6 +221,6 @@ check_level(Level) ->
     info -> ok;
     warning -> ok;
     error -> ok;
-    A -> A
+    _ -> no_ok
   end.
 
