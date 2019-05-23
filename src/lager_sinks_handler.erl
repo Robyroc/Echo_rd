@@ -86,7 +86,7 @@ terminate_if_not_terminated() ->
   {stop, Reason :: term()} | ignore).
 init([]) ->
   self() ! startup,
-  {ok, #state{}}.
+  {ok, #state{path = udefine, started = not_started}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -95,16 +95,31 @@ init([]) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec(handle_call(Request :: term(), From :: {pid(), Tag :: term()},
-    State :: #state{}) ->
-  {reply, Reply :: term(), NewState :: #state{}} |
-  {reply, Reply :: term(), NewState :: #state{}, timeout() | hibernate} |
-  {noreply, NewState :: #state{}} |
-  {noreply, NewState :: #state{}, timeout() | hibernate} |
-  {stop, Reason :: term(), Reply :: term(), NewState :: #state{}} |
-  {stop, Reason :: term(), NewState :: #state{}}).
-handle_call(_Request, _From, State) ->
-  {reply, ok, State}.
+%%-spec(handle_call(Request :: term(), From :: {pid(), Tag :: term()},
+%%    State :: #state{}) ->
+%%  {reply, Reply :: term(), NewState :: #state{}} |
+%%  {reply, Reply :: term(), NewState :: #state{}, timeout() | hibernate} |
+%%  {noreply, NewState :: #state{}} |
+%%  {noreply, NewState :: #state{}, timeout() | hibernate} |
+%%  {stop, Reason :: term(), Reply :: term(), NewState :: #state{}} |
+%%  {stop, Reason :: term(), NewState :: #state{}}).
+handle_call(start_if_not_started, _From, State) ->
+  Started = State#state.started,
+  case Started of
+    not_started ->
+      lager:start(),
+      {reply, ok, State#state{started = started}};
+    _ -> {reply, ok, State}
+  end;
+
+handle_call(terminate_if_not_terminated, _From, State) ->
+  Started = State#state.started,
+  case Started of
+    started ->
+      lager:stop(),
+      {reply, ok, State#state{started = not_started}};
+    _ -> {reply, ok, State}
+  end.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -183,14 +198,15 @@ handle_info(startup, _State) ->
   Port = naming_handler:get_identity(port),
   {ok, Directory} = file:get_cwd(),
   Path = Directory ++ "/log/" ++ integer_to_list(Port) ++ "_logging",
-
-  %TODO check if these 3 lines are useful
   application:set_env(lager, log_root, Path),
   application:set_env(echo_rd, lager_log, lager_on),
   application:set_env(echo_rd, log, all),
 
+  %TODO check if it is useful
+  lager:start(),
+
   naming_handler:notify_identity(self(), lager_sinks_handler),
-  {noreply, #state{path = Path, started = not_started}}.
+  {noreply, #state{path = Path, started = started}}.
 
 
 %%--------------------------------------------------------------------
