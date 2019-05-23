@@ -79,7 +79,10 @@ handle_call({send, {Alias, Method, Params}}, _From, State) ->
 
 handle_call(Request, _From, State) ->
   case logging_policies:check_lager_policy(?MODULE) of
-    lager_on -> lager:error("Handler: Unexpected call message: ~p~n", [Request]);
+    {lager_on, _} ->
+      lager:error("Handler: Unexpected call message: ~p~n", [Request]);
+    {lager_off, _} ->
+      io:format("Handler: Unexpected call message: ~p~n", [Request]);
     _ -> ok
   end,
   {reply, ok, State}.
@@ -93,7 +96,10 @@ handle_call(Request, _From, State) ->
 %%--------------------------------------------------------------------
 handle_cast(Request, State) ->
   case logging_policies:check_lager_policy(?MODULE) of
-    lager_on -> lager:error("Handler: Unexpected cast message: ~p~n", [Request]);
+    {lager_on, _} ->
+      lager:error("Handler: Unexpected cast message: ~p~n", [Request]);
+    {lager_off, _} ->
+      io:format("Handler: Unexpected cast message: ~p~n", [Request]);
     _ -> ok
   end,
   {noreply, State}.
@@ -141,7 +147,10 @@ handle_info({tcp_closed, Socket}, State) when Socket =:= State#state.socket ->
 
 handle_info(Info, State) ->
   case logging_policies:check_lager_policy(?MODULE) of
-    lager_on -> lager:error("Handler: Unexpected ! message: ~p~n", [Info]);
+    {lager_on, _} ->
+      lager:error("Handler: Unexpected ! message: ~p~n", [Info]);
+    {lager_off, _} ->
+      io:format("Handler: Unexpected ! message: ~p~n", [Info]);
     _ -> ok
   end,
   {noreply, State}.

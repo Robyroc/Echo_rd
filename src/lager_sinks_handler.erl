@@ -12,7 +12,13 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, create_log_sink/3, create_console_sink/2, create_chord_sinks/0]).
+-export([start_link/0,
+  create_log_sink/3,
+  create_console_sink/2,
+  create_chord_sinks/0,
+  start_if_not_started/0,
+  terminate_if_not_terminated/0]).
+
 %% gen_server callbacks
 -export([init/1,
   handle_call/3,
@@ -23,7 +29,7 @@
 
 -define(SERVER, ?MODULE).
 
--record(state, {path}).
+-record(state, {path, started}).
 
 %%%===================================================================
 %%% API
@@ -48,12 +54,17 @@ create_console_sink(Name, Level) ->
   PID = naming_handler:get_identity(lager_sinks_handler),
   gen_server:cast(PID, {create_console_sink, Name, Level}).
 
-
 create_chord_sinks() ->
   PID = naming_handler:get_identity(lager_sinks_handler),
   gen_server:cast(PID, create_chord_sinks).
 
+start_if_not_started() ->
+  PID = naming_handler:get_identity(lager_sinks_handler),
+  gen_server:call(PID, start_if_not_started).
 
+terminate_if_not_terminated() ->
+  PID = naming_handler:get_identity(lager_sinks_handler),
+  gen_server:call(PID, terminate_if_not_terminated).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -179,7 +190,7 @@ handle_info(startup, _State) ->
   application:set_env(echo_rd, log, all),
 
   naming_handler:notify_identity(self(), lager_sinks_handler),
-  {noreply, #state{path = Path}}.
+  {noreply, #state{path = Path, started = not_started}}.
 
 
 %%--------------------------------------------------------------------

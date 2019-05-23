@@ -14,8 +14,14 @@ check_policy(Module) ->
 check_lager_policy(Module) ->
   LagerPolicy = application:get_env(echo_rd, lager_log),
   case LagerPolicy of
-    undefined -> unable;
-    {ok, Profile} -> check_profile(Module, Profile)
+    undefined -> {unable, unable};
+    {ok, lager_on} ->
+      {lager_on, check_policy(Module)},
+      lager_sinks_handler:start_if_not_started();
+    {ok, lager_off} ->
+      {lager_off, check_policy(Module)},
+      lager_sinks_handler:terminate_if_not_terminated();
+    _ -> {unable, unable}
   end.
 
 check_profile(communication_manager, all) -> able;
@@ -40,5 +46,4 @@ check_profile(naming_handler, naming_only) -> able;
 
 check_profile(naming_manager, Policy) -> check_profile(naming_handler, Policy);
 
-check_profile(_, lager_on) -> lager_on;
 check_profile(_, _) -> unable.

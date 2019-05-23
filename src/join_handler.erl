@@ -255,7 +255,10 @@ pre_join(cast, {info,Address, Res, Succ, Nbits}, Session) ->
 pre_join(cast, {abort, Reason}, Session) ->
   ok = handle(pre_join, look),
   case logging_policies:check_lager_policy(?MODULE) of
-    lager_on -> lager:error(" -- JOIN ABORTED -- Reason of abort: ~p~n", [Reason]);
+    {lager_on, _} ->
+      lager:error(" -- JOIN ABORTED -- Reason of abort: ~p~n", [Reason]);
+    {lager_off, _} ->
+      io:format(" -- JOIN ABORTED -- Reason of abort: ~p~n", [Reason]);
     _ -> ok
   end,
   ProviderAddr = Session#session.provider_addr,
@@ -282,8 +285,11 @@ j_ready(cast, {ack_join, _Address}, Session) ->
 j_ready(cast, {abort, Reason}, Session) ->
   ok = handle(j_ready, look),
   case logging_policies:check_lager_policy(?MODULE) of
-    lager_on -> lager:error("Reason of abort: ~p~n", [Reason]);
-    _-> ok
+    {lager_on, _} ->
+      lager:error("Reason of abort: ~p~n", [Reason]);
+    {lager_off, _} ->
+      io:format("Reason of abort: ~p~n", [Reason]);
+    _ -> ok
   end,
   ProviderAddr = Session#session.provider_addr,
   timer:sleep(?SLEEP_INTERVAL),
@@ -474,21 +480,22 @@ code_change(_OldVsn, StateName, State, _Extra) ->
 
 handle(From, To) ->
   case logging_policies:check_lager_policy(?MODULE) of
-    lager_on ->
-      case logging_policies:check_policy(?MODULE) of
-        able ->
-          lagerConsole:info("+++ JOINER +++ ~p ---> ~p +++~n", [From, To]),
-          joinerLager:info("+++ JOINER +++ ~p ---> ~p +++~n", [From, To]);
-        able_lager -> joinerLager:info("+++ JOINER +++ ~p ---> ~p +++~n", [From, To]);
-        unable -> ok
-      end;
+    {lager_on, able} ->
+      lagerConsole:info("+++ JOINER +++ ~p ---> ~p +++~n", [From, To]),
+      joinerLager:info("+++ JOINER +++ ~p ---> ~p +++~n", [From, To]);
+    {lager_on, able_lager} ->
+      joinerLager:info("+++ JOINER +++ ~p ---> ~p +++~n", [From, To]);
+    {lager_off, able} ->
+      io:format("+++ JOINER +++ ~p ---> ~p +++~n", [From, To]);
     _ -> ok
   end.
 
 handle_generic_event({EventType, EventContent, Session}) ->
   case logging_policies:check_lager_policy(?MODULE) of
-    lager_on ->
+    {lager_on, _} ->
       lager:error("Event abnormal: ~p | ~p~n", [EventType, EventContent]);
+    {lager_off, _} ->
+      io:format("Event abnormal: ~p | ~p~n", [EventType, EventContent]);
     _ -> ok
   end,
   {keep_state, Session}.
