@@ -158,12 +158,12 @@ handle_info({'DOWN', Monitor, process, _PID, tcp_closed}, State) ->
   checker:notify_lost_node(Address),
   stabilizer:notify_lost_node(Address),
   router:notify_lost_node(Address),
-  {noreply, #state{connections = [{Pid, Addr, Mon} || {Pid, Addr, Mon} <- State#state.connections, Mon =/= Monitor]}};
+  {noreply, State#state{connections = [{Pid, Addr, Mon} || {Pid, Addr, Mon} <- State#state.connections, Mon =/= Monitor]}};
 
 handle_info({'DOWN', Monitor, process, _PID, Reason}, State) ->
   Present = [X || {_, X, M} <- State#state.connections, M =:= Monitor],
   lager:error("LM: A handler failed: Address: ~p~nReason: ~p~n", [hd(Present), Reason]),
-  {noreply, #state{connections = [{P, A, M} || {P, A, M} <- State#state.connections, M =/= Monitor]}};
+  {noreply, State#state{connections = [{P, A, M} || {P, A, M} <- State#state.connections, M =/= Monitor]}};
 
 handle_info({tcp, Socket, Bin}, State) ->
   {ok, Pid} = socket_handler:start(Socket),
@@ -172,10 +172,10 @@ handle_info({tcp, Socket, Bin}, State) ->
   exit(Pid, normal),
   {noreply, State};
 
-handle_info(startup, _State) ->
+handle_info(startup, State) ->
   naming_handler:wait_service(port),
   naming_handler:notify_identity(self(), link_manager),
-  {noreply, #state{connections = []}};
+  {noreply, State#state{connections = []}};
 
 handle_info(Info, State) ->
   unexpected:error("LM: Unexpected ! message: ~p~n", [Info]),
@@ -229,12 +229,12 @@ send(Port, IP, Message, State, Size) when Size < 8000 ->
               gen_tcp:controlling_process(RequestSocket, PID),
               Monitor = erlang:monitor(process, PID),
               socket_handler:send_message(PID, Message),
-              {reply, ok, #state{connections = [{PID, {Port, IP}, Monitor} | State#state.connections]}};
+              {reply, ok, State#state{connections = [{PID, {Port, IP}, Monitor} | State#state.connections]}};
             {ok, PID, _} ->
               gen_tcp:controlling_process(RequestSocket, PID),
               Monitor = erlang:monitor(process, PID),
               socket_handler:send_message(PID, Message),
-              {reply, ok, #state{connections = [{PID, {Port, IP}, Monitor} | State#state.connections]}}
+              {reply, ok, State#state{connections = [{PID, {Port, IP}, Monitor} | State#state.connections]}}
           end;
         {error, Reason} ->
           {reply, {error, Reason}, State}

@@ -106,12 +106,12 @@ handle_call({lost, Address}, _From, State) ->
       {reply, ok, State#state{succ_list = AdjNewList, fail_counter = 1, last_sent = not_sent}}
   end;
 
-handle_call(turn_off, _From, _State) ->
-  {reply, ok, #state{fail_counter = 1, succ_list = undefined, nbits = undefined, id = undefined, op = no_operating, last_sent = not_sent, times = [1000]}};
+handle_call(turn_off, _From, State) ->
+  {reply, ok, State#state{fail_counter = 1, succ_list = undefined, nbits = undefined, id = undefined, op = no_operating, last_sent = not_sent, times = [1000]}};
 
-handle_call(turn_on, _From, _State) ->
+handle_call(turn_on, _From, State) ->
   self() ! startup,
-  {reply, ok, #state{fail_counter = 1, op = no_operating, last_sent = not_sent, times = [1000]}};
+  {reply, ok, State#state{fail_counter = 1, op = no_operating, last_sent = not_sent, times = [1000]}};
 
 handle_call(Request, _From, State) ->
   unexpected:error("STABILIZER: Unexpected call message: ~p~n", [Request]),
