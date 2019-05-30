@@ -103,23 +103,22 @@ init([]) ->
 %%  {noreply, NewState :: #state{}, timeout() | hibernate} |
 %%  {stop, Reason :: term(), Reply :: term(), NewState :: #state{}} |
 %%  {stop, Reason :: term(), NewState :: #state{}}).
+handle_call(start_if_not_started, _From, State) when State#state.started =:= not_started ->
+  lager:start(),
+  {reply, ok, State#state{started = started}};
+
 handle_call(start_if_not_started, _From, State) ->
-  Started = State#state.started,
-  case Started of
-    not_started ->
-      lager:start(),
-      {reply, ok, State#state{started = started}};
-    _ -> {reply, ok, State}
-  end;
+  {reply, ok, State};
+
+handle_call(terminate_if_not_terminated, _From, State) when State#state.started =:= started ->
+  lager:stop(),
+  {reply, ok, State#state{started = not_started}};
 
 handle_call(terminate_if_not_terminated, _From, State) ->
-  Started = State#state.started,
-  case Started of
-    started ->
-      lager:stop(),
-      {reply, ok, State#state{started = not_started}};
-    _ -> {reply, ok, State}
-  end.
+  {reply, ok, State};
+
+handle_call(_, _, State) ->
+  {reply, ok, State}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -174,7 +173,10 @@ handle_cast(create_chord_sinks, State) ->
   create_log_sink(checkerLager,info, "checker"),
   create_log_sink(routerLager,info, "router"),
   create_console_sink(lagerConsole, info),
-  {noreply,State}.
+  {noreply,State};
+
+handle_cast(_, State) ->
+  {norpely, State}.
 
 
 
@@ -206,7 +208,10 @@ handle_info(startup, _State) ->
   lager:start(),
 
   naming_handler:notify_identity(self(), lager_sinks_handler),
-  {noreply, #state{path = Path, started = started}}.
+  {noreply, #state{path = Path, started = started}};
+
+handle_info(_, State) ->
+  {noreply, State}.
 
 
 %%--------------------------------------------------------------------
