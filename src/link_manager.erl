@@ -169,7 +169,7 @@ handle_info({tcp, Socket, Bin}, State) ->
   {ok, Pid} = socket_handler:start(Socket),
   Pid ! {tcp, Socket, Bin},
   timer:sleep(10000),
-  exit(Pid, kill),
+  exit(Pid, normal),
   {noreply, State};
 
 handle_info(startup, _State) ->
@@ -253,12 +253,12 @@ send(Port, IP, Message, State, _Size) ->
         {ok, PID} ->
           gen_tcp:controlling_process(RequestSocket, PID),
           socket_handler:send_message(PID, Message),
-          timer:apply_after(300000, erlang, exit, [PID, kill]),
+          timer:apply_after(300000, erlang, exit, [PID, normal]),
           {reply, ok, State};
         {ok, PID, _} ->
           gen_tcp:controlling_process(RequestSocket, PID),
           socket_handler:send_message(PID, Message),
-          timer:apply_after(300000, erlang, exit, [PID, kill]),
+          timer:apply_after(300000, erlang, exit, [PID, normal]),
           {reply, ok, State}
       end;
     {error, Reason} ->
