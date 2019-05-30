@@ -40,8 +40,7 @@ notify_identity(PID, Identity) ->
   end.
 
 get_identity(Identity) ->
-  Results = ets:lookup(naming_db, Identity),
-  {Identity, PID} = hd(Results),
+  [{Identity, PID}] = ets:lookup(naming_db, Identity),
   PID.
 
 wait_service(Name) ->
