@@ -26,6 +26,10 @@
 
 -record(state, {join_time, max_lookup_time, lookup_drop, ftable_timing, lookup_times}).
 
+%TODO rethink the statistics algorithm because this one may create problems:
+%If a proceess exits the network while the packet is circulating, the packet will loop indefinitely.
+%Also statistics reflects the topology of the network, this may be not safe
+
 %%%===================================================================
 %%% API
 %%%===================================================================

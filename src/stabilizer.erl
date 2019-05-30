@@ -98,20 +98,20 @@ handle_call({lost, Address}, _From, State) ->
     [] ->                                                               %The corner case is handled by splitting the network in half
       OwnAddress = link_manager:get_own_address(),
       AdjOwnId = adjust_successor(State#state.id, State#state.id, State#state.nbits),
-      {reply, ok, State#state{succ_list = [{AdjOwnId, OwnAddress}], fail_counter = 0, last_sent = not_sent}};
+      {reply, ok, State#state{succ_list = [{AdjOwnId, OwnAddress}], fail_counter = 1, last_sent = not_sent}};
     _ ->
       {SuccID, SuccAddr} = hd(NewList),
       AdjSuccID = adjust_successor(SuccID, State#state.id, State#state.nbits),
       AdjNewList = [{AdjSuccID, SuccAddr} | tl(NewList)],
-      {reply, ok, State#state{succ_list = AdjNewList, fail_counter = 0, last_sent = not_sent}}
+      {reply, ok, State#state{succ_list = AdjNewList, fail_counter = 1, last_sent = not_sent}}
   end;
 
 handle_call(turn_off, _From, _State) ->
-  {reply, ok, #state{fail_counter = 0, succ_list = undefined, nbits = undefined, id = undefined, op = no_operating, last_sent = not_sent, times = [1000]}};
+  {reply, ok, #state{fail_counter = 1, succ_list = undefined, nbits = undefined, id = undefined, op = no_operating, last_sent = not_sent, times = [1000]}};
 
 handle_call(turn_on, _From, _State) ->
   self() ! startup,
-  {reply, ok, #state{fail_counter = 0, op = no_operating, last_sent = not_sent, times = [1000]}};
+  {reply, ok, #state{fail_counter = 1, op = no_operating, last_sent = not_sent, times = [1000]}};
 
 handle_call(Request, _From, State) ->
   unexpected:error("STABILIZER: Unexpected call message: ~p~n", [Request]),
@@ -134,7 +134,7 @@ handle_cast({stabilize_response, Predecessor, NewSuccList}, State) ->
   NewSuccessorList = handle_pred_tell(PredIndex, ID, HeadIndex, NewSuccList, OwnSuccessorList, Predecessor, NBits),
   Time = timer:now_diff(erlang:timestamp(), State#state.last_sent) div 1000,
   NewList = add_time(Time, State#state.times),
-  {noreply, State#state{fail_counter = 0, succ_list = NewSuccessorList, last_sent = not_sent, times = NewList}};
+  {noreply, State#state{fail_counter = 1, succ_list = NewSuccessorList, last_sent = not_sent, times = NewList}};
 
 handle_cast(Request, State) ->
   unexpected:error("STABILIZER: Unexpected cast message: ~p~n", [Request]),
@@ -164,7 +164,7 @@ handle_info(startup, State) ->
   NewList = update_successor_list(lists:sort(Corrected), {SuccID, Successor}, NBits),
   naming_handler:notify_identity(self(), stabilizer),
   erlang:send_after(get_timing(State), self(), stabilize),
-  {noreply, State#state{fail_counter = 0, succ_list = NewList, id = ID, nbits = NBits, op = operating, last_sent = not_sent}};
+  {noreply, State#state{fail_counter = 1, succ_list = NewList, id = ID, nbits = NBits, op = operating, last_sent = not_sent}};
 
 handle_info(stabilize, State) when State#state.op =:= no_operating ->
   {noreply, State};
@@ -176,10 +176,10 @@ handle_info(stabilize, State) when State#state.fail_counter > ?THRESHOLD ->
       OwnAddress = link_manager:get_own_address(),
       AdjOwnId = adjust_successor(State#state.id, State#state.id, State#state.nbits),
       self() ! stabilize,
-      {noreply, State#state{fail_counter = 0, succ_list = [{AdjOwnId, OwnAddress}], last_sent = not_sent}};
+      {noreply, State#state{fail_counter = 1, succ_list = [{AdjOwnId, OwnAddress}], last_sent = not_sent}};
     _ ->
       self() ! stabilize,
-      {noreply, State#state{fail_counter = 0, succ_list = tl(State#state.succ_list), last_sent = not_sent}}
+      {noreply, State#state{fail_counter = 1, succ_list = tl(State#state.succ_list), last_sent = not_sent}}
   end;
 
 handle_info(stabilize, State) ->
