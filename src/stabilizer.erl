@@ -127,12 +127,6 @@ handle_call(Request, _From, State) ->
 handle_cast({stabilize_response, _Predecessor, _NewSuccList}, State) when State#state.last_sent =:= not_sent ->
   {noreply, State};
 
-handle_cast({stabilize_response, _Predecessor, _NewSuccList}, State) when State#state.fail_counter > ?THRESHOLD ->
-  io:format("Received finally!!!!!!!!!!!!!!!!!!\n"),
-  Time = timer:now_diff(erlang:timestamp(), State#state.last_sent) div 1000,
-  NewList = add_time(Time, State#state.times),
-  {noreply, State#state{fail_counter = 1, last_sent = not_sent, times = NewList}};
-
 handle_cast({stabilize_response, Predecessor, NewSuccList}, State) ->
   PredIndex = normalizer:normalize_as_successor_including(hash_f:get_hashed_addr(Predecessor)),
   HeadIndex = normalizer:normalize_as_successor(hd([I || {I, _} <- State#state.succ_list])),
@@ -177,18 +171,17 @@ handle_info(stabilize, State) when State#state.op =:= no_operating ->
 
 handle_info(stabilize, State) when State#state.fail_counter > ?THRESHOLD ->
   io:format("\007Dropped\n"),
-  erlang:send_after(get_timing(State), self(), stabilize),
-  {noreply, State};
-%%case tl(State#state.succ_list) of
-%%    [] ->
-%%      OwnAddress = link_manager:get_own_address(),
-%%      AdjOwnId = adjust_successor(State#state.id, State#state.id, State#state.nbits),
-%%      self() ! stabilize,
-%%      {noreply, State#state{fail_counter = 1, succ_list = [{AdjOwnId, OwnAddress}], last_sent = not_sent}};
-%%    _ ->
-%%      self() ! stabilize,
-%%      {noreply, State#state{fail_counter = 1, succ_list = tl(State#state.succ_list), last_sent = not_sent}}
-%%  end;
+  case tl(State#state.succ_list) of
+    [] ->
+      OwnAddress = link_manager:get_own_address(),
+      AdjOwnId = adjust_successor(State#state.id, State#state.id, State#state.nbits),
+      self() ! stabilize,
+      {noreply, State#state{fail_counter = 1, succ_list = [{AdjOwnId, OwnAddress}], last_sent = not_sent}};
+    _ ->
+      self() ! stabilize,
+      {noreply, State#state{fail_counter = 1, succ_list = tl(State#state.succ_list), last_sent = not_sent}}
+  end;
+
 handle_info(stabilize, State) ->
   case State#state.last_sent of
     not_sent ->

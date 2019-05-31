@@ -145,7 +145,9 @@ handle_cast({send_msg, Method, Params, Address, Alias}, State) ->
   Translated = translate(Method),
   Encoded = encode_params(Method, Params, State#state.nbits),
   case Encoded of
-    badarg -> {noreply, State};
+    badarg ->
+      io:format("ààààà Error in the encoding of the message ààààà\n"),
+      {noreply, State};
     _ ->
       link_manager:send_message(Address, {Alias, Translated, Encoded}),
       {noreply,State}
@@ -286,18 +288,18 @@ decode_params(join_info, [M], _NBits) -> decode_nbits_successor_and_resources(M)
 decode_params(ack_info, [], _NBits) -> [];
 decode_params(abort, [S], _NBits) -> [binary_to_list(S)];
 decode_params(ack_join, [], _NBits) -> [];
-decode_params(leave_info, _, no_nbits) -> badarg;
+decode_params(leave_info, _, no_nbits) -> io:format("ààààà Error in the decoding of the message ààààà\n"), badarg;
 decode_params(leave_info, [], _NBits) -> [];
 decode_params(leave_info, [Res], _NBits) -> [decode_resource(Res)];
 decode_params(ack_leave, [], _NBits) -> [];
 decode_params(ask_pred, [], _NBits) -> [];
-decode_params(pred_reply, _, no_nbits) -> badarg;
+decode_params(pred_reply, _, no_nbits) -> io:format("ààààà Error in the decoding of the message ààààà\n"), badarg;
 decode_params(pred_reply, [Pred, SL], NBits) -> [link_manager:binary_to_address(Pred), decode_successor_list(SL, NBits)];
 decode_params(lookup, [ID], _NBits) -> [decode_ID(ID)];
 decode_params(command, [A,C], _NBits) -> [link_manager:binary_to_address(A), C];
 decode_params(get_stats, [], _NBits) -> [];
 decode_params(stats, [Bin], _NBits) -> <<A:32, B:32, C:32, D:32>> = Bin, [{A, B, C, D}];
-decode_params(_, _, _) -> badarg.
+decode_params(_, _, _) -> io:format("ààààà Error in the decoding of the message ààààà\n"), badarg.
 
 forward(lookup_for_join, [], From) -> {[router], fun() -> router:lookup_for_join(From) end};
 forward(lookup_response, [ID, Addr], _From) -> {[request_gateway, join_handler], fun() -> request_gateway:lookup_response(ID, Addr), join_handler:look_response(Addr) end};
