@@ -18,7 +18,7 @@
 -define(SERVER, ?MODULE).
 -define(MIN_WAIT_TIME, 10000).
 
--record(state, {requested, from, list, type, time}).
+-record(state, {requested, from, list, type, time, last}).
 
 %%%===================================================================
 %%% API
@@ -189,5 +189,11 @@ next_message(State) when ((State#state.list =:= []) and (State#state.type =:= fi
 
 next_message(State) ->
   Address = hd(State#state.list),
-  communication_manager:send_message_async(lookup, [State#state.requested], Address, link_manager:get_own_address()),
-  State#state{list = tl(State#state.list)}.
+  Last = State#state.last,
+  case Address of
+    Last ->
+      State#state{list = tl(State#state.list)};
+    _ ->
+      communication_manager:send_message_async(lookup, [State#state.requested], Address, link_manager:get_own_address()),
+      State#state{list = tl(State#state.list), last = Address}
+  end.

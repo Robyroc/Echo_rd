@@ -119,7 +119,7 @@ handle_info(loop, State) ->
 handle_info(startup, _State) ->
   naming_handler:wait_service(link_manager),
   Port = naming_handler:get_identity(port),
-  {ok, Listen} = gen_tcp:listen(Port, [binary, {packet, 0}, {reuseaddr, true}, {active, true}]),
+  {ok, Listen} = gen_tcp:listen(Port, [binary, {packet, 0}, {reuseaddr, true}, {active, false}]),
   case logging_policies:check_lager_policy(?MODULE) of
     {lager_on, _} ->
       lager:info("Listening at port ~p\n", [Port]);

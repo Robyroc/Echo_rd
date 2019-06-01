@@ -53,6 +53,7 @@ send_message(PID, Message) ->
 %% @end
 %%--------------------------------------------------------------------
 init([Socket]) ->
+  inet:setopts(Socket, {active, once}),
   {ok, #state{socket = Socket, remaining = 0, acc = []}, ?TIMEOUT};
 
 init(_) ->
@@ -120,6 +121,7 @@ handle_cast(Request, State) ->
 %%--------------------------------------------------------------------
 
 handle_info({tcp, Socket, <<"Not used">>}, State) when Socket =:= State#state.socket ->
+  inet:setopts(Socket, {active, once}),
   exit(self(), unused),
   {stop, unused_connection, State};
 
@@ -132,8 +134,11 @@ handle_info({tcp, Socket , Bin}, State) when Socket =:= State#state.socket ->
         Received ->
           {Address, Method, Params} = parse_message(Message),
           link_manager:notify_incoming_message({Method, Address, Params}),
+          inet:setopts(Socket, {active, once}),
           {noreply, State, ?TIMEOUT};
-        _ -> {noreply, State#state{remaining = Size - Received, acc = [Message]}, ?TIMEOUT}
+        _ ->
+          inet:setopts(Socket, {active, once}),
+          {noreply, State#state{remaining = Size - Received, acc = [Message]}, ?TIMEOUT}
       end;
     _ ->
       Received = byte_size(Bin),
@@ -143,8 +148,11 @@ handle_info({tcp, Socket , Bin}, State) when Socket =:= State#state.socket ->
           Total = list_to_binary(lists:reverse([Bin | State#state.acc])),
           {Address, Method, Params} = parse_message(Total),
           link_manager:notify_incoming_message({Method, Address, Params}),
+          inet:setopts(Socket, {active, once}),
           {noreply, State#state{remaining = 0, acc = []}, ?TIMEOUT};
-        _ -> {noreply, State#state{remaining = Remaining - Received, acc = [Bin | State#state.acc]}, ?TIMEOUT}
+        _ ->
+          inet:setopts(Socket, {active, once}),
+          {noreply, State#state{remaining = Remaining - Received, acc = [Bin | State#state.acc]}, ?TIMEOUT}
       end
   end;
 
