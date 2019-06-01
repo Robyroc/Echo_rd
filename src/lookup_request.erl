@@ -75,9 +75,11 @@ handle_call({lost, Address}, _From, State) ->
 handle_call(Request, _From, State) ->
   case logging_policies:check_lager_policy(?MODULE) of
     {lager_on, _} ->
-      lager:error("Request: Unexpected call message: ~p~n", [Request]);
+      lager:error("Request: Unexpected call message: ~p\n", [Request]);
+    {lager_only, _} ->
+      lager:error("Request: Unexpected call message: ~p\n", [Request]);
     {lager_off, _} ->
-      io:format("Request: Unexpected call message: ~p~n", [Request]);
+      io:format("Request: Unexpected call message: ~p\n", [Request]);
     _ -> ok
   end,
   {reply, ok, State}.
@@ -99,9 +101,11 @@ handle_cast({response, Address}, State) ->
 handle_cast(Request, State) ->
   case logging_policies:check_lager_policy(?MODULE) of
     {lager_on, _} ->
-      lager:error("Request: Unexpected cast message: ~p~n", [Request]);
+      lager:error("Request: Unexpected cast message: ~p\n", [Request]);
+    {lager_only, _} ->
+      lager:error("Request: Unexpected cast message: ~p\n", [Request]);
     {lager_off, _} ->
-      io:format("Request: Unexpected cast message: ~p~n", [Request]);
+      io:format("Request: Unexpected cast message: ~p\n", [Request]);
     _ -> ok
   end,
   {noreply, State}.
@@ -130,9 +134,11 @@ handle_info(next, State) ->
 handle_info(Info, State) ->
   case logging_policies:check_lager_policy(?MODULE) of
     {lager_on, _} ->
-      lager:error("Request: Unexpected ! message: ~p~n", [Info]);
+      lager:error("Request: Unexpected ! message: ~p\n", [Info]);
+    {lager_only, _} ->
+      lager:error("Request: Unexpected ! message: ~p\n", [Info]);
     {lager_off, _} ->
-      io:format("Request: Unexpected ! message: ~p~n", [Info]);
+      io:format("Request: Unexpected ! message: ~p\n", [Info]);
     _ -> ok
   end,
   {noreply, State}.

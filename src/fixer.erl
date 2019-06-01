@@ -61,9 +61,11 @@ init([]) ->
 handle_call(Request, _From, State) ->
   case logging_policies:check_lager_policy(?MODULE) of
     {lager_on, _} ->
-      lager:error("FIX: Unexpected call message: ~p~n", [Request]);
+      lager:error("FIX: Unexpected call message: ~p\n", [Request]);
+    {lager_only, _} ->
+      lager:error("FIX: Unexpected call message: ~p\n", [Request]);
     {lager_off, _} ->
-      io:format("FIX: Unexpected call message: ~p~n", [Request]);
+      io:format("FIX: Unexpected call message: ~p\n", [Request]);
     _ -> ok
   end,
   {reply, ok, State}.
@@ -78,9 +80,11 @@ handle_call(Request, _From, State) ->
 handle_cast(Request, State) ->
   case logging_policies:check_lager_policy(?MODULE) of
     {lager_on, _} ->
-      lager:error("FIX: Unexpected cast message: ~p~n", [Request]);
+      lager:error("FIX: Unexpected cast message: ~p\n", [Request]);
+    {lager_only, _} ->
+      lager:error("FIX: Unexpected cast message: ~p\n", [Request]);
     {lager_off, _} ->
-      io:format("FIX: Unexpected cast message: ~p~n", [Request]);
+      io:format("FIX: Unexpected cast message: ~p\n", [Request]);
     _ -> ok
   end,
   {noreply, State}.
@@ -107,12 +111,12 @@ handle_info(fix, State) ->
   Theo = (State#state.id + round(math:pow(2, State#state.index))),
   case logging_policies:check_lager_policy(?MODULE) of
     {lager_on, able} ->
-      lagerConsole:info("%%% FIXER %%%: ~p~n", [Theo]),
-      fixerLager:info("%%% FIXER %%%: ~p~n", [Theo]);
-    {lager_on, able_lager} ->
-      fixerLager:info("%%% FIXER %%%: ~p~n", [Theo]);
+      lagerConsole:info("%%% FIXER %%%: ~p\n", [Theo]),
+      fixerLager:info("%%% FIXER %%%: ~p\n", [Theo]);
+    {lager_only, able} ->
+      fixerLager:info("%%% FIXER %%%: ~p\n", [Theo]);
     {lager_off, able} ->
-      io:format("%%% FIXER %%%: ~p~n", [Theo]);
+      io:format("%%% FIXER %%%: ~p\n", [Theo]);
     _ -> ok
   end,
   {found, Address} = router:local_lookup(Theo),
@@ -123,9 +127,11 @@ handle_info(fix, State) ->
 handle_info(Info, State) ->
   case logging_policies:check_lager_policy(?MODULE) of
     {lager_on, _} ->
-      lager:error("FIX: Unexpected ! message: ~p~n", [Info]);
+      lager:error("FIX: Unexpected ! message: ~p\n", [Info]);
+    {lager_only, _} ->
+      lager:error("FIX: Unexpected ! message: ~p\n", [Info]);
     {lager_off, _} ->
-      io:format("FIX: Unexpected ! message: ~p~n", [Info]);
+      io:format("FIX: Unexpected ! message: ~p\n", [Info]);
     _ -> ok
   end,
   {noreply, State}.
@@ -164,5 +170,5 @@ iterate_state(State) ->
   MaxIndex = NBits - 1,
   case Index of
     MaxIndex -> #state{id = ID, nbits = NBits, index = 0};
-    _ -> #state{id = ID, nbits = NBits, index = Index + 1}
+    _ -> State#state{id = ID, nbits = NBits, index = Index + 1}
   end.

@@ -102,7 +102,7 @@ handle_call({send_msg, Method, Params, Address, Alias}, _From, State) ->
     {lager_on, able} ->
       lagerConsole:info("### OUT ###: Method:~p | Params:~p | Address:~p \n", [Method, Params, Address]),
       inout:info("### OUT ###: Method:~p | Params:~p | Address:~p \n", [Method, Params, Address]);
-    {lager_on, able_lager} ->
+    {lager_only, able} ->
       inout:info("### OUT ###: Method:~p | Params:~p | Address:~p \n", [Method, Params, Address]);
     {lager_off, able} ->
       io:format("### OUT ###: Method:~p | Params:~p | Address:~p \n", [Method, Params, Address]);
@@ -122,9 +122,11 @@ handle_call({get_nbits, NBits}, _From, State) ->
 handle_call(Request, _From, State) ->
   case logging_policies:check_lager_policy(?MODULE) of
     {lager_on, _} ->
-      lager:error("CM: Unexpected call message: ~p~n", [Request]);
+      lager:error("CM: Unexpected call message: ~p\n", [Request]);
+    {lager_only, _} ->
+      lager:error("CM: Unexpected call message: ~p\n", [Request]);
     {lager_off, _} ->
-      io:format("CM: Unexpected call message: ~p~n", [Request]);
+      io:format("CM: Unexpected call message: ~p\n", [Request]);
     _ -> ok
   end,
   {reply, ok, State}.
@@ -145,12 +147,12 @@ handle_cast({send_msg, Method, Params, Address, Alias}, State) ->
     _ ->
       case logging_policies:check_lager_policy(?MODULE) of
         {lager_on, able} ->
-          lagerConsole:info("### OUT ###: Method:~p | Params:~p | Address:~p~n", [Method, Params, Address]),
-          inout:info("### OUT ###: Method:~p | Params:~p | Address:~p~n", [Method, Params, Address]);
-        {lager_on, able_lager} ->
-          inout:info("### OUT ###: Method:~p | Params:~p | Address:~p~n", [Method, Params, Address]);
+          lagerConsole:info("### OUT ###: Method:~p | Params:~p | Address:~p\n", [Method, Params, Address]),
+          inout:info("### OUT ###: Method:~p | Params:~p | Address:~p\n", [Method, Params, Address]);
+        {lager_only, able} ->
+          inout:info("### OUT ###: Method:~p | Params:~p | Address:~p\n", [Method, Params, Address]);
         {lager_off, able} ->
-          io:format("### OUT ###: Method:~p | Params:~p | Address:~p~n", [Method, Params, Address]);
+          io:format("### OUT ###: Method:~p | Params:~p | Address:~p\n", [Method, Params, Address]);
         _ -> ok
       end
   end,
@@ -173,12 +175,12 @@ handle_cast({rcv_msg, Method, Address, Params}, State) ->
     _ ->
       case logging_policies:check_lager_policy(?MODULE) of
         {lager_on, able} ->
-          lagerConsole:info("### IN ###: Method:~p | Params:~p | Address:~p~n", [BackTranslated, DecodedParams, Address]),
-          inout:info("### IN ###: Method:~p | Params:~p | Address:~p~n", [BackTranslated, DecodedParams, Address]);
-        {lager_on, able_lager} ->
-          inout:info("### IN ###: Method:~p | Params:~p | Address:~p~n", [BackTranslated, DecodedParams, Address]);
+          lagerConsole:info("### IN ###: Method:~p | Params:~p | Address:~p\n", [BackTranslated, DecodedParams, Address]),
+          inout:info("### IN ###: Method:~p | Params:~p | Address:~p\n", [BackTranslated, DecodedParams, Address]);
+        {lager_only, able} ->
+          inout:info("### IN ###: Method:~p | Params:~p | Address:~p\n", [BackTranslated, DecodedParams, Address]);
         {lager_off, able} ->
-          io:format("### IN ###: Method:~p | Params:~p | Address:~p~n", [BackTranslated, DecodedParams, Address]);
+          io:format("### IN ###: Method:~p | Params:~p | Address:~p\n", [BackTranslated, DecodedParams, Address]);
         _ -> ok
       end
   end,
@@ -188,9 +190,11 @@ handle_cast({rcv_msg, Method, Address, Params}, State) ->
 handle_cast(Request, State) ->
   case logging_policies:check_lager_policy(?MODULE) of
     {lager_on, _} ->
-      lager:error("CM: Unexpected cast message: ~p~n", [Request]);
+      lager:error("CM: Unexpected cast message: ~p\n", [Request]);
+    {lager_only, _} ->
+      lager:error("CM: Unexpected cast message: ~p\n", [Request]);
     {lager_off, _} ->
-      io:format("CM: Unexpected cast message: ~p~n", [Request]);
+      io:format("CM: Unexpected cast message: ~p\n", [Request]);
     _ -> ok
   end,
   {noreply, State}.
@@ -209,9 +213,11 @@ handle_cast(Request, State) ->
 handle_info(Info, State) ->
   case logging_policies:check_lager_policy(?MODULE) of
     {lager_on, _} ->
-      lager:error("CM: Unexpected ! message: ~p~n", [Info]);
+      lager:error("CM: Unexpected ! message: ~p\n", [Info]);
+    {lager_only, _} ->
+      lager:error("CM: Unexpected ! message: ~p\n", [Info]);
     {lager_off, _} ->
-      io:format("CM: Unexpected ! message: ~p~n", [Info]);
+      io:format("CM: Unexpected ! message: ~p\n", [Info]);
     _ -> ok
   end,
   {noreply, State}.

@@ -71,9 +71,11 @@ init([]) ->
 handle_call(Request, _From, State) ->
   case logging_policies:check_lager_policy(?MODULE) of
     {lager_on, _} ->
-      lager:error("Listen: Unexpected call message: ~p~n", [Request]);
+      lager:error("Listen: Unexpected call message: ~p\n", [Request]);
+    {lager_only, _} ->
+      lager:error("Listen: Unexpected call message: ~p\n", [Request]);
     {lager_off, _} ->
-      io:format("Listen: Unexpected call message: ~p~n", [Request]);
+      io:format("Listen: Unexpected call message: ~p\n", [Request]);
     _ -> ok
   end,
   {reply, ok, State}.
@@ -88,9 +90,11 @@ handle_call(Request, _From, State) ->
 handle_cast(Request, State) ->
   case logging_policies:check_lager_policy(?MODULE) of
     {lager_on, _} ->
-      lager:error("Listen: Unexpected cast message: ~p~n", [Request]);
+      lager:error("Listen: Unexpected cast message: ~p\n", [Request]);
+    {lager_only, _} ->
+      lager:error("Listen: Unexpected cast message: ~p\n", [Request]);
     {lager_off, _} ->
-      io:format("Listen: Unexpected cast message: ~p~n", [Request]);
+      io:format("Listen: Unexpected cast message: ~p\n", [Request]);
     _ -> ok
   end,
   {noreply, State}.
@@ -118,9 +122,11 @@ handle_info(startup, _State) ->
   {ok, Listen} = gen_tcp:listen(Port, [binary, {packet, 0}, {reuseaddr, true}, {active, true}]),
   case logging_policies:check_lager_policy(?MODULE) of
     {lager_on, _} ->
-      lager:info("Listening at port ~p~n", [Port]);
+      lager:info("Listening at port ~p\n", [Port]);
+    {lager_only, _} ->
+      lager:info("Listening at port ~p\n", [Port]);
     {lager_off, _} ->
-      io:format("Listening at port ~p~n", [Port]);
+      io:format("Listening at port ~p\n", [Port]);
     _ -> ok
   end,
   naming_handler:notify_identity(self(), listener),
@@ -130,9 +136,11 @@ handle_info(startup, _State) ->
 handle_info(Info, State) ->
   case logging_policies:check_lager_policy(?MODULE) of
     {lager_on, _} ->
-      lager:error("Listen: Unexpected ! message: ~p~n", [Info]);
+      lager:error("Listen: Unexpected ! message: ~p\n", [Info]);
+    {lager_only, _} ->
+      lager:error("Listen: Unexpected ! message: ~p\n", [Info]);
     {lager_off, _} ->
-      io:format("Listen: Unexpected ! message: ~p~n", [Info]);
+      io:format("Listen: Unexpected ! message: ~p\n", [Info]);
     _ -> ok
   end,
   {noreply, State}.
@@ -148,15 +156,7 @@ handle_info(Info, State) ->
 %% @spec terminate(Reason, State) -> void()
 %% @end
 %%--------------------------------------------------------------------
-terminate(Reason, State) ->
-  %TODO check lager and policy
-  case logging_policies:check_lager_policy(?MODULE) of
-    {lager_on, _} ->
-      lager:info("Listen terminate: ~p~n", [Reason]);
-    {lager_off, _} ->
-      io:format("Listen terminate: ~p~n", [Reason]);
-    _ -> ok
-  end,
+terminate(_Reason, State) ->
   gen_tcp:close(State#state.socket),
   ok.
 

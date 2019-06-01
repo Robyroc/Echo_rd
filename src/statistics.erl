@@ -86,9 +86,11 @@ init([]) ->
 handle_call(Request, _From, State) ->
   case logging_policies:check_lager_policy(?MODULE) of
     {lager_on, _} ->
-      lager:error("STATISTICS: Unexpected call message: ~p~n", [Request]);
+      lager:error("STATISTICS: Unexpected call message: ~p\n", [Request]);
+    {lager_only, _} ->
+      lager:error("STATISTICS: Unexpected call message: ~p\n", [Request]);
     {lager_off, _} ->
-      io:format("STATISTICS: Unexpected call message: ~p~n", [Request]);
+      io:format("STATISTICS: Unexpected call message: ~p\n", [Request]);
     _ -> ok
   end,
   {reply, ok, State}.
@@ -113,12 +115,16 @@ handle_cast({show_stats, Address, Stats}, State) ->
   %TODO check lager and policy
   case logging_policies:check_lager_policy(?MODULE) of
     {lager_on, _} ->
-      lager:info("^^^^^ STATS ^^^^^~n ID: ~p~n IP: ~p~n Join time: ~p~n
-      Highest lookup time: ~p~n Number of lookup timeouts: ~p~n FTable last refresh timings: ~p~n~n",
+      lager:info("^^^^^ STATS ^^^^^\n ID: ~p\n IP: ~p\n Join time: ~p\n
+      Highest lookup time: ~p\n Number of lookup timeouts: ~p\n FTable last refresh timings: ~p\n\n",
+        [ID, Address, JoinTime, HighLookupTime, LookupDrop, FtableTimings]);
+    {lager_only, _} ->
+      lager:info("^^^^^ STATS ^^^^^\n ID: ~p\n IP: ~p\n Join time: ~p\n
+      Highest lookup time: ~p\n Number of lookup timeouts: ~p\n FTable last refresh timings: ~p\n\n",
         [ID, Address, JoinTime, HighLookupTime, LookupDrop, FtableTimings]);
     {lager_off, _} ->
-      io:format("^^^^^ STATS ^^^^^~n ID: ~p~n IP: ~p~n Join time: ~p~n
-      Highest lookup time: ~p~n Number of lookup timeouts: ~p~n FTable last refresh timings: ~p~n~n",
+      io:format("^^^^^ STATS ^^^^^\n ID: ~p\n IP: ~p\n Join time: ~p\n
+      Highest lookup time: ~p\n Number of lookup timeouts: ~p\n FTable last refresh timings: ~p\n\n",
         [ID, Address, JoinTime, HighLookupTime, LookupDrop, FtableTimings]);
     _ -> ok
   end,
@@ -157,9 +163,11 @@ handle_cast({finger_completion, Time}, State) ->
 handle_cast(Request, State) ->
   case logging_policies:check_lager_policy(?MODULE) of
     {lager_on, _} ->
-      lager:error("STATISTICS: Unexpected cast message: ~p~n", [Request]);
+      lager:error("STATISTICS: Unexpected cast message: ~p\n", [Request]);
+    {lager_only, _} ->
+      lager:error("STATISTICS: Unexpected cast message: ~p\n", [Request]);
     {lager_off, _} ->
-      io:format("STATISTICS: Unexpected cast message: ~p~n", [Request]);
+      io:format("STATISTICS: Unexpected cast message: ~p\n", [Request]);
     _ -> ok
   end,
   {noreply, State}.
@@ -176,9 +184,11 @@ handle_info(startup, State) ->
 handle_info(Info, State) ->
   case logging_policies:check_lager_policy(?MODULE) of
     {lager_on, _} ->
-      lager:error("STATISTICS: Unexpected ! message: ~p~n", [Info]);
+      lager:error("STATISTICS: Unexpected ! message: ~p\n", [Info]);
+    {lager_only, _} ->
+      lager:error("STATISTICS: Unexpected ! message: ~p\n", [Info]);
     {lager_off, _} ->
-      io:format("STATISTICS: Unexpected ! message: ~p~n", [Info]);
+      io:format("STATISTICS: Unexpected ! message: ~p\n", [Info]);
     _ -> ok
   end,
   {noreply, State}.

@@ -74,9 +74,11 @@ handle_call({get_param, nbits}, _From, State) ->
 handle_call({get_param, Invalid}, _From, State) ->
   case logging_policies:check_lager_policy(?MODULE) of
     {lager_on, _} ->
-      lager:error("PARAMS HANDLER: Invalid Parameter has been requested: ~p~n", [Invalid]);
+      lager:error("PARAMS HANDLER: Invalid Parameter has been requested: ~p\n", [Invalid]);
+    {lager_only, _} ->
+      lager:error("PARAMS HANDLER: Invalid Parameter has been requested: ~p\n", [Invalid]);
     {lager_off, _} ->
-      io:format("PARAMS HANDLER: Invalid Parameter has been requested: ~p~n", [Invalid]);
+      io:format("PARAMS HANDLER: Invalid Parameter has been requested: ~p\n", [Invalid]);
     _ -> ok
   end,
   {reply, ok, State};
@@ -84,9 +86,11 @@ handle_call({get_param, Invalid}, _From, State) ->
 handle_call(Request, _From, State) ->
   case logging_policies:check_lager_policy(?MODULE) of
     {lager_on, _} ->
-      lager:error("PARAMS HANDLER: Unexpected call message: ~p~n", [Request]);
+      lager:error("PARAMS HANDLER: Unexpected call message: ~p\n", [Request]);
+    {lager_only, _} ->
+      lager:error("PARAMS HANDLER: Unexpected call message: ~p\n", [Request]);
     {lager_off, _} ->
-      io:format("PARAMS HANDLER: Unexpected call message: ~p~n", [Request]);
+      io:format("PARAMS HANDLER: Unexpected call message: ~p\n", [Request]);
     _ -> ok
   end,
   {reply, ok, State}.
@@ -101,9 +105,11 @@ handle_call(Request, _From, State) ->
 handle_cast(Request, State) ->
   case logging_policies:check_lager_policy(?MODULE) of
     {lager_on, _} ->
-      lager:error("PARAMS HANDLER: Unexpected cast message: ~p~n", [Request]);
+      lager:error("PARAMS HANDLER: Unexpected cast message: ~p\n", [Request]);
+    {lager_only, _} ->
+      lager:error("PARAMS HANDLER: Unexpected cast message: ~p\n", [Request]);
     {lager_off, _} ->
-      io:format("PARAMS HANDLER: Unexpected cast message: ~p~n", [Request]);
+      io:format("PARAMS HANDLER: Unexpected cast message: ~p\n", [Request]);
     _ -> ok
   end,
   {noreply, State}.
@@ -121,9 +127,11 @@ handle_cast(Request, State) ->
 handle_info(Info, State) ->
   case logging_policies:check_lager_policy(?MODULE) of
     {lager_on, _} ->
-      lager:error("PARAMS HANDLER: Unexpected ! message: ~p~n", [Info]);
+      lager:error("PARAMS HANDLER: Unexpected ! message: ~p\n", [Info]);
+    {lager_only, _} ->
+      lager:error("PARAMS HANDLER: Unexpected ! message: ~p\n", [Info]);
     {lager_off, _} ->
-      io:format("PARAMS HANDLER: Unexpected ! message: ~p~n", [Info]);
+      io:format("PARAMS HANDLER: Unexpected ! message: ~p\n", [Info]);
     _ -> ok
   end,
   {noreply, State}.
