@@ -52,10 +52,8 @@ init([]) ->
     Restart, Shutdown, supervisor, [naming_supervisor]},
   Son2 = {chord_supervisor, {chord_supervisor, start_link, []},
     Restart, Shutdown, supervisor, [chord_supervisor]},
-  Son3 = {add_on_supervisor, {add_on_supervisor, start_link, []},
-    Restart, Shutdown, supervisor, [add_on_supervisor]},
 
-  {ok, {SupFlags, [Son1, Son2, Son3]}}.
+  {ok, {SupFlags, [Son1, Son2]}}.
 
 %%%===================================================================
 %%% Internal functions

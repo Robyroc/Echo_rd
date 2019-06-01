@@ -55,8 +55,10 @@ init([]) ->
     Restart, Shutdown, worker, [communication_manager]},
   Son3 = {link_supervisor, {link_supervisor, start_link, []},
     Restart, Shutdown, supervisor, [link_supervisor]},
+  Son4 = {add_on_supervisor, {add_on_supervisor, start_link, []},
+    Restart, Shutdown, supervisor, [add_on_supervisor]},
 
-  {ok, {SupFlags, [Son1, Son2, Son3]}}.
+  {ok, {SupFlags, [Son1, Son2, Son3, Son4]}}.
 
 %%%===================================================================
 %%% Internal functions
