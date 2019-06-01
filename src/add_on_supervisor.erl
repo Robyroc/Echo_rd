@@ -1,5 +1,13 @@
--module(communication_supervisor).
--author("Giacomo").
+%%%-------------------------------------------------------------------
+%%% @author mrbo9
+%%% @copyright (C) 2019, <COMPANY>
+%%% @doc
+%%%
+%%% @end
+%%% Created : 01. Jun 2019 13:44
+%%%-------------------------------------------------------------------
+-module(add_on_supervisor).
+-author("robyroc").
 
 -behaviour(supervisor).
 
@@ -39,7 +47,6 @@ start_link() ->
 %% @end
 %%--------------------------------------------------------------------
 init([]) ->
-  naming_handler:notify_identity(self(), communication_supervisor),
   RestartStrategy = one_for_one,
   MaxRestarts = 1000,
   MaxSecondsBetweenRestarts = 3600,
@@ -49,14 +56,12 @@ init([]) ->
   Restart = permanent,
   Shutdown = 2000,
 
-  Son1 = {routing_supervisor, {routing_supervisor, start_link, []},
-    Restart, Shutdown, supervisor, [routing_supervisor]},
-  Son2 = {communication_manager, {communication_manager, start_link, []},
-    Restart, Shutdown, worker, [communication_manager]},
-  Son3 = {link_supervisor, {link_supervisor, start_link, []},
-    Restart, Shutdown, supervisor, [link_supervisor]},
+  Son1 = {statistics, {statistics, start_link, []},
+    Restart, Shutdown, worker, [statistics]},
+  Son2 = {lager_sinks_handler, {lager_sinks_handler, start_link, []},
+    Restart, Shutdown, worker, [lager_sinks_handler]},
 
-  {ok, {SupFlags, [Son1, Son2, Son3]}}.
+  {ok, {SupFlags, [Son1, Son2]}}.
 
 %%%===================================================================
 %%% Internal functions
