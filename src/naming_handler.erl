@@ -25,9 +25,15 @@
 
 notify_identity(PID, Identity) ->
   try
-    case logging_policies:check_policy(?MODULE) of
-      able -> lager:info("=== NEW ENTRY === Name:~p ===~n", [Identity]);
-      unable -> ok
+    %TODO check lager and policy
+    case logging_policies:check_lager_policy(?MODULE) of
+      {lager_on, able} ->
+        lager:info("=== NEW ENTRY === Name:~p ===\n", [Identity]);
+      {lager_only, able} ->
+        lager:info("=== NEW ENTRY === Name:~p ===\n", [Identity]);
+      {lager_off, able} ->
+        io:format("=== NEW ENTRY === Name:~p ===\n", [Identity]);
+      _ -> ok
     end,
     Naming = get_identity(naming_handler),
     gen_server:call(Naming, {notify, Identity, PID})          %TODO check if timeout is needed
@@ -110,16 +116,29 @@ handle_call(delete, _From, State) ->
   {reply, ok, State};
 
 handle_call({reheir, NewManager}, _From, State) ->
-  case logging_policies:check_policy(?MODULE) of
-    able ->
-      lager:info("Naming Handler: Changing Heir options ~n");
-    unable -> ok
+  %TODO check lager and policy
+  case logging_policies:check_lager_policy(?MODULE) of
+    {lager_on, _} ->
+      lager:info("Naming Handler: Changing Heir options\n");
+    {lager_only, _} ->
+      lager:info("Naming Handler: Changing Heir options\n");
+    {lager_off, _} ->
+      io:format("Naming Handler: Changing Heir options\n");
+    _ -> ok
   end,
   ets:setopts(naming_db, {heir, NewManager, naming_db}),
   {reply, ok, State};
 
 handle_call(Request, _From, State) ->
-  unexpected:error("Naming Handler: Unexpected call message: ~p~n", [Request]),
+  case logging_policies:check_lager_policy(?MODULE) of
+    {lager_on, _} ->
+      lager:error("Naming Handler: Unexpected call message: ~p\n", [Request]);
+    {lager_only, _} ->
+      lager:error("Naming Handler: Unexpected call message: ~p\n", [Request]);
+    {lager_off, _} ->
+      io:format("Naming Handler: Unexpected call message: ~p\n", [Request]);
+    _ -> ok
+  end,
   {reply, ok, State}.
 
 %%--------------------------------------------------------------------
@@ -130,7 +149,15 @@ handle_call(Request, _From, State) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_cast(Request, State) ->
-  unexpected:error("Naming Handler: Unexpected cast message: ~p~n", [Request]),
+  case logging_policies:check_lager_policy(?MODULE) of
+    {lager_on, _} ->
+      lager:error("Naming Handler: Unexpected cast message: ~p\n", [Request]);
+    {lager_only, _} ->
+      lager:error("Naming Handler: Unexpected cast message: ~p\n", [Request]);
+    {lager_off, _} ->
+      io:format("Naming Handler: Unexpected cast message: ~p\n", [Request]);
+    _ -> ok
+  end,
   {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -145,15 +172,27 @@ handle_cast(Request, State) ->
 %%--------------------------------------------------------------------
 handle_info({'ETS-TRANSFER', TableId, Pid, _Data}, State) ->
   ets:insert(naming_db, {naming_handler, self()}),
-  case logging_policies:check_policy(?MODULE) of
-    able ->
-      lager:info("Manager(~p) -> Handler(~p) getting TableId: ~p~n", [Pid, self(), TableId]);
-    unable -> ok
+  case logging_policies:check_lager_policy(?MODULE) of
+    {lager_on, able} ->
+      lager:info("Manager(~p) -> Handler(~p) getting TableId: ~p\n", [Pid, self(), TableId]);
+    {lager_only, able} ->
+      lager:info("Manager(~p) -> Handler(~p) getting TableId: ~p\n", [Pid, self(), TableId]);
+    {lager_off, able} ->
+      io:format("Manager(~p) -> Handler(~p) getting TableId: ~p\n", [Pid, self(), TableId]);
+    _ -> ok
   end,
   {noreply, State};
 
 handle_info(Info, State) ->
-  unexpected:error("Naming Handler: Unexpected ! message: ~p~n", [Info]),
+  case logging_policies:check_lager_policy(?MODULE) of
+    {lager_on, _} ->
+      lager:error("Naming Handler: Unexpected ! message: ~p\n", [Info]);
+    {lager_only, _} ->
+      lager:error("Naming Handler: Unexpected ! message: ~p\n", [Info]);
+    {lager_off, _} ->
+      io:format("Naming Handler: Unexpected ! message: ~p\n", [Info]);
+    _ -> ok
+  end,
   {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -168,7 +207,15 @@ handle_info(Info, State) ->
 %% @end
 %%--------------------------------------------------------------------
 terminate(_Reason, _State) ->
-  lager:info("Naming Handler is terminating"),
+  case logging_policies:check_lager_policy(?MODULE) of
+    {lager_on, _} ->
+      lager:info("Naming Handler is terminating\n");
+    {lager_only, _} ->
+      lager:info("Naming Handler is terminating\n");
+    {lager_off, _} ->
+      io:format("Naming Handler is terminating\n");
+    _ -> ok
+  end,
   ok.
 
 %%--------------------------------------------------------------------

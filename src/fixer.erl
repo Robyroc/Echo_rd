@@ -59,7 +59,15 @@ init([]) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_call(Request, _From, State) ->
-  unexpected:error("FIX: Unexpected call message: ~p~n", [Request]),
+  case logging_policies:check_lager_policy(?MODULE) of
+    {lager_on, _} ->
+      lager:error("FIX: Unexpected call message: ~p\n", [Request]);
+    {lager_only, _} ->
+      lager:error("FIX: Unexpected call message: ~p\n", [Request]);
+    {lager_off, _} ->
+      io:format("FIX: Unexpected call message: ~p\n", [Request]);
+    _ -> ok
+  end,
   {reply, ok, State}.
 
 %%--------------------------------------------------------------------
@@ -70,7 +78,15 @@ handle_call(Request, _From, State) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_cast(Request, State) ->
-  unexpected:error("FIX: Unexpected cast message: ~p~n", [Request]),
+  case logging_policies:check_lager_policy(?MODULE) of
+    {lager_on, _} ->
+      lager:error("FIX: Unexpected cast message: ~p\n", [Request]);
+    {lager_only, _} ->
+      lager:error("FIX: Unexpected cast message: ~p\n", [Request]);
+    {lager_off, _} ->
+      io:format("FIX: Unexpected cast message: ~p\n", [Request]);
+    _ -> ok
+  end,
   {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -93,12 +109,15 @@ handle_info(startup, _State) ->
 
 handle_info(fix, State) ->
   Theo = (State#state.id + round(math:pow(2, State#state.index))),
-  case logging_policies:check_policy(?MODULE) of
-    able ->
-      lagerConsole:info("%%% FIXER %%%: ~p~n", [Theo]),
-      fixerLager:info("%%% FIXER %%%: ~p~n", [Theo]);
-    able_lager -> fixerLager:info("%%% FIXER %%%: ~p~n", [Theo]);
-    unable -> ok
+  case logging_policies:check_lager_policy(?MODULE) of
+    {lager_on, able} ->
+      lagerConsole:info("%%% FIXER %%%: ~p\n", [Theo]),
+      fixerLager:info("%%% FIXER %%%: ~p\n", [Theo]);
+    {lager_only, able} ->
+      fixerLager:info("%%% FIXER %%%: ~p\n", [Theo]);
+    {lager_off, able} ->
+      io:format("%%% FIXER %%%: ~p\n", [Theo]);
+    _ -> ok
   end,
   {found, Address} = router:local_lookup(Theo),
   router:update_finger_table(Address, Theo),
@@ -106,7 +125,15 @@ handle_info(fix, State) ->
   {noreply, iterate_state(State)};
 
 handle_info(Info, State) ->
-  unexpected:error("FIX: Unexpected ! message: ~p~n", [Info]),
+  case logging_policies:check_lager_policy(?MODULE) of
+    {lager_on, _} ->
+      lager:error("FIX: Unexpected ! message: ~p\n", [Info]);
+    {lager_only, _} ->
+      lager:error("FIX: Unexpected ! message: ~p\n", [Info]);
+    {lager_off, _} ->
+      io:format("FIX: Unexpected ! message: ~p\n", [Info]);
+    _ -> ok
+  end,
   {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -143,5 +170,5 @@ iterate_state(State) ->
   MaxIndex = NBits - 1,
   case Index of
     MaxIndex -> #state{id = ID, nbits = NBits, index = 0};
-    _ -> #state{id = ID, nbits = NBits, index = Index + 1}
+    _ -> State#state{id = ID, nbits = NBits, index = Index + 1}
   end.

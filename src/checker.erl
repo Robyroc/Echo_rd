@@ -96,7 +96,15 @@ handle_call({set_pred, Address}, _From, State) ->
   {reply, ok, State#state{pred = Address, pred_id = ID}};
 
 handle_call(Request, _From, State) ->
-  unexpected:error("CHECKER: Unexpected call message: ~p~n", [Request]),
+  case logging_policies:check_lager_policy(?MODULE) of
+    {lager_on, _} ->
+      lager:error("CHECKER: Unexpected call message: ~p\n", [Request]);
+    {lager_only, _} ->
+      lager:error("CHECKER: Unexpected call message: ~p\n", [Request]);
+    {lager_off, _} ->
+      io:format("CHECKER: Unexpected call message: ~p\n", [Request]);
+    _ -> ok
+  end,
   {reply, ok, State}.
 
 %%--------------------------------------------------------------------
@@ -123,12 +131,15 @@ handle_cast({pred_find, Address}, State) ->
     Predecessor ->
       Index = hash_f:get_hashed_addr(Address),
       #state{pred = Predecessor, pred_id = PredID, own_id = OwnID, n_bits = NBits} = State,
-      case logging_policies:check_policy(?MODULE) of
-        able ->
-          lagerConsole:info("]]] CHECKER [[[: ~p~n", [PredID]),
-          checkerLager:info("]]] CHECKER [[[: ~p~n", [PredID]);
-        able_lager -> checkerLager:info("]]] CHECKER [[[: ~p~n", [PredID]);
-        unable -> ok
+      case logging_policies:check_lager_policy(?MODULE) of
+        {lager_on, able} ->
+          lagerConsole:info("]]] CHECKER [[[: ~p\n", [PredID]),
+          checkerLager:info("]]] CHECKER [[[: ~p\n", [PredID]);
+        {lager_only, able} ->
+          checkerLager:info("]]] CHECKER [[[: ~p\n", [PredID]);
+        {lager_off, able} ->
+          io:format("]]] CHECKER [[[: ~p\n", [PredID]);
+        _ -> ok
       end,
       case Index of
         _ when Index < OwnID ->
@@ -144,7 +155,15 @@ handle_cast({pred_find, Address}, State) ->
   end;
 
 handle_cast(Request, State) ->
-  unexpected:error("CHECKER: Unexpected cast message: ~p~n", [Request]),
+  case logging_policies:check_lager_policy(?MODULE) of
+    {lager_on, _} ->
+      lager:error("CHECKER: Unexpected cast message: ~p\n", [Request]);
+    {lager_only, _} ->
+      lager:error("CHECKER: Unexpected cast message: ~p\n", [Request]);
+    {lager_off, _} ->
+      io:format("CHECKER: Unexpected cast message: ~p\n", [Request]);
+    _ -> ok
+  end,
   {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -171,7 +190,15 @@ handle_info(timeout, State) ->
   {noreply, State#state{pred = nil, pred_id = nil}};
 
 handle_info(Info, State) ->
-  unexpected:error("CHECKER: Unexpected ! message: ~p~n", [Info]),
+  case logging_policies:check_lager_policy(?MODULE) of
+    {lager_on, _} ->
+      lager:error("CHECKER: Unexpected ! message: ~p\n", [Info]);
+    {lager_only, _} ->
+      lager:error("CHECKER: Unexpected ! message: ~p\n", [Info]);
+    {lager_off, _} ->
+      io:format("CHECKER: Unexpected ! message: ~p\n", [Info]);
+    _ -> ok
+  end,
   {noreply, State}.
 
 %%--------------------------------------------------------------------

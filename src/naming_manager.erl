@@ -70,7 +70,15 @@ init([Supervisor]) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_call(Request, _From, State) ->
-  unexpected:error("NAMING MANAGER: Unexpected call message: ~p~n", [Request]),
+  case logging_policies:check_lager_policy(?MODULE) of
+    {lager_on, _} ->
+      lager:error("NAMING MANAGER: Unexpected call message: ~p\n", [Request]);
+    {lager_only, _} ->
+      lager:error("NAMING MANAGER: Unexpected call message: ~p\n", [Request]);
+    {lager_off, _} ->
+      io:format("NAMING MANAGER: Unexpected call message: ~p\n", [Request]);
+    _ -> ok
+  end,
   {reply, ok, State}.
 
 %%--------------------------------------------------------------------
@@ -81,7 +89,15 @@ handle_call(Request, _From, State) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_cast(Request, State) ->
-  unexpected:error("NAMING MANAGER: Unexpected cast message: ~p~n", [Request]),
+  case logging_policies:check_lager_policy(?MODULE) of
+    {lager_on, _} ->
+      lager:error("NAMING MANAGER: Unexpected cast message: ~p\n", [Request]);
+    {lager_only, _} ->
+      lager:error("NAMING MANAGER: Unexpected cast message: ~p\n", [Request]);
+    {lager_off, _} ->
+      io:format("NAMING MANAGER: Unexpected cast message: ~p\n", [Request]);
+    _ -> ok
+  end,
   {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -109,11 +125,17 @@ handle_info({startup, Supervisor}, State) ->
   {noreply, State#state{}};
 
 handle_info({'ETS-TRANSFER', TableId, Pid, Data}, State) ->
-  case logging_policies:check_policy(?MODULE) of
-    able ->
-      lager:warning("Warning TableId: ~p HandlerPid: ~p is dying~n"
-      "Table is returning to Manager, in order to be passed to the new Handler~n", [TableId, Pid]);
-    unable -> ok
+  case logging_policies:check_lager_policy(?MODULE) of
+    {lager_on, able} ->
+      lager:warning("Warning TableId: ~p HandlerPid: ~p is dying\n"
+      "Table is returning to Manager, in order to be passed to the new Handler\n", [TableId, Pid]);
+    {lager_only, able} ->
+      lager:warning("Warning TableId: ~p HandlerPid: ~p is dying\n"
+      "Table is returning to Manager, in order to be passed to the new Handler\n", [TableId, Pid]);
+    {lager_off, able} ->
+      io:format("Warning TableId: ~p HandlerPid: ~p is dying\n"
+      "Table is returning to Manager, in order to be passed to the new Handler\n", [TableId, Pid]);
+    _ -> ok
   end,
   ets:delete(naming_db, naming_handler),
   Handler = wait_for_handler(),
@@ -121,7 +143,15 @@ handle_info({'ETS-TRANSFER', TableId, Pid, Data}, State) ->
   {noreply, State#state{}};
 
 handle_info(Info, State) ->
-  unexpected:error("NAMING MANAGER: Unexpected ! message: ~p~n", [Info]),
+  case logging_policies:check_lager_policy(?MODULE) of
+    {lager_on, _} ->
+      lager:error("NAMING MANAGER: Unexpected ! message: ~p\n", [Info]);
+    {lager_only, _} ->
+      lager:error("NAMING MANAGER: Unexpected ! message: ~p\n", [Info]);
+    {lager_off, _} ->
+      io:format("NAMING MANAGER: Unexpected ! message: ~p\n", [Info]);
+    _ -> ok
+  end,
   {noreply, State}.
 
 %%--------------------------------------------------------------------
