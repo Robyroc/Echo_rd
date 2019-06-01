@@ -114,7 +114,15 @@ handle_call(turn_on, _From, State) ->
   {reply, ok, State#state{fail_counter = 1, op = no_operating, last_sent = not_sent, times = [1000]}};
 
 handle_call(Request, _From, State) ->
-  unexpected:error("STABILIZER: Unexpected call message: ~p~n", [Request]),
+  case logging_policies:check_lager_policy(?MODULE) of
+    {lager_on, _} ->
+      lager:error("STABILIZER: Unexpected call message: ~p\n", [Request]);
+    {lager_only, _} ->
+      lager:error("STABILIZER: Unexpected call message: ~p\n", [Request]);
+    {lager_off, _} ->
+      io:format("STABILIZER: Unexpected call message: ~p\n", [Request]);
+    _ -> ok
+  end,
   {reply, ok, State}.
 
 %%--------------------------------------------------------------------
@@ -137,7 +145,15 @@ handle_cast({stabilize_response, Predecessor, NewSuccList}, State) ->
   {noreply, State#state{fail_counter = 1, succ_list = NewSuccessorList, last_sent = not_sent, times = NewList}};
 
 handle_cast(Request, State) ->
-  unexpected:error("STABILIZER: Unexpected cast message: ~p~n", [Request]),
+  case logging_policies:check_lager_policy(?MODULE) of
+    {lager_on, _} ->
+        lager:error("STABILIZER: Unexpected cast message: ~p\n", [Request]);
+    {lager_only, _} ->
+      lager:error("STABILIZER: Unexpected cast message: ~p\n", [Request]);
+    {lager_off, _} ->
+      io:format("STABILIZER: Unexpected cast message: ~p\n", [Request]);
+    _ -> ok
+  end,
   {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -195,7 +211,15 @@ handle_info(stabilize, State) ->
   end;
 
 handle_info(Info, State) ->
-  unexpected:error("STABILIZER: Unexpected ! message: ~p~n", [Info]),
+  case logging_policies:check_lager_policy(?MODULE) of
+    {lager_on, _} ->
+      lager:error("STABILIZER: Unexpected ! message: ~p\n", [Info]);
+    {lager_only, _} ->
+      lager:error("STABILIZER: Unexpected ! message: ~p\n", [Info]);
+    {lager_off, _} ->
+      io:format("STABILIZER: Unexpected ! message: ~p\n", [Info]);
+    _ -> ok
+  end,
   {noreply, State}.
 
 %%--------------------------------------------------------------------

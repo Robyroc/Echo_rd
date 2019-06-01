@@ -86,7 +86,15 @@ handle_call({lost, Address}, _From, State) ->
   {reply, ok, State};
 
 handle_call(Request, _From, State) ->
-  unexpected:error("R. Gateway: Unexpected call message: ~p~n", [Request]),
+  case logging_policies:check_lager_policy(?MODULE) of
+    {lager_on, _} ->
+      lager:error("R. Gateway: Unexpected call message: ~p\n", [Request]);
+    {lager_only, _} ->
+      lager:error("R. Gateway: Unexpected call message: ~p\n", [Request]);
+    {lager_off, _} ->
+      io:format("R. Gateway: Unexpected call message: ~p\n", [Request]);
+    _ -> ok
+  end,
   {reply, ok, State}.
 
 %%--------------------------------------------------------------------
@@ -101,7 +109,15 @@ handle_cast({response, Requested, Address}, State) ->
   {noreply, State};
 
 handle_cast(Request, State) ->
-  unexpected:error("R. Gateway: Unexpected cast message: ~p~n", [Request]),
+  case logging_policies:check_lager_policy(?MODULE) of
+    {lager_on, _} ->
+      lager:error("R. Gateway: Unexpected cast message: ~p\n", [Request]);
+    {lager_only, _} ->
+      lager:error("R. Gateway: Unexpected cast message: ~p\n", [Request]);
+    {lager_off, _} ->
+      io:format("R. Gateway: Unexpected cast message: ~p\n", [Request]);
+    _ -> ok
+  end,
   {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -123,11 +139,27 @@ handle_info({'DOWN', Monitor, process, _PID, normal}, State) ->
 
 handle_info({'DOWN', Monitor, process, _PID, Reason}, State) ->
   Present = [X || {_, X, M} <- State#state.requests, M =:= Monitor],
-  lager:error("R. Gateway: A request failed: Requested: ~p~nReason: ~p~n", [hd(Present), Reason]),
+  case logging_policies:check_lager_policy(?MODULE) of
+    {lager_on, _} ->
+      lager:error("R. Gateway: A request failed: Requested: ~p~nReason: ~p\n", [hd(Present), Reason]);
+    {lager_only, _} ->
+      lager:error("R. Gateway: A request failed: Requested: ~p~nReason: ~p\n", [hd(Present), Reason]);
+    {lager_off, _} ->
+      io:format("R. Gateway: A request failed: Requested: ~p~nReason: ~p\n", [hd(Present), Reason]);
+    _ -> ok
+  end,
   {noreply, #state{requests = [{P, R, M} || {P, R, M} <- State#state.requests, M =/= Monitor]}};
 
 handle_info(Info, State) ->
-  unexpected:error("R. Gateway: Unexpected ! message: ~p~n", [Info]),
+  case logging_policies:check_lager_policy(?MODULE) of
+    {lager_on, _} ->
+      lager:error("R. Gateway: Unexpected ! message: ~p\n", [Info]);
+    {lager_only, _} ->
+      lager:error("R. Gateway: Unexpected ! message: ~p\n", [Info]);
+    {lager_off, _} ->
+      io:format("R. Gateway: Unexpected ! message: ~p\n", [Info]);
+    _ -> ok
+  end,
   {noreply, State}.
 
 %%--------------------------------------------------------------------

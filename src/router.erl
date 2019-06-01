@@ -96,19 +96,21 @@ handle_call(show_id, _From, State) ->
 handle_call({lookup, Requested}, From, State) ->
   ActualRequested = normalizer:normalize_id(Requested, State#state.nbits),
   {SuccID, Succ} = stabilizer:get_successor(),
-  case logging_policies:check_policy(?MODULE) of
-    able ->
-      lagerConsole:info("$$$ ROUTER $$$:~p~n", [ActualRequested]),
-      routerLager:info("$$$ ROUTER $$$:~p~n", [ActualRequested]);
-    able_lager -> routerLager:info("$$$ ROUTER $$$:~p~n", [ActualRequested]);
-    unable -> ok
+  case logging_policies:check_lager_policy(?MODULE) of
+    {lager_on, able} ->
+      lagerConsole:info("$$$$$ ROUTER: Requested ~p $$$$$\n", [ActualRequested]),
+      routerLager:info("$$$$$ ROUTER: Requested ~p $$$$$\n", [ActualRequested]);
+    {lager_only, able} ->
+      routerLager:info("$$$$$ ROUTER: Requested ~p $$$$$\n", [ActualRequested]);
+    {lager_off, able} ->
+      io:format("$$$$$ ROUTER: Requested ~p $$$$$\n", [ActualRequested]);
+    _ -> ok
   end,
   Next = check_if_next(ActualRequested, State#state.id, SuccID, State#state.nbits),
   case Next of
     next -> {reply, {found, Succ}, State};
     _ ->
       List = lookup(ActualRequested, State#state.id, State#state.finger_table, State#state.nbits),
-
       request_gateway:add_request(ActualRequested, From, List),
       {noreply, State}
   end;
@@ -127,7 +129,15 @@ handle_call({lost, Address}, _From, State) ->
   {reply, ok, State#state{finger_table = NewTable, time = Time}};
 
 handle_call(Request, _From, State) ->
-  unexpected:error("Router: Unexpected call message: ~p~n", [Request]),
+  case logging_policies:check_lager_policy(?MODULE) of
+    {lager_on, _} ->
+      lager:error("Router: Unexpected call message: ~p\n", [Request]);
+    {lager_only, _} ->
+      lager:error("Router: Unexpected call message: ~p\n", [Request]);
+    {lager_off, _} ->
+      io:format("Router: Unexpected call message: ~p\n", [Request]);
+    _ -> ok
+  end,
   {reply, ok, State}.
 
 %%--------------------------------------------------------------------
@@ -162,12 +172,15 @@ handle_cast({update, Address, Theoretical}, State) ->
 handle_cast({lookup, Alias, Requested}, State) ->
   ActualRequested = adjust_successor(Requested, State#state.id, State#state.nbits),
   {SuccID, Succ} = stabilizer:get_successor(),
-  case logging_policies:check_policy(?MODULE) of
-    able ->
-      lagerConsole:info("$$$ ROUTER $$$:~p~n", [ActualRequested]),
-      routerLager:info("$$$ ROUTER $$$:~p~n", [ActualRequested]);
-    able_lager -> routerLager:info("$$$ ROUTER $$$:~p~n", [ActualRequested]);
-    unable -> ok
+  case logging_policies:check_lager_policy(?MODULE) of
+    {lager_on, able} ->
+      lagerConsole:info("$$$$$ ROUTER: Requested from outside ~p $$$$$\n", [ActualRequested]),
+      routerLager:info("$$$$$ ROUTER: Requested from outside ~p $$$$$\n", [ActualRequested]);
+    {lager_only, able} ->
+      routerLager:info("$$$$$ ROUTER: Requested from outside ~p $$$$$\n", [ActualRequested]);
+    {lager_off, able} ->
+      io:format("$$$$$ ROUTER: Requested from outside ~p $$$$$\n", [ActualRequested]);
+    _ -> ok
   end,
   Next = check_if_next(ActualRequested, State#state.id, SuccID, State#state.nbits),
   case Next of
@@ -187,7 +200,15 @@ handle_cast({lookup, Alias, Requested}, State) ->
   end;
 
 handle_cast(Request, State) ->
-  unexpected:error("Router: Unexpected cast message: ~p~n", [Request]),
+  case logging_policies:check_lager_policy(?MODULE) of
+    {lager_on, _} ->
+      lager:error("Router: Unexpected cast message: ~p\n", [Request]);
+    {lager_only, _} ->
+      lager:error("Router: Unexpected cast message: ~p\n", [Request]);
+    {lager_off, _} ->
+      io:format("Router: Unexpected cast message: ~p\n", [Request]);
+    _ -> ok
+  end,
   {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -212,7 +233,15 @@ handle_info(startup, _State) ->
   {noreply, #state{finger_table = [HeadRoutingTable | TailRoutingTable], nbits = Nbits, id = ID, time = Time}};
 
 handle_info(Info, State) ->
-  unexpected:error("Router: Unexpected ! message: ~p~n", [Info]),
+  case logging_policies:check_lager_policy(?MODULE) of
+    {lager_on, _} ->
+      lager:error("Router: Unexpected ! message: ~p\n", [Info]);
+    {lager_only, _} ->
+      lager:error("Router: Unexpected ! message: ~p\n", [Info]);
+    {lager_off, _} ->
+      io:format("Router: Unexpected ! message: ~p\n", [Info]);
+    _ -> ok
+  end,
   {noreply, State}.
 %%--------------------------------------------------------------------
 %% @private
@@ -244,10 +273,25 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 
 show_finger_table(State) ->
-  %TODO check if the finger table has to be in the .log file or printed in console
-  routerLager:info("Finger Table: \n
-  Theo\t| Real\t| Address~n"),
-  [routerLager:info("~p\t| ~p\t| ~p~n", [T, R, A]) || {T, R, A} <- State#state.finger_table],  %TODO: check formatting
+  %TODO check policy and lager
+  case logging_policies:check_lager_policy(?MODULE) of
+    {lager_on, able} ->
+      lagerConsole:info("Finger Table: \n
+      Theo\t| Real\t| Address\n"),
+      [lagerConsole:info("~p\t| ~p\t| ~p\n", [T, R, A]) || {T, R, A} <- State#state.finger_table],
+      routerLager:info("Finger Table: \n
+      Theo\t| Real\t| Address\n"),
+      [routerLager:info("~p\t| ~p\t| ~p\n", [T, R, A]) || {T, R, A} <- State#state.finger_table];
+    {lager_only, able} ->
+      routerLager:info("Finger Table: \n
+      Theo\t| Real\t| Address\n"),
+      [routerLager:info("~p\t| ~p\t| ~p\n", [T, R, A]) || {T, R, A} <- State#state.finger_table];
+    {lager_off, able} ->
+      io:format("Finger Table: \n
+      Theo\t| Real\t| Address\n"),
+      [io:format("~p\t| ~p\t| ~p\n", [T, R, A]) || {T, R, A} <- State#state.finger_table];
+    _ -> ok
+  end,
   ok.
 
 lookup(Searched, ID, Table, NBits) when Searched < ID ->
