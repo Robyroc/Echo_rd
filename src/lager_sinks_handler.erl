@@ -59,12 +59,10 @@ create_chord_sinks() ->
   gen_server:cast(PID, create_chord_sinks).
 
 start_if_not_started() ->
-  naming_handler:wait_service(lager_sinks_handler),
   PID = naming_handler:get_identity(lager_sinks_handler),
   gen_server:call(PID, start_if_not_started).
 
 terminate_if_not_terminated() ->
-  naming_handler:wait_service(lager_sinks_handler),
   PID = naming_handler:get_identity(lager_sinks_handler),
   gen_server:call(PID, terminate_if_not_terminated).
 
@@ -107,6 +105,7 @@ init([]) ->
 %%  {stop, Reason :: term(), NewState :: #state{}}).
 handle_call(start_if_not_started, _From, State) when State#state.started =:= not_started ->
   lager:start(),
+  create_chord_sinks(),
   {reply, ok, State#state{started = started}};
 
 handle_call(start_if_not_started, _From, State) ->
@@ -199,7 +198,6 @@ handle_cast(_, State) ->
   {noreply, NewState :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term(), NewState :: #state{}}).
 handle_info(startup, _State) ->
-  naming_handler:wait_service(port),
   Port = naming_handler:get_identity(port),
   {ok, Directory} = file:get_cwd(),
   Path = Directory ++ "/log/" ++ integer_to_list(Port) ++ "_logging",

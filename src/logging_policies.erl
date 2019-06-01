@@ -16,28 +16,32 @@ check_lager_policy(Module) ->
   case LagerPolicy of
     undefined -> {unable, unable};
     {ok, lager_on} ->
-      case naming_handler:get_maybe_identity(port) of
+      case naming_handler:get_maybe_identity(lager_sinks_handler) of
         no_name_registered ->
-          application:set_env(echo_rd, lager_log, lager_off),
-          check_lager_policy(Module);
+          {lager_off, check_policy(Module)};
         _ ->
           lager_sinks_handler:start_if_not_started(),
           {lager_on, check_policy(Module)}
       end;
     {ok, lager_only} ->
-      case naming_handler:get_maybe_identity(port) of
+      case naming_handler:get_maybe_identity(lager_sinks_handler) of
         no_name_registered ->
-          application:set_env(echo_rd, lager_log, undefined),
-          check_lager_policy(Module);
+          {undefined, check_policy(Module)};
         _ ->
           lager_sinks_handler:start_if_not_started(),
           {lager_only, check_policy(Module)}
       end;
     {ok, lager_off} ->
-      lager_sinks_handler:terminate_if_not_terminated(),
+      case naming_handler:get_maybe_identity(lager_sinks_handler) of
+        no_name_registered -> ok;
+        _ -> lager_sinks_handler:terminate_if_not_terminated()
+      end,
       {lager_off, check_policy(Module)};
     _ ->
-      lager_sinks_handler:terminate_if_not_terminated(),
+      case naming_handler:get_maybe_identity(lager_sinks_handler) of
+        no_name_registered -> ok;
+        _ -> lager_sinks_handler:terminate_if_not_terminated()
+      end,
       {unable, unable}
   end.
 
