@@ -15,7 +15,7 @@
   code_change/3]).
 
 -define(SERVER, ?MODULE).
-
+-define(TIMEOUT, 240000).    % 4 minutes
 -record(state, {socket, remaining, acc}).
 
 %%%===================================================================
@@ -53,7 +53,7 @@ send_message(PID, Message) ->
 %% @end
 %%--------------------------------------------------------------------
 init([Socket]) ->
-  {ok, #state{socket = Socket, remaining = 0, acc = []}};
+  {ok, #state{socket = Socket, remaining = 0, acc = []}, ?TIMEOUT};
 
 init(_) ->
   {stop, badarg}.
@@ -67,7 +67,7 @@ init(_) ->
 %%--------------------------------------------------------------------
 handle_call(Request, _From, State) ->
   unexpected:error("Handler: Unexpected call message: ~p~n", [Request]),
-  {reply, ok, State}.
+  {reply, ok, State, ?TIMEOUT}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -80,17 +80,17 @@ handle_cast({send, {no_alias, Method, Params}}, State) ->
   Message = marshall(link_manager:get_own_address(), Method, Params),
   Size = byte_size(Message),
   ok = gen_tcp:send(State#state.socket, <<Size:40/integer, Message/binary>>),
-  {noreply, State};
+  {noreply, State, ?TIMEOUT};
 
 handle_cast({send, {Alias, Method, Params}}, State) ->
   Message = marshall(Alias, Method, Params),
   Size = byte_size(Message),
   ok = gen_tcp:send(State#state.socket, <<Size:40/integer, Message/binary>>),
-  {noreply, State};
+  {noreply, State, ?TIMEOUT};
 
 handle_cast(Request, State) ->
   unexpected:error("Handler: Unexpected cast message: ~p~n", [Request]),
-  {noreply, State}.
+  {noreply, State, ?TIMEOUT}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -103,6 +103,10 @@ handle_cast(Request, State) ->
 %% @end
 %%--------------------------------------------------------------------
 
+handle_info({tcp, Socket, <<"Not used">>}, State) when Socket =:= State#state.socket ->
+  exit(self(), unused),
+  {stop, unused_connection, State};
+
 handle_info({tcp, Socket , Bin}, State) when Socket =:= State#state.socket ->
   case State#state.remaining of
     0 ->
@@ -112,8 +116,8 @@ handle_info({tcp, Socket , Bin}, State) when Socket =:= State#state.socket ->
         Received ->
           {Address, Method, Params} = parse_message(Message),
           link_manager:notify_incoming_message({Method, Address, Params}),
-          {noreply, State};
-        _ -> {noreply, State#state{remaining = Size - Received, acc = [Message]}}
+          {noreply, State, ?TIMEOUT};
+        _ -> {noreply, State#state{remaining = Size - Received, acc = [Message]}, ?TIMEOUT}
       end;
     _ ->
       Received = byte_size(Bin),
@@ -123,8 +127,8 @@ handle_info({tcp, Socket , Bin}, State) when Socket =:= State#state.socket ->
           Total = list_to_binary(lists:reverse([Bin | State#state.acc])),
           {Address, Method, Params} = parse_message(Total),
           link_manager:notify_incoming_message({Method, Address, Params}),
-          {noreply, State#state{remaining = 0, acc = []}};
-        _ -> {noreply, State#state{remaining = Remaining - Received, acc = [Bin | State#state.acc]}}
+          {noreply, State#state{remaining = 0, acc = []}, ?TIMEOUT};
+        _ -> {noreply, State#state{remaining = Remaining - Received, acc = [Bin | State#state.acc]}, ?TIMEOUT}
       end
   end;
 
@@ -133,9 +137,15 @@ handle_info({tcp_closed, Socket}, State) when Socket =:= State#state.socket ->
   exit(self(), tcp_closed),
   {stop, closed_connection, State};
 
+handle_info(timeout, State) ->
+  gen_tcp:send(State#state.socket, <<"Not used">>),
+  timer:sleep(10000),
+  exit(self(), unused),
+  {stop, unused_connection, State};
+
 handle_info(Info, State) ->
   unexpected:error("Handler: Unexpected ! message: ~p~n", [Info]),
-  {noreply, State}.
+  {noreply, State, ?TIMEOUT}.
 %%--------------------------------------------------------------------
 %% @private
 %% @doc

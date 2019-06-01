@@ -170,6 +170,9 @@ handle_info({'DOWN', Monitor, process, _PID, tcp_closed}, State) ->
   router:notify_lost_node(Address),
   {noreply, State#state{connections = [{Pid, Addr, Mon} || {Pid, Addr, Mon} <- State#state.connections, Mon =/= Monitor]}};
 
+handle_info({'DOWN', Monitor, process, _PID, unused}, State) ->
+  {noreply, State#state{connections = [{Pid, Addr, Mon} || {Pid, Addr, Mon} <- State#state.connections, Mon =/= Monitor]}};
+
 handle_info({'DOWN', Monitor, process, _PID, Reason}, State) ->
   Present = [X || {_, X, M} <- State#state.connections, M =:= Monitor],
   lager:error("LM: A handler failed: Address: ~p~nReason: ~p~n", [hd(Present), Reason]),
@@ -263,12 +266,12 @@ send_async(Port, IP, Message, State, _Size) ->
         {ok, PID} ->
           gen_tcp:controlling_process(RequestSocket, PID),
           socket_handler:send_message(PID, Message),
-          timer:apply_after(300000, erlang, exit, [PID, normal]),
+          %%timer:apply_after(300000, erlang, exit, [PID, normal]),
           {noreply, State};
         {ok, PID, _} ->
           gen_tcp:controlling_process(RequestSocket, PID),
           socket_handler:send_message(PID, Message),
-          timer:apply_after(300000, erlang, exit, [PID, normal]),
+          %%timer:apply_after(300000, erlang, exit, [PID, normal]),
           {noreply, State}
       end;
     {error, _Reason} ->
