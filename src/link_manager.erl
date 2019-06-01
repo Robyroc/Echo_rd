@@ -8,12 +8,13 @@
   incoming_connection/1,
   get_own_address/0,
   notify_incoming_message/1,
-  send_message/2,
+  send_message_sync/2,
   compact_address/1,
   move_socket/1,
   address_to_binary/1,
   binary_to_address/1,
-  binary_address_size/0]).
+  binary_address_size/0,
+  send_message_async/2]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -48,9 +49,13 @@ notify_incoming_message(Message) ->
   PID = naming_handler:get_identity(link_manager),
   gen_server:cast(PID, {received, Message}).
 
-send_message({Port, IP}, Message) ->
+send_message_sync({Port, IP}, Message) ->
   PID = naming_handler:get_identity(link_manager),
   gen_server:call(PID, {send, {Port, IP}, Message}, 10000).
+
+send_message_async({Port, IP}, Message) ->
+  PID = naming_handler:get_identity(link_manager),
+  gen_server:cast(PID, {send, {Port, IP}, Message}).
 
 compact_address(Address) ->
   {Port, {IPA, IPB, IPC, IPD}} = Address,
@@ -124,6 +129,11 @@ handle_call(Request, _From, State) ->
 handle_cast({received, Message}, State) ->
   communication_manager:receive_message(Message),
   {noreply, State};
+
+handle_cast({send, {Port, IP}, Message}, State) ->
+  {_, _, Params} = Message,
+  Size = byte_size(list_to_binary(Params)),
+  send_async(Port, IP, Message, State, Size);
 
 handle_cast({new_connection, Socket}, State) ->
   Sup = naming_handler:get_identity(handler_supervisor),
@@ -216,7 +226,7 @@ local_address() ->
   IP = hd([Addr || {Addr, _,_} <- Addrs, size(Addr) == 4, Addr =/= {127,0,0,1}]),
   {naming_handler:get_identity(port), IP}.
 
-send(Port, IP, Message, State, Size) when Size < 8000 ->
+send_async(Port, IP, Message, State, Size) when Size < 8000 ->
   Present = [X || {X, Addr, _} <- State#state.connections, Addr == {Port, IP}],
   case Present of
     [] ->
@@ -229,20 +239,41 @@ send(Port, IP, Message, State, Size) when Size < 8000 ->
               gen_tcp:controlling_process(RequestSocket, PID),
               Monitor = erlang:monitor(process, PID),
               socket_handler:send_message(PID, Message),
-              {reply, ok, State#state{connections = [{PID, {Port, IP}, Monitor} | State#state.connections]}};
+              {noreply, State#state{connections = [{PID, {Port, IP}, Monitor} | State#state.connections]}};
             {ok, PID, _} ->
               gen_tcp:controlling_process(RequestSocket, PID),
               Monitor = erlang:monitor(process, PID),
               socket_handler:send_message(PID, Message),
-              {reply, ok, State#state{connections = [{PID, {Port, IP}, Monitor} | State#state.connections]}}
+              {noreply, State#state{connections = [{PID, {Port, IP}, Monitor} | State#state.connections]}}
           end;
-        {error, Reason} ->
-          {reply, {error, Reason}, State}
+        {error, _Reason} ->
+          {noreply, State}
       end;
     [H|_] ->
       socket_handler:send_message(H, Message),
-      {reply, ok, State}
+      {noreply, State}
   end;
+
+send_async(Port, IP, Message, State, _Size) ->
+  case gen_tcp:connect(IP, Port, [binary, {packet, 0}], ?INTERVAL) of
+    {ok, RequestSocket} ->
+      Sup = naming_handler:get_identity(handler_supervisor),
+      Ret = supervisor:start_child(Sup, [RequestSocket]),
+      case Ret of
+        {ok, PID} ->
+          gen_tcp:controlling_process(RequestSocket, PID),
+          socket_handler:send_message(PID, Message),
+          timer:apply_after(300000, erlang, exit, [PID, normal]),
+          {noreply, State};
+        {ok, PID, _} ->
+          gen_tcp:controlling_process(RequestSocket, PID),
+          socket_handler:send_message(PID, Message),
+          timer:apply_after(300000, erlang, exit, [PID, normal]),
+          {noreply, State}
+      end;
+    {error, _Reason} ->
+      {noreply, State}
+  end.
 
 send(Port, IP, Message, State, _Size) ->
   case gen_tcp:connect(IP, Port, [binary, {packet, 0}], ?INTERVAL) of

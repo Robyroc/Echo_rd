@@ -35,7 +35,7 @@ start(Socket) ->
   gen_server:start(?MODULE, [Socket], []).
 
 send_message(PID, Message) ->
-  gen_server:call(PID, {send, Message})   .        %TODO timeout?
+  gen_server:cast(PID, {send, Message}).        %TODO timeout?
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -65,18 +65,6 @@ init(_) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
-handle_call({send, {no_alias, Method, Params}}, _From, State) ->
-  Message = marshall(link_manager:get_own_address(), Method, Params),
-  Size = byte_size(Message),
-  ok = gen_tcp:send(State#state.socket, <<Size:40/integer, Message/binary>>),
-  {reply, ok, State};
-
-handle_call({send, {Alias, Method, Params}}, _From, State) ->
-  Message = marshall(Alias, Method, Params),
-  Size = byte_size(Message),
-  ok = gen_tcp:send(State#state.socket, <<Size:40/integer, Message/binary>>),
-  {reply, ok, State};
-
 handle_call(Request, _From, State) ->
   unexpected:error("Handler: Unexpected call message: ~p~n", [Request]),
   {reply, ok, State}.
@@ -88,6 +76,18 @@ handle_call(Request, _From, State) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
+handle_cast({send, {no_alias, Method, Params}}, State) ->
+  Message = marshall(link_manager:get_own_address(), Method, Params),
+  Size = byte_size(Message),
+  ok = gen_tcp:send(State#state.socket, <<Size:40/integer, Message/binary>>),
+  {noreply, State};
+
+handle_cast({send, {Alias, Method, Params}}, State) ->
+  Message = marshall(Alias, Method, Params),
+  Size = byte_size(Message),
+  ok = gen_tcp:send(State#state.socket, <<Size:40/integer, Message/binary>>),
+  {noreply, State};
+
 handle_cast(Request, State) ->
   unexpected:error("Handler: Unexpected cast message: ~p~n", [Request]),
   {noreply, State}.

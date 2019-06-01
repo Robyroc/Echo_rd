@@ -110,7 +110,7 @@ handle_call({send_msg, Method, Params, Address, Alias}, _From, State) ->
   case Encoded of
     badarg -> {reply, fail, State};
     _ ->
-      {reply,link_manager:send_message(Address, {Alias, Translated, Encoded}),State}
+      {reply,link_manager:send_message_sync(Address, {Alias, Translated, Encoded}),State}
   end;
 
 handle_call({get_nbits, NBits}, _From, State) ->
@@ -149,7 +149,7 @@ handle_cast({send_msg, Method, Params, Address, Alias}, State) ->
       io:format("ààààà Error in the encoding of the message ààààà\n"),
       {noreply, State};
     _ ->
-      link_manager:send_message(Address, {Alias, Translated, Encoded}),
+      link_manager:send_message_async(Address, {Alias, Translated, Encoded}),
       {noreply,State}
   end;
 
