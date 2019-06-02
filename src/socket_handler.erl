@@ -215,6 +215,7 @@ parse_message(Bin) ->
   parse_cleaner({{Port, {IpA, IpB, IpC, IpD}}, Method, Parameters}).
 
 message_framer(Bin, State) when ((byte_size(Bin) < 6) and (State#state.remaining =:= 0)) ->
+  io:format("HHHHHHH The header is: ~p~n", [Bin]),
   {noreply, State#state{remaining = header, acc = [Bin]}, ?TIMEOUT};
 
 message_framer(Bin, State) when State#state.remaining =:= 0 ->
@@ -227,9 +228,11 @@ message_framer(Bin, State) when State#state.remaining =:= 0 ->
       {noreply, State, ?TIMEOUT};
     _ when Received > Size ->
       <<First:Size/binary, Second/binary>> = Message,
+      io:format("SSSSSSSS Received > Size SSSSSSSS~nThe second message is: ~p~n", [Second]),
       {noreply, NewState, _} = message_framer(First, State),
       message_framer(Second, NewState);
     _ ->
+      io:format("YYYYYYYY Received < Size, Remaining is: ~p~n", [Size - Received]),
       {noreply, State#state{remaining = Size - Received, acc = [Message]}, ?TIMEOUT}
   end;
 
@@ -243,12 +246,15 @@ message_framer(Bin, State) ->
     Remaining ->
       Total = list_to_binary(lists:reverse([Bin | State#state.acc])),
       {Address, Method, Params} = parse_message(Total),
+      io:format("NNNNNNNN The recomposed message is: ~p  ~p  ~p~n", [Address, Method, Params]),
       link_manager:notify_incoming_message({Method, Address, Params}),
       {noreply, State#state{remaining = 0, acc = []}, ?TIMEOUT};
     _ when Received > Remaining ->
       <<First:Remaining/binary, Second/binary>> = Bin,
+      io:format("PPPPPPPP Received > Remaining PPPPPPPP~nThe second message is: ~p~n", [Second]),
       {noreply, NewState, _} = message_framer(First, State),
       message_framer(Second, NewState);
     _ ->
+      io:format("RRRRRRRRR Remaining < Received, Remaining is: ~p~n", [Remaining - Received]),
       {noreply, State#state{remaining = Remaining - Received, acc = [Bin | State#state.acc]}, ?TIMEOUT}
   end.
