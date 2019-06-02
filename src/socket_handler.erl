@@ -227,7 +227,8 @@ message_framer(Bin, State) when State#state.remaining =:= 0 ->
       link_manager:notify_incoming_message({Method, Address, Params}),
       {noreply, State, ?TIMEOUT};
     _ when Received > Size ->
-      <<First:Size/binary, Second/binary>> = Message,
+      TotalDimensionOfFirst = Size + 5,
+      <<First:TotalDimensionOfFirst/binary, Second/binary>> = Bin,
       io:format("SSSSSSSS Received > Size SSSSSSSS~nThe second message is: ~p~n", [Second]),
       {noreply, NewState, _} = message_framer(First, State),
       message_framer(Second, NewState);
