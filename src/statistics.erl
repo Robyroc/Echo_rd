@@ -7,7 +7,7 @@
 -export([start_link/0,
   gather/0,
   incoming_statistics/2,
-  get_statistics/1,
+  get_statistics/2,
   notify_join_time/1,
   notify_lookup_time/1,
   notify_finger_table_completion/1,
@@ -53,9 +53,9 @@ incoming_statistics(Address, Stats) ->
   PID = naming_handler:get_identity(statistics),
   gen_server:cast(PID, {show_stats, Address, Stats}).
 
-get_statistics(Address) ->
+get_statistics(Address, Number) ->
   PID = naming_handler:get_identity(statistics),
-  gen_server:cast(PID, {get_stats, Address}).
+  gen_server:cast(PID, {get_stats, Address, Number}).
 
 notify_join_time(Time) ->
   PID = naming_handler:get_identity(statistics),
@@ -125,7 +125,7 @@ handle_cast(gather, State) ->
     lookup_drop = LD,
     ftable_timing = FT} = State,
   {_, Succ} = stabilizer:get_successor(),
-  communication_manager:send_message_async(get_stats, [], Succ, no_alias),
+  communication_manager:send_message_async(get_stats, [1], Succ, no_alias),
   incoming_statistics(link_manager:get_own_address(), {JT, MLT, LD, FT}),
   {noreply, State};
 
@@ -150,10 +150,19 @@ handle_cast({show_stats, Address, Stats}, State) ->
   end,
   {noreply, State};
 
-handle_cast({get_stats, Address}, State) ->
+handle_cast({get_stats, Address, Number}, State) ->
   OwnAddress = link_manager:get_own_address(),
   case Address of
-    OwnAddress -> ok;
+    OwnAddress ->
+      case logging_policies:check_lager_policy(?MODULE) of
+        {lager_on, _} ->
+          lager:info("Number of nodes: ~p\n", [Number]);
+        {lager_only, _} ->
+          lager:info("Number of nodes: ~p\n", [Number]);
+        {lager_off, _} ->
+          io:format("Number of nodes: ~p\n", [Number]);
+        _ -> ok
+      end;
     _ ->
       #state{join_time = JT,
         max_lookup_time = MLT,
@@ -161,7 +170,7 @@ handle_cast({get_stats, Address}, State) ->
         ftable_timing = FT} = State,
       communication_manager:send_message_async(stats, [{JT, MLT, LD, FT}], Address, no_alias),
       {_, Succ} = stabilizer:get_successor(),
-      communication_manager:send_message_async(get_stats, [], Succ, Address)
+      communication_manager:send_message_async(get_stats, [Number + 1], Succ, Address)
   end,
   {noreply, State};
 

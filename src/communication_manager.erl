@@ -310,7 +310,8 @@ encode_params(pred_reply, [Pred, SL], NBits) -> [link_manager:address_to_binary(
 encode_params(lookup, _, no_nbits) -> badarg;
 encode_params(lookup, [ID], NBits) -> [encode_ID(ID, NBits)];
 encode_params(command, [Address,C], _NBits) -> [link_manager:address_to_binary(Address), C];
-encode_params(get_stats, [], _NBits) -> [];
+encode_params(get_stats, _, no_nbits) -> badarg;
+encode_params(get_stats, [Number], NBits) -> [encode_ID(Number, NBits)];
 encode_params(stats, [{A, B, C, D}], _NBits) -> [<<A:32, B:32, C:32, D:32>>];
 encode_params(_, _, _) -> badarg.
 
@@ -321,18 +322,18 @@ decode_params(join_info, [M], _NBits) -> decode_nbits_successor_and_resources(M)
 decode_params(ack_info, [], _NBits) -> [];
 decode_params(abort, [S], _NBits) -> [binary_to_list(S)];
 decode_params(ack_join, [], _NBits) -> [];
-decode_params(leave_info, _, no_nbits) -> io:format("ààààà Error in the decoding of the message ààààà\n"), badarg;
+decode_params(leave_info, _, no_nbits) -> badarg;
 decode_params(leave_info, [], _NBits) -> [];
 decode_params(leave_info, [Res], _NBits) -> [decode_resource(Res)];
 decode_params(ack_leave, [], _NBits) -> [];
 decode_params(ask_pred, [], _NBits) -> [];
-decode_params(pred_reply, _, no_nbits) -> io:format("ààààà Error in the decoding of the message ààààà\n"), badarg;
+decode_params(pred_reply, _, no_nbits) -> badarg;
 decode_params(pred_reply, [Pred, SL], NBits) -> [link_manager:binary_to_address(Pred), decode_successor_list(SL, NBits)];
 decode_params(lookup, [ID], _NBits) -> [decode_ID(ID)];
 decode_params(command, [A,C], _NBits) -> [link_manager:binary_to_address(A), C];
-decode_params(get_stats, [], _NBits) -> [];
+decode_params(get_stats, [Number], _NBits) -> [decode_ID(Number)];
 decode_params(stats, [Bin], _NBits) -> <<A:32, B:32, C:32, D:32>> = Bin, [{A, B, C, D}];
-decode_params(_, _, _) -> io:format("ààààà Error in the decoding of the message ààààà\n"), badarg.
+decode_params(_, _, _) -> badarg.
 
 forward(lookup_for_join, [], From) -> {[router], fun() -> router:lookup_for_join(From) end};
 forward(lookup_response, [ID, Addr], _From) -> {[request_gateway, join_handler], fun() -> request_gateway:lookup_response(ID, Addr), join_handler:look_response(Addr) end};
@@ -348,7 +349,7 @@ forward(ask_pred, [], From) -> {[checker], fun() -> checker:get_pred(From) end};
 forward(pred_reply, [Pred, SL], _From) -> {[stabilizer], fun() -> stabilizer:notify_successor(Pred, SL) end};
 forward(lookup, [ID], From) -> {[router], fun() -> router:remote_lookup(ID, From) end};
 forward(command, [A,C], _From) -> {[application_manager], fun() -> application_manager:receive_command(A,C) end};
-forward(get_stats, [], From) -> {[statistics], fun() -> statistics:get_statistics(From) end};
+forward(get_stats, [Number], From) -> {[statistics], fun() -> statistics:get_statistics(From, Number) end};
 forward(stats, [S], From) -> {[statistics], fun() -> statistics:incoming_statistics(From, S) end};
 forward(_, _, _) -> {[], fun() -> ok end}.
 
