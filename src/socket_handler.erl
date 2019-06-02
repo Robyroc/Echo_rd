@@ -136,6 +136,9 @@ handle_info({tcp, Socket , Bin}, State) when Socket =:= State#state.socket ->
           link_manager:notify_incoming_message({Method, Address, Params}),
           inet:setopts(Socket, [{active, once}]),
           {noreply, State, ?TIMEOUT};
+        _ when Received > Size -> io:format("/007About to drop, hooray!!! \n"),
+          inet:setopts(Socket, [{active, once}]),
+          {noreply, State#state{remaining = Size - Received, acc = [Message]}, ?TIMEOUT};
         _ ->
           inet:setopts(Socket, [{active, once}]),
           {noreply, State#state{remaining = Size - Received, acc = [Message]}, ?TIMEOUT}
