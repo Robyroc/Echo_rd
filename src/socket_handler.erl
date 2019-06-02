@@ -227,7 +227,7 @@ message_framer(Bin, State) when State#state.remaining =:= 0 ->
       {noreply, State, ?TIMEOUT};
     _ when Received > Size ->
       <<First:Size/binary, Second/binary>> = Message,
-      {noreply, NewState} = message_framer(First, State),
+      {noreply, NewState, _} = message_framer(First, State),
       message_framer(Second, NewState);
     _ ->
       {noreply, State#state{remaining = Size - Received, acc = [Message]}, ?TIMEOUT}
@@ -247,7 +247,7 @@ message_framer(Bin, State) ->
       {noreply, State#state{remaining = 0, acc = []}, ?TIMEOUT};
     _ when Received > Remaining ->
       <<First:Remaining/binary, Second/binary>> = Bin,
-      {noreply, NewState} = message_framer(First, State),
+      {noreply, NewState, _} = message_framer(First, State),
       message_framer(Second, NewState);
     _ ->
       {noreply, State#state{remaining = Remaining - Received, acc = [Bin | State#state.acc]}, ?TIMEOUT}
