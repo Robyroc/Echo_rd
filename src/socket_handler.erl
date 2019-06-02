@@ -126,40 +126,9 @@ handle_info({tcp, Socket, <<"Not used">>}, State) when Socket =:= State#state.so
   {stop, unused_connection, State};
 
 handle_info({tcp, Socket , Bin}, State) when Socket =:= State#state.socket ->
-  case State#state.remaining of
-    0 ->
-      <<Size:40/integer, Message/binary>> = Bin,
-      Received = byte_size(Message),
-      case Size of
-        Received ->
-          {Address, Method, Params} = parse_message(Message),
-          link_manager:notify_incoming_message({Method, Address, Params}),
-          inet:setopts(Socket, [{active, once}]),
-          {noreply, State, ?TIMEOUT};
-        _ when Received > Size -> io:format("\007About to drop, hooray!!! \n"),
-          io:format("UUUUUUUU Remaining is: ~p~n", [Size - Received]),
-          io:format("UUUUUUUU The message is : ~p~n", [Message]),
-          inet:setopts(Socket, [{active, once}]),
-          {noreply, State#state{remaining = Size - Received, acc = [Message]}, ?TIMEOUT};
-        _ ->
-          inet:setopts(Socket, [{active, once}]),
-          {noreply, State#state{remaining = Size - Received, acc = [Message]}, ?TIMEOUT}
-      end;
-    _ ->
-      Received = byte_size(Bin),
-      Remaining = State#state.remaining,
-      case Received of
-        Remaining ->
-          Total = list_to_binary(lists:reverse([Bin | State#state.acc])),
-          {Address, Method, Params} = parse_message(Total),
-          link_manager:notify_incoming_message({Method, Address, Params}),
-          inet:setopts(Socket, [{active, once}]),
-          {noreply, State#state{remaining = 0, acc = []}, ?TIMEOUT};
-        _ ->
-          inet:setopts(Socket, [{active, once}]),
-          {noreply, State#state{remaining = Remaining - Received, acc = [Bin | State#state.acc]}, ?TIMEOUT}
-      end
-  end;
+  Result = message_framer(Bin, State),
+  inet:setopts(Socket, [{active, once}]),
+  Result;
 
 handle_info({tcp_closed, Socket}, State) when Socket =:= State#state.socket ->
   gen_tcp:close(Socket),
@@ -244,3 +213,42 @@ parse_message(Bin) ->
   {ListParams, LastParam} = ParamsParsed,
   Parameters = lists:reverse([LastParam | ListParams]),
   parse_cleaner({{Port, {IpA, IpB, IpC, IpD}}, Method, Parameters}).
+
+message_framer(Bin, State) when ((byte_size(Bin) < 6) and (State#state.remaining =:= 0)) ->
+  {noreply, State#state{remaining = header, acc = [Bin]}, ?TIMEOUT};
+
+message_framer(Bin, State) when State#state.remaining =:= 0 ->
+  <<Size:40/integer, Message/binary>> = Bin,
+  Received = byte_size(Message),
+  case Size of
+    Received ->
+      {Address, Method, Params} = parse_message(Message),
+      link_manager:notify_incoming_message({Method, Address, Params}),
+      {noreply, State, ?TIMEOUT};
+    _ when Received > Size ->
+      <<First:Size/binary, Second/binary>> = Message,
+      {noreply, NewState} = message_framer(First, State),
+      message_framer(Second, NewState);
+    _ ->
+      {noreply, State#state{remaining = Size - Received, acc = [Message]}, ?TIMEOUT}
+  end;
+
+message_framer(Bin, State) when State#state.remaining =:= header ->
+  message_framer(list_to_binary([State#state.acc, Bin]), State#state{remaining = 0, acc = []});
+
+message_framer(Bin, State) ->
+  Received = byte_size(Bin),
+  Remaining = State#state.remaining,
+  case Received of
+    Remaining ->
+      Total = list_to_binary(lists:reverse([Bin | State#state.acc])),
+      {Address, Method, Params} = parse_message(Total),
+      link_manager:notify_incoming_message({Method, Address, Params}),
+      {noreply, State#state{remaining = 0, acc = []}, ?TIMEOUT};
+    _ when Received > Remaining ->
+      <<First:Remaining/binary, Second/binary>> = Bin,
+      {noreply, NewState} = message_framer(First, State),
+      message_framer(Second, NewState);
+    _ ->
+      {noreply, State#state{remaining = Remaining - Received, acc = [Bin | State#state.acc]}, ?TIMEOUT}
+  end.

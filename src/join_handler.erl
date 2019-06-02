@@ -254,7 +254,7 @@ pre_join(cast, {info, Address, Res, Succ, Nbits}, Session) ->
 
 pre_join(cast, {abort, "Used ID"}, Session) ->
   ok = handle(pre_join, init_joiner),
-  lager:error(" -- JOIN ABORTED -- Reason of abort: Used ID~n"),
+  lager:error(" -- JOIN ABORTED -- Reason of abort: Used ID\n"),
   link_shutdown(),
   gen_statem:reply(Session#session.app_mngr, fail),
   {next_state, init_joiner, reset_session(Session)};
