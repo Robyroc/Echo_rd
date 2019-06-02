@@ -111,7 +111,6 @@ handle_call(delete, _From, State) ->
   ets:delete(naming_db, stabilizer),
   ets:delete(naming_db, router),
   ets:delete(naming_db, port),
-  ets:delete(naming_db, lager_sinks_handler),
   ets:delete(naming_db, listener),
   ets:delete(naming_db, link_manager),
   {reply, ok, State};
