@@ -570,7 +570,7 @@ stop(Session, Address) ->
       Stab = naming_handler:get_identity(stabilizer),
       application_manager:drop_many_resources(all_res),
       stabilizer:turn_off(),
-      exit(naming_handler:get_identity(communication_supervisor), normal),
+      exit(naming_handler:get_identity(communication_supervisor), kill),
       naming_handler:delete_comm_tree(),
       gen_statem:reply(Session#session.app_mngr, ok),
       {next_state, init_joiner, reset_session(Session#session{stabilizer = Stab})};
@@ -579,7 +579,7 @@ stop(Session, Address) ->
 
 link_shutdown() ->
   Pid = naming_handler:get_identity(link_supervisor),
-  exit(Pid, normal),
+  exit(Pid, kill),
   naming_handler:delete_comm_tree().
 
 adjust_predecessor(ID, OwnId, _NBits) when ID < OwnId -> ID;
