@@ -137,6 +137,8 @@ handle_info({tcp, Socket , Bin}, State) when Socket =:= State#state.socket ->
           inet:setopts(Socket, [{active, once}]),
           {noreply, State, ?TIMEOUT};
         _ when Received > Size -> io:format("\007About to drop, hooray!!! \n"),
+          io:format("UUUUUUUU Remaining is: ~p~n", [Size - Received]),
+          io:format("UUUUUUUU The message is : ~p~n", [Message]),
           inet:setopts(Socket, [{active, once}]),
           {noreply, State#state{remaining = Size - Received, acc = [Message]}, ?TIMEOUT};
         _ ->
