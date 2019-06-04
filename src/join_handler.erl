@@ -580,7 +580,7 @@ stop(Session, Address) ->
 link_shutdown() ->
   Pid = naming_handler:get_identity(link_supervisor),
   naming_handler:delete_comm_tree(),
-  exit(Pid, kill).
+  exit(Pid, normal).
 
 adjust_predecessor(ID, OwnId, _NBits) when ID < OwnId -> ID;
 adjust_predecessor(ID, OwnId, NBits) -> adjust_predecessor(ID - round(math:pow(2, NBits)), OwnId, NBits).
