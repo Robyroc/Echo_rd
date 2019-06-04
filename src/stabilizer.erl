@@ -16,7 +16,7 @@
   code_change/3]).
 
 -define(MULT, 5).
--define(THRESHOLD, 20).
+-define(THRESHOLD, 3).
 -define(SERVER, ?MODULE).
 -define(INTERVAL, 5000).
 -define(SIZE, 51).

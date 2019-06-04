@@ -141,9 +141,9 @@ handle_call(Request, _From, State) ->
 
 handle_cast({send_msg, Method, Params, Address, Alias}, State) ->
   case Method of
-    join_info -> ok;
-    leave_info -> ok;
-    command -> ok;
+    join_info -> print_out_only_method_and_address(Method, Address);
+    leave_info -> print_out_only_method_and_address(Method, Address);
+    command -> print_out_only_method_and_address(Method, Address);
     _ ->
       case logging_policies:check_lager_policy(?MODULE) of
         {lager_on, able} ->
@@ -171,9 +171,9 @@ handle_cast({rcv_msg, Method, Address, Params}, State) ->
   BackTranslated = back_translate(Method),
   DecodedParams = decode_params(back_translate(Method), Params, State#state.nbits),
   case Method of
-    join_info -> ok;
-    leave_info -> ok;
-    command -> ok;
+    join_info -> print_in_only_method_and_address(Method, Address);
+    leave_info -> print_in_only_method_and_address(Method, Address);
+    command -> print_in_only_method_and_address(Method, Address);
     _ ->
       case logging_policies:check_lager_policy(?MODULE) of
         {lager_on, able} ->
@@ -470,3 +470,27 @@ extract_names(N, Rest, Acc) ->
 
 unpad([0 | X]) -> unpad(X);
 unpad(X) -> X.
+
+print_out_only_method_and_address(Method, Address) ->
+  case logging_policies:check_lager_policy(?MODULE) of
+    {lager_on, able} ->
+      lagerConsole:info("### OUT ###: Method:~p | Address:~p\n", [Method, Address]),
+      inout:info("### OUT ###: Method:~p | Address:~p\n", [Method, Address]);
+    {lager_only, able} ->
+      inout:info("### OUT ###: Method:~p | Address:~p\n", [Method, Address]);
+    {lager_off, able} ->
+      io:format("### OUT ###: Method:~p | Address:~p\n", [Method, Address]);
+    _ -> ok
+  end.
+
+print_in_only_method_and_address(Method, Address) ->
+  case logging_policies:check_lager_policy(?MODULE) of
+    {lager_on, able} ->
+      lagerConsole:info("### IN ###: Method:~p | Address:~p\n", [Method, Address]),
+      inout:info("### IN ###: Method:~p | Address:~p\n", [Method, Address]);
+    {lager_only, able} ->
+      inout:info("### IN ###: Method:~p | Address:~p\n", [Method, Address]);
+    {lager_off, able} ->
+      io:format("### IN ###: Method:~p | Address:~p\n", [Method, Address]);
+    _ -> ok
+  end.

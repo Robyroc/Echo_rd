@@ -179,7 +179,6 @@ handle_cast(Request, State) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_info({'DOWN', Monitor, process, _PID, tcp_closed}, State) ->
-  io:format("Node down \n"),
   Present = [X || {_, X, M} <- State#state.connections, M =:= Monitor],
   Address = hd(Present),
   checker:notify_lost_node(Address),
@@ -188,7 +187,6 @@ handle_info({'DOWN', Monitor, process, _PID, tcp_closed}, State) ->
   {noreply, State#state{connections = [{Pid, Addr, Mon} || {Pid, Addr, Mon} <- State#state.connections, Mon =/= Monitor]}};
 
 handle_info({'DOWN', Monitor, process, _PID, unused}, State) ->
-  io:format("Unused down\n"),
   {noreply, State#state{connections = [{Pid, Addr, Mon} || {Pid, Addr, Mon} <- State#state.connections, Mon =/= Monitor]}};
 
 handle_info({'DOWN', Monitor, process, _PID, Reason}, State) ->
@@ -211,6 +209,7 @@ handle_info({tcp, Socket, Bin}, State) ->
 
 handle_info(startup, State) ->
   naming_handler:wait_service(port),
+  timer:sleep(500),
   naming_handler:notify_identity(self(), link_manager),
   {noreply, State#state{connections = []}};
 
