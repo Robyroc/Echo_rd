@@ -4,7 +4,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, show_table/0, local_lookup/1, update_finger_table/2, remote_lookup/2, lookup_for_join/1, notify_lost_node/1, show_id/0]).
+-export([start_link/0, show_table/0, local_lookup/1, update_finger_table/2, remote_lookup/3, lookup_for_join/2, notify_lost_node/1, show_id/0]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -35,18 +35,18 @@ local_lookup(ID) ->
   PID = naming_handler:get_identity(router),
   Nbits = params_handler:get_param(nbits),
   Time = statistics:get_average_lookup_time(),
-  gen_server:call(PID, {lookup, ID}, Nbits*6000 + Time).                   %TODO tune timeout here accordingly
+  gen_server:call(PID, {lookup, ID}, Nbits*6000 + Time).
 
 update_finger_table(Address, Theoretical) ->
   PID = naming_handler:get_identity(router),
   gen_server:cast(PID, {update, Address, Theoretical}).
 
-remote_lookup(Requested, Alias) ->
+remote_lookup(Requested, Alias, Hops) ->
   PID = naming_handler:get_identity(router),
-  gen_server:cast(PID, {lookup, Alias, Requested}).
+  gen_server:cast(PID, {lookup, Alias, Requested, Hops}).
 
-lookup_for_join(Address) ->
-  remote_lookup(hash_f:get_hashed_addr(Address), Address).
+lookup_for_join(Address, Hops) ->
+  remote_lookup(hash_f:get_hashed_addr(Address), Address, Hops).
 
 show_table() ->
   PID = naming_handler:get_identity(router),
@@ -169,7 +169,10 @@ handle_cast({update, Address, Theoretical}, State) ->
   end,
   {noreply, State#state{finger_table = NewTable, nbits = State#state.nbits, id = State#state.id}};
 
-handle_cast({lookup, Alias, Requested}, State) ->
+handle_cast({lookup, _Alias, _Requested, Hops}, State) when Hops =:= 0 ->
+  {noreply, State};
+
+handle_cast({lookup, Alias, Requested, Hops}, State) ->
   ActualRequested = adjust_successor(Requested, State#state.id, State#state.nbits),
   {SuccID, Succ} = stabilizer:get_successor(),
   case logging_policies:check_lager_policy(?MODULE) of
@@ -191,10 +194,10 @@ handle_cast({lookup, Alias, Requested}, State) ->
       Destinations = lookup(ActualRequested, State#state.id, State#state.finger_table, State#state.nbits),
       case Destinations of
         [] ->
-          communication_manager:send_message_async(lookup, [ActualRequested], Succ, Alias),
+          communication_manager:send_message_async(lookup, [ActualRequested, Hops - 1], Succ, Alias),
           {noreply, State};
         [X | _] ->
-          communication_manager:send_message_async(lookup, [ActualRequested], X, Alias),
+          communication_manager:send_message_async(lookup, [ActualRequested, Hops - 1], X, Alias),
           {noreply, State}
       end
   end;
@@ -273,24 +276,29 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 
 show_finger_table(State) ->
-  %TODO check policy and lager
   case logging_policies:check_lager_policy(?MODULE) of
-    {lager_on, able} ->
+    {lager_on, _} ->
       lagerConsole:info("Finger Table: \n
       Theo\t| Real\t| Address\n"),
       [lagerConsole:info("~p\t| ~p\t| ~p\n", [T, R, A]) || {T, R, A} <- State#state.finger_table],
       routerLager:info("Finger Table: \n
       Theo\t| Real\t| Address\n"),
       [routerLager:info("~p\t| ~p\t| ~p\n", [T, R, A]) || {T, R, A} <- State#state.finger_table];
-    {lager_only, able} ->
+    {lager_only, _} ->
+      lagerConsole:info("Finger Table: \n
+      Theo\t| Real\t| Address\n"),
+      [lagerConsole:info("~p\t| ~p\t| ~p\n", [T, R, A]) || {T, R, A} <- State#state.finger_table],
       routerLager:info("Finger Table: \n
       Theo\t| Real\t| Address\n"),
       [routerLager:info("~p\t| ~p\t| ~p\n", [T, R, A]) || {T, R, A} <- State#state.finger_table];
-    {lager_off, able} ->
+    {lager_off, _} ->
       io:format("Finger Table: \n
       Theo\t| Real\t| Address\n"),
       [io:format("~p\t| ~p\t| ~p\n", [T, R, A]) || {T, R, A} <- State#state.finger_table];
-    _ -> ok
+    _ ->
+      io:format("Finger Table: \n
+      Theo\t| Real\t| Address\n"),
+      [io:format("~p\t| ~p\t| ~p\n", [T, R, A]) || {T, R, A} <- State#state.finger_table]
   end,
   ok.
 

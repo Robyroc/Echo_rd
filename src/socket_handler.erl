@@ -35,7 +35,7 @@ start(Socket) ->
   gen_server:start(?MODULE, [Socket], []).
 
 send_message(PID, Message) ->
-  gen_server:cast(PID, {send, Message}).        %TODO timeout?
+  gen_server:cast(PID, {send, Message}).
 
 %%%===================================================================
 %%% gen_server callbacks

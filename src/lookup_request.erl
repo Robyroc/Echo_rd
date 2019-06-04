@@ -14,7 +14,7 @@
   terminate/2,
   code_change/3]).
 
--define(TIMEOUT, 3000).           %TODO tune this parameter accordingly
+-define(TIMEOUT, 3000).
 -define(SERVER, ?MODULE).
 -define(MIN_WAIT_TIME, 10000).
 

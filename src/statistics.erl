@@ -27,8 +27,7 @@
 -record(state, {join_time, max_lookup_time, lookup_drop, ftable_timing, lookup_times}).
 
 %TODO rethink the statistics algorithm because this one may create problems:
-%If a proceess exits the network while the packet is circulating, the packet will loop indefinitely.
-%Also statistics reflects the topology of the network, this may be not safe
+%If a proceess exits the network while the packet is circulating, the packet will loop indefinitely. (HOPS?)
 
 %%%===================================================================
 %%% API
@@ -132,21 +131,19 @@ handle_cast(gather, State) ->
 handle_cast({show_stats, Address, Stats}, State) ->
   {JoinTime, HighLookupTime, LookupDrop, FtableTimings} = Stats,
   ID = hash_f:get_hashed_addr(Address),
-  %TODO check lager and policy
   case logging_policies:check_lager_policy(?MODULE) of
     {lager_on, _} ->
-      lager:info("^^^^^ STATS ^^^^^\n ID: ~p\n IP: ~p\n Join time: ~p\n
-      Highest lookup time: ~p\n Number of lookup timeouts: ~p\n FTable last refresh timings: ~p\n\n",
+      lager:info("\n^^^^^ STATS ^^^^^\n ID: ~p\n IP: ~p\n Join time: ~p\nHighest lookup time: ~p\n Number of lookup timeouts: ~p\n FTable last refresh timings: ~p\n\n",
         [ID, Address, JoinTime, HighLookupTime, LookupDrop, FtableTimings]);
     {lager_only, _} ->
-      lager:info("^^^^^ STATS ^^^^^\n ID: ~p\n IP: ~p\n Join time: ~p\n
-      Highest lookup time: ~p\n Number of lookup timeouts: ~p\n FTable last refresh timings: ~p\n\n",
+      lager:info("\n^^^^^ STATS ^^^^^\n ID: ~p\n IP: ~p\n Join time: ~p\nHighest lookup time: ~p\n Number of lookup timeouts: ~p\n FTable last refresh timings: ~p\n\n",
         [ID, Address, JoinTime, HighLookupTime, LookupDrop, FtableTimings]);
     {lager_off, _} ->
-      io:format("^^^^^ STATS ^^^^^\n ID: ~p\n IP: ~p\n Join time: ~p\n
-      Highest lookup time: ~p\n Number of lookup timeouts: ~p\n FTable last refresh timings: ~p\n\n",
+      io:format("\n^^^^^ STATS ^^^^^\n ID: ~p\n IP: ~p\n Join time: ~p\nHighest lookup time: ~p\n Number of lookup timeouts: ~p\n FTable last refresh timings: ~p\n\n",
         [ID, Address, JoinTime, HighLookupTime, LookupDrop, FtableTimings]);
-    _ -> ok
+    _ ->
+      io:format("\n^^^^^ STATS ^^^^^\n ID: ~p\n IP: ~p\n Join time: ~p\nHighest lookup time: ~p\n Number of lookup timeouts: ~p\n FTable last refresh timings: ~p\n\n",
+        [ID, Address, JoinTime, HighLookupTime, LookupDrop, FtableTimings])
   end,
   {noreply, State};
 

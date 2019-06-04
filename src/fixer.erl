@@ -104,7 +104,7 @@ handle_info(startup, _State) ->
   ID = hash_f:get_hashed_addr(link_manager:get_own_address()),
   NBits = params_handler:get_param(nbits),
   naming_handler:notify_identity(self(), fixer),
-  erlang:send_after(?MIN_FIX_TIME, self(), fix),                    %TODO tune parameters accordingly
+  erlang:send_after(?MIN_FIX_TIME, self(), fix),
   {noreply, #state{id = ID, nbits = NBits, index = 0}};
 
 handle_info(fix, State) ->
