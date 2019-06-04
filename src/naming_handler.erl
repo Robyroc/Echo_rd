@@ -111,12 +111,12 @@ handle_call(delete, _From, State) ->
   ets:delete(naming_db, stabilizer),
   ets:delete(naming_db, router),
   ets:delete(naming_db, port),
-  ets:delete(naming_db, listener),
+  ets:delete(naming_db, lager_sinks_handler),
   ets:delete(naming_db, link_manager),
+  ets:delete(naming_db, listener),
   {reply, ok, State};
 
 handle_call({reheir, NewManager}, _From, State) ->
-  %TODO check lager and policy
   case logging_policies:check_lager_policy(?MODULE) of
     {lager_on, _} ->
       lager:info("Naming Handler: Changing Heir options\n");

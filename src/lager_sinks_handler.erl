@@ -198,6 +198,7 @@ handle_cast(_, State) ->
   {noreply, NewState :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term(), NewState :: #state{}}).
 handle_info(startup, _State) ->
+  naming_handler:wait_service(port),
   Port = naming_handler:get_identity(port),
   {ok, Directory} = file:get_cwd(),
   Path = Directory ++ "/log/" ++ integer_to_list(Port) ++ "_logging",
