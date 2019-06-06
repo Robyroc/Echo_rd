@@ -25,7 +25,6 @@
 
 notify_identity(PID, Identity) ->
   try
-    %TODO check lager and policy
     case logging_policies:check_lager_policy(?MODULE) of
       {lager_on, able} ->
         lager:info("=== NEW ENTRY === Name:~p ===\n", [Identity]);
@@ -36,7 +35,7 @@ notify_identity(PID, Identity) ->
       _ -> ok
     end,
     Naming = get_identity(naming_handler),
-    gen_server:call(Naming, {notify, Identity, PID})          %TODO check if timeout is needed
+    gen_server:call(Naming, {notify, Identity, PID})
   of
     A -> A
   catch
@@ -65,7 +64,7 @@ get_maybe_identity(Identity) ->
 
 delete_comm_tree() ->
   Naming = get_identity(naming_handler),
-  gen_server:call(Naming, delete).          %TODO check if timeout is needed
+  gen_server:call(Naming, delete).
 
 %%--------------------------------------------------------------------
 %% @doc

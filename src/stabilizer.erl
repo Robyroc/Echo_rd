@@ -186,7 +186,15 @@ handle_info(stabilize, State) when State#state.op =:= no_operating ->
   {noreply, State};
 
 handle_info(stabilize, State) when State#state.fail_counter > ?THRESHOLD ->
-  io:format("\007Dropped\n"),
+  case logging_policies:check_lager_policy(?MODULE) of
+    {lager_on, _} ->
+      lager:info("##@@++** Dropped successor! **++@@##");
+    {lager_only, _} ->
+      lager:info("##@@++** Dropped successor! **++@@##");
+    {lager_off, _} ->
+      io:format("##@@++** Dropped successor! **++@@##");
+    _ -> ok
+  end,
   case tl(State#state.succ_list) of
     [] ->
       OwnAddress = link_manager:get_own_address(),
