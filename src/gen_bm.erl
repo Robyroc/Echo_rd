@@ -1,7 +1,13 @@
 -module(gen_bm).
 -author("Giacomo").
 
--callback receive_command(From :: term(), Command :: term()) -> C :: term().
--callback add_many_resources(Resources :: term()) -> B :: term().
--callback get_local_resources(From :: term()) -> B :: term().
--callback drop_many_resources(From :: term()) -> B :: term().
+-type ip_port() :: integer().
+-type ip() :: {integer(), integer(), integer(), integer()}.
+-type address() :: {ip_port(), ip()}.
+-type resource() :: {string(), binary()}.
+-type resource_list() :: [] | [resource() | resource_list()].
+
+-callback receive_command(From :: address(), Command :: binary()) -> ok.
+-callback add_many_resources(Resources :: resource_list()) -> ok.
+-callback get_local_resources(From :: integer()) -> Resources :: resource_list().
+-callback drop_many_resources(From :: integer()) -> ok.
