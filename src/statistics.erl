@@ -26,9 +26,6 @@
 
 -record(state, {join_time, max_lookup_time, lookup_drop, ftable_timing, lookup_times}).
 
-%TODO rethink the statistics algorithm because this one may create problems:
-%If a proceess exits the network while the packet is circulating, the packet will loop indefinitely. (HOPS?)
-
 %%%===================================================================
 %%% API
 %%%===================================================================
@@ -148,28 +145,12 @@ handle_cast({show_stats, Address, Stats}, State) ->
   {noreply, State};
 
 handle_cast({get_stats, Address, Number}, State) ->
-  OwnAddress = link_manager:get_own_address(),
-  case Address of
-    OwnAddress ->
-      case logging_policies:check_lager_policy(?MODULE) of
-        {lager_on, _} ->
-          lager:info("Number of nodes: ~p\n", [Number]);
-        {lager_only, _} ->
-          lager:info("Number of nodes: ~p\n", [Number]);
-        {lager_off, _} ->
-          io:format("Number of nodes: ~p\n", [Number]);
-        _ -> ok
-      end;
-    _ ->
-      #state{join_time = JT,
-        max_lookup_time = MLT,
-        lookup_drop = LD,
-        ftable_timing = FT} = State,
-      communication_manager:send_message_async(stats, [{JT, MLT, LD, FT}], Address, no_alias),
-      {_, Succ} = stabilizer:get_successor(),
-      communication_manager:send_message_async(get_stats, [Number + 1], Succ, Address)
-  end,
-  {noreply, State};
+  NBits = params_handler:get_param(nbits),
+  Max = math:pow(2, NBits),
+  case Number of
+    Max -> {noreply, State};
+    _ -> get_stats(Address, Number, State)
+  end;
 
 handle_cast({join_time, Time}, State) ->
   {noreply, State#state{join_time = Time}};
@@ -261,3 +242,28 @@ add_time(Time, List) ->
     ?SIZE -> [Time | lists:reverse(tl(lists:reverse(List)))];
     _ -> [Time | List]
   end.
+
+
+get_stats(Address, Number, State) ->
+  OwnAddress = link_manager:get_own_address(),
+  case Address of
+    OwnAddress ->
+      case logging_policies:check_lager_policy(?MODULE) of
+        {lager_on, _} ->
+          lager:info("Number of nodes: ~p\n", [Number]);
+        {lager_only, _} ->
+          lager:info("Number of nodes: ~p\n", [Number]);
+        {lager_off, _} ->
+          io:format("Number of nodes: ~p\n", [Number]);
+        _ -> ok
+      end;
+    _ ->
+      #state{join_time = JT,
+        max_lookup_time = MLT,
+        lookup_drop = LD,
+        ftable_timing = FT} = State,
+      communication_manager:send_message_async(stats, [{JT, MLT, LD, FT}], Address, no_alias),
+      {_, Succ} = stabilizer:get_successor(),
+      communication_manager:send_message_async(get_stats, [Number + 1], Succ, Address)
+  end,
+  {noreply, State}.
