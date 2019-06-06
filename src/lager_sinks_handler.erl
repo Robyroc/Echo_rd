@@ -68,7 +68,7 @@ handle_call(start_if_not_started, _From, State) ->
   {reply, ok, State};
 
 handle_call(terminate_if_not_terminated, _From, State) when State#state.started =:= started ->
-  lager:stop(),
+  application:stop(lager),
   {reply, ok, State#state{started = not_started}};
 
 handle_call(terminate_if_not_terminated, _From, State) ->
