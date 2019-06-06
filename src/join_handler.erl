@@ -1,11 +1,3 @@
-%%%-------------------------------------------------------------------
-%%% @author Antonio
-%%% @copyright (C) 2019, <COMPANY>
-%%% @doc
-%%%
-%%% @end
-%%% Created : 30. mar 2019 13:10
-%%%-------------------------------------------------------------------
 -module(join_handler).
 -author("Antonio").
 
@@ -98,15 +90,7 @@ ack_leave(Address) ->
   gen_statem:cast(PID, {ack_leave, Address}).
 
 
-%%--------------------------------------------------------------------
-%% @doc
-%% Creates a gen_statem process which calls Module:init/1 to
-%% initialize. To ensure a synchronized start-up procedure, this
-%% function does not return until Module:init/1 has returned.
-%%
-%% @spec start_link() -> {ok, Pid} | ignore | {error, Error}
-%% @end
-%%--------------------------------------------------------------------
+
 start_link(Pid) ->
   gen_statem:start_link({local, ?SERVER}, ?MODULE, [Pid], []).
 
@@ -116,19 +100,7 @@ start_link(Pid) ->
 %%% gen_statem callbacks
 %%%===================================================================
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Whenever a gen_statem is started using gen_statem:start/[3,4] or
-%% gen_statem:start_link/[3,4], this function is called by the new
-%% process to initialize.
-%%
-%% @spec init(Args) -> {CallbackMode, StateName, State} |
-%%                     {CallbackMode, StateName, State, Actions} |
-%%                     ignore |
-%%                     {stop, StopReason}
-%% @end
-%%--------------------------------------------------------------------
+
 init([Pid]) ->
   naming_handler:notify_identity(self(), join_handler),
   ok = handle(init,init_joiner),
@@ -139,55 +111,15 @@ init([Pid]) ->
 init(_) -> badarg.
 
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% This function is called by a gen_statem when it needs to find out 
-%% the callback mode of the callback module.
-%%
-%% @spec callback_mode() -> atom().
-%% @end
-%%--------------------------------------------------------------------
 callback_mode() ->
   state_functions.
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Called (1) whenever sys:get_status/1,2 is called by gen_statem or
-%% (2) when gen_statem terminates abnormally.
-%% This callback is optional.
-%%
-%% @spec format_status(Opt, [PDict, StateName, State]) -> term()
-%% @end
-%%--------------------------------------------------------------------
+
 format_status(_Opt, [_PDict, _StateName, _State]) ->
   Status = some_term,
   Status.
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% There should be one instance of this function for each possible
-%% state name.  If callback_mode is statefunctions, one of these
-%% functions is called when gen_statem receives and event from
-%% call/2, cast/2, or as a normal process message.
-%%
-%% @spec state_name(Event, From, State) ->
-%%                   {next_state, NextStateName, NextState} |
-%%                   {next_state, NextStateName, NextState, Actions} |
-%%                   {stop, Reason, NewState} |
-%%    				 stop |
-%%                   {stop, Reason :: term()} |
-%%                   {stop, Reason :: term(), NewData :: data()} |
-%%                   {stop_and_reply, Reason, Replies} |
-%%                   {stop_and_reply, Reason, Replies, NewState} |
-%%                   {keep_state, NewData :: data()} |
-%%                   {keep_state, NewState, Actions} |
-%%                   keep_state_and_data |
-%%                   {keep_state_and_data, Actions}
-%% @end
-%%--------------------------------------------------------------------
+
 init_joiner({call, From}, {join, OwnPort, Address}, Session) ->
   Time = erlang:timestamp(),
   ok = handle(init_joiner, look),
@@ -254,7 +186,15 @@ pre_join(cast, {info, Address, Res, Succ, Nbits}, Session) ->
 
 pre_join(cast, {abort, "Used ID"}, Session) ->
   ok = handle(pre_join, init_joiner),
-  lager:error(" -- JOIN ABORTED -- Reason of abort: Used ID\n"),
+  case logging_policies:check_lager_policy(?MODULE) of
+    {lager_on, _} ->
+      lager:error(" -- JOIN ABORTED -- Reason of abort: Used ID\n");
+    {lager_only, _} ->
+      lager:error(" -- JOIN ABORTED -- Reason of abort: Used ID\n");
+    {lager_off, _} ->
+      io:format(" -- JOIN ABORTED -- Reason of abort: Used ID\n");
+    _ -> ok
+  end,
   link_shutdown(),
   gen_statem:reply(Session#session.app_mngr, fail),
   {next_state, init_joiner, reset_session(Session)};
@@ -444,56 +384,16 @@ leaving(EventType, EventContent, Session) ->
   handle_generic_event({EventType, EventContent, Session}).
 
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%%
-%% If callback_mode is handle_event_function, then whenever a
-%% gen_statem receives an event from call/2, cast/2, or as a normal
-%% process message, this function is called.
-%%
-%% @spec handle_event(Event, StateName, State) ->
-%%                   {next_state, NextStateName, NextState} |
-%%                   {next_state, NextStateName, NextState, Actions} |
-%%                   {stop, Reason, NewState} |
-%%    				 stop |
-%%                   {stop, Reason :: term()} |
-%%                   {stop, Reason :: term(), NewData :: data()} |
-%%                   {stop_and_reply, Reason, Replies} |
-%%                   {stop_and_reply, Reason, Replies, NewState} |
-%%                   {keep_state, NewData :: data()} |
-%%                   {keep_state, NewState, Actions} |
-%%                   keep_state_and_data |
-%%                   {keep_state_and_data, Actions}
-%% @end
-%%--------------------------------------------------------------------
+
 handle_event(_EventType, _EventContent, _StateName, State) ->
   NextStateName = the_next_state_name,
   {next_state, NextStateName, State}.
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% This function is called by a gen_statem when it is about to
-%% terminate. It should be the opposite of Module:init/1 and do any
-%% necessary cleaning up. When it returns, the gen_statem terminates with
-%% Reason. The return value is ignored.
-%%
-%% @spec terminate(Reason, StateName, State) -> void()
-%% @end
-%%--------------------------------------------------------------------
+
 terminate(_Reason, _StateName, _State) ->
   ok.
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Convert process state when code is changed
-%%
-%% @spec code_change(OldVsn, StateName, State, Extra) ->
-%%                   {ok, StateName, NewState}
-%% @end
-%%--------------------------------------------------------------------
+
 code_change(_OldVsn, StateName, State, _Extra) ->
   {ok, StateName, State}.
 

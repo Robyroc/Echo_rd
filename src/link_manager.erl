@@ -32,12 +32,6 @@
 %%% API
 %%%===================================================================
 
-%%--------------------------------------------------------------------
-%% @doc
-%% Starts the server
-%%
-%% @end
-%%--------------------------------------------------------------------
 start_link() ->
   gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
@@ -88,28 +82,12 @@ move_socket(Socket) ->
 %%% gen_server callbacks
 %%%===================================================================
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Initializes the server
-%%
-%% @spec init(Args) -> {ok, State} |
-%%                     {ok, State, Timeout} |
-%%                     ignore |
-%%                     {stop, Reason}
-%% @end
-%%--------------------------------------------------------------------
+
 init([]) ->
   self() ! startup,
   {ok, #state{}}.
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Handling call messages
-%%
-%% @end
-%%--------------------------------------------------------------------
+
 handle_call({send, {Port, IP}, Message}, _From, State) ->
   {_, _, Params} = Message,
   Size = byte_size(list_to_binary(Params)),
@@ -127,13 +105,7 @@ handle_call(Request, _From, State) ->
   end,
   {reply, ok, State}.
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Handling cast messages
-%%
-%% @end
-%%--------------------------------------------------------------------
+
 handle_cast({received, Message}, State) ->
   communication_manager:receive_message(Message),
   {noreply, State};
@@ -168,16 +140,6 @@ handle_cast(Request, State) ->
   {noreply, State}.
 
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Handling all non call/cast messages
-%%
-%% @spec handle_info(Info, State) -> {noreply, State} |
-%%                                   {noreply, State, Timeout} |
-%%                                   {stop, Reason, State}
-%% @end
-%%--------------------------------------------------------------------
 handle_info({'DOWN', Monitor, process, _PID, tcp_closed}, State) ->
   Present = [X || {_, X, M} <- State#state.connections, M =:= Monitor],
   Address = hd(Present),
@@ -209,7 +171,6 @@ handle_info({tcp, Socket, Bin}, State) ->
 
 handle_info(startup, State) ->
   naming_handler:wait_service(port),
-  timer:sleep(500),
   naming_handler:notify_identity(self(), link_manager),
   {noreply, State#state{connections = []}};
 
@@ -225,35 +186,17 @@ handle_info(Info, State) ->
   end,
   {noreply, State}.
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% This function is called by a gen_server when it is about to
-%% terminate. It should be the opposite of Module:init/1 and do any
-%% necessary cleaning up. When it returns, the gen_server terminates
-%% with Reason. The return value is ignored.
-%%
-%% @spec terminate(Reason, State) -> void()
-%% @end
-%%--------------------------------------------------------------------
+
 terminate(_Reason, _State) ->
   ok.
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Convert process state when code is changed
-%%
-%% @spec code_change(OldVsn, State, Extra) -> {ok, NewState}
-%% @end
-%%--------------------------------------------------------------------
+
 code_change(_OldVsn, State, _Extra) ->
   {ok, State}.
 
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
-
 
 local_address() ->
   {ok, Addrs} = inet:getif(),
@@ -297,12 +240,10 @@ send_async(Port, IP, Message, State, _Size) ->
         {ok, PID} ->
           gen_tcp:controlling_process(RequestSocket, PID),
           socket_handler:send_message(PID, Message),
-          %%timer:apply_after(300000, erlang, exit, [PID, normal]),
           {noreply, State};
         {ok, PID, _} ->
           gen_tcp:controlling_process(RequestSocket, PID),
           socket_handler:send_message(PID, Message),
-          %%timer:apply_after(300000, erlang, exit, [PID, normal]),
           {noreply, State}
       end;
     {error, _Reason} ->
@@ -318,12 +259,10 @@ send(Port, IP, Message, State, _Size) ->
         {ok, PID} ->
           gen_tcp:controlling_process(RequestSocket, PID),
           socket_handler:send_message(PID, Message),
-          %timer:apply_after(300000, erlang, exit, [PID, normal]),
           {reply, ok, State};
         {ok, PID, _} ->
           gen_tcp:controlling_process(RequestSocket, PID),
           socket_handler:send_message(PID, Message),
-          %timer:apply_after(300000, erlang, exit, [PID, normal]),
           {reply, ok, State}
       end;
     {error, Reason} ->

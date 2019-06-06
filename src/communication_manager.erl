@@ -37,13 +37,6 @@
 %%% API
 %%%===================================================================
 
-%%--------------------------------------------------------------------
-%% @doc
-%% Starts the server
-%%
-%% @end
-%%--------------------------------------------------------------------
-
 
 start_link() ->
   gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
@@ -68,19 +61,6 @@ receive_nbits(NBits) ->
 %%% gen_server callbacks
 %%%===================================================================
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Initializes the server
-%%
-%% @spec init(Args) -> {ok, State} |
-%%                     {ok, State, Timeout} |
-%%                     ignore |
-%%                     {stop, Reason}
-%% @end
-%%--------------------------------------------------------------------
-
-
 init([]) ->
   case naming_handler:get_maybe_identity(params_handler) of
     no_name_registered -> NBits = no_nbits;
@@ -89,13 +69,6 @@ init([]) ->
   naming_handler:notify_identity(self(), communication_manager),
   {ok, #state{nbits = NBits}}.
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Handling call messages
-%%
-%% @end
-%%--------------------------------------------------------------------
 
 handle_call({send_msg, Method, Params, Address, Alias}, _From, State) ->
   case logging_policies:check_lager_policy(?MODULE) of
@@ -131,13 +104,6 @@ handle_call(Request, _From, State) ->
   end,
   {reply, ok, State}.
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Handling cast messages
-%%
-%% @end
-%%--------------------------------------------------------------------
 
 handle_cast({send_msg, Method, Params, Address, Alias}, State) ->
   case Method of
@@ -160,7 +126,6 @@ handle_cast({send_msg, Method, Params, Address, Alias}, State) ->
   Encoded = encode_params(Method, Params, State#state.nbits),
   case Encoded of
     badarg ->
-      io:format("ààààà Error in the encoding of the message ààààà\n"),
       {noreply, State};
     _ ->
       link_manager:send_message_async(Address, {Alias, Translated, Encoded}),
@@ -203,16 +168,6 @@ handle_cast(Request, State) ->
   end,
   {noreply, State}.
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Handling all non call/cast messages
-%%
-%% @spec handle_info(Info, State) -> {noreply, State} |
-%%                                   {noreply, State, Timeout} |
-%%                                   {stop, Reason, State}
-%% @end
-%%--------------------------------------------------------------------
 
 handle_info(Info, State) ->
   case logging_policies:check_lager_policy(?MODULE) of
@@ -226,29 +181,9 @@ handle_info(Info, State) ->
   end,
   {noreply, State}.
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% This function is called by a gen_server when it is about to
-%% terminate. It should be the opposite of Module:init/1 and do any
-%% necessary cleaning up. When it returns, the gen_server terminates
-%% with Reason. The return value is ignored.
-%%
-%% @spec terminate(Reason, State) -> void()
-%% @end
-%%--------------------------------------------------------------------
 
 terminate(_Reason, _State) ->
   ok.
-
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Convert process state when code is changed
-%%
-%% @spec code_change(OldVsn, State, Extra) -> {ok, NewState}
-%% @end
-%%--------------------------------------------------------------------
 
 code_change(_OldVsn, State, _Extra) ->
   {ok, State}.
