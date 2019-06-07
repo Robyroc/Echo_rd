@@ -66,6 +66,8 @@ The following table shows the possible configurations (in square brackets defaul
 | lager_log | lager_only  | Logs are written only on file                                                           |
 | lager_log | lager_off   | Logs are written only on terminal (may make it hard to use the terminal)                |
 | lager_log | [undefined] | No logging                                                                              |
+| delay     | NUMBER      | Add NUMBER ms of latency to communication                                               |
+| delay     | [undefined] | No artificial delay                                                                     |
 
 Messages
 -----
