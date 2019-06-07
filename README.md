@@ -70,25 +70,23 @@ The following table shows the possible configurations (in square brackets defaul
 Messages
 -----
 
-| message       | From       | To         | Description                                     | Params                  |
-|---------------|------------|------------|-------------------------------------------------|-------------------------|
-| lookup        | 1          | Router     | Request to find successor of index passed       | Sender, index           |
-| checkAlive    | Checker(s) | Stabilizer | Checks if the predecessor is still alive        | Sender                  |
-| imAlive       | Stabilizer | Checker(s) | Notifies checker that the process is alive      | Sender                  |
-| updateTable   | Fixer      | Router     | Tells the router to update the finger table     | Sender, index, newValue |
-| newSucc       | Router     | Stabilizer | Tells the stab that there is a new succ         | Sender, newSucc         |
-| predFind      | Stabilizer | Checker(s) | Asks for the predecessor of the successor       | Sender                  |
-| predTell      | Checker(s) | Stabilizer | Answers the above message                       | Sender, predecessor     |
-| localAdd      | 2          | B. Manager | Adds the data to the storage                    | Sender, data            |
-| localAdded    | B. Manager | many       | Returns the index of the added item             | Sender, index           |
-| localGet      | 2          | B. Manager | Asks for an item in the given position          | Sender, index           |
-| localObtained | B. Manager | many       | Answers the above message                       | Sender, data            |
-| localDelete   | 2          | B. Manager | Ask for the deletion of the item of that index  | Sender, index           |
-| localDeleted  | B. Manager | many       | Answers the above message                       | Sender, index           |
-| getAll        | Api        | B. Manager | Asks for all the blocks stored                  | Sender                  |
-| obtainedAll   | B. Manager | API        | Answers the above message                       | Sender, data            |
-| join          | C.M.(any)  | C.M.       | Ask for the successor in order to join          | Sender                  |
-| leave         | Api        | C.M.       | Tells the CM to stop all incoming conversations | Sender                  |
+| Message         | Params                          | Created by             | Forwarded to                  | Notes                                                                                            |
+|-----------------|---------------------------------|------------------------|-------------------------------|--------------------------------------------------------------------------------------------------|
+| lookup_for_join |                                 | join_handler           | router                        |                                                                                                  |
+| lookup_response | ID, Address                     | router                 | request_gateway, join_handler | ID contains the requested id, Address will points to the closest   successor of the requested id |
+| ready_for_info  |                                 | join_handler           | join_handler                  |                                                                                                  |
+| join_info       | Nbits, SuccessorList, Resources | join_handler           | join_handler                  | Contains all the info needed for the join                                                        |
+| ack_info        |                                 | join_handler           | join_handler                  | Confirms the reception of join_info                                                              |
+| abort           | Reason                          | join_handler           | join_handler                  | Aborts current join operation                                                                    |
+| ack_join        |                                 | join_handler           | join_handler                  | Ends the join operation                                                                          |
+| leave_info      | Resources                       | join_handler           | join_handler                  | Contains the resources of the leaving node                                                       |
+| ack_leave       |                                 | join_handler           | join_handler                  | Confirms the reception of leave_info                                                             |
+| ask_pred        |                                 | stabilizer             | checker                       |                                                                                                  |
+| pred_reply      | Predecessor, SuccessorList      | checker                | stabilizer                    | Responds to the ask_pred message                                                                 |
+| lookup          | ID, Hops                        | router, lookup_request | router                        | Hops indicates the max number of nodes that can be visited                                       |
+| command         | Address, Command                | application_manager    | application_manager           | Address contains the ip address of the node sending the command                                  |
+| get_stats       | Number                          | statistics             | statistics                    | Number contains the number of already visited nodes                                              |
+| stats           | Statistics                      | statistics             | statistics                    |                                                                                                  |
 
 - 1 is Api (l), Router, Fixer(l)
 - 2 is Api (any) 
