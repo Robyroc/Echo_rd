@@ -97,28 +97,30 @@ handle_cast(gather, State) ->
   #state{join_time = JT,
     max_lookup_time = MLT,
     lookup_drop = LD,
-    ftable_timing = FT} = State,
+    ftable_timing = FT,
+    lookup_times = LT,
+    lookup_lengths = LL} = State,
   {_, Succ} = stabilizer:get_successor(),
   communication_manager:send_message_async(get_stats, [1], Succ, no_alias),
-  incoming_statistics(link_manager:get_own_address(), {JT, MLT, LD, FT}),
+  incoming_statistics(link_manager:get_own_address(), {JT, MLT, get_avg_integer(LT), get_avg_float(LL), LD, FT}),
   {noreply, State};
 
 handle_cast({show_stats, Address, Stats}, State) ->
-  {JoinTime, HighLookupTime, LookupDrop, FtableTimings} = Stats,
+  {JoinTime, HighLookupTime, AvgLookupTime, AvgLookupLength, LookupDrop, FtableTimings} = Stats,
   ID = hash_f:get_hashed_addr(Address),
   case logging_policies:check_lager_policy(?MODULE) of
     {lager_on, _} ->
-      lager:info("\n^^^^^ STATS ^^^^^\n ID: ~p\n IP: ~p\n Join time: ~p\nHighest lookup time: ~p\n Number of lookup timeouts: ~p\n FTable last refresh timings: ~p\n\n",
-        [ID, Address, JoinTime, HighLookupTime, LookupDrop, FtableTimings]);
+      lager:info("\n^^^^^ STATS ^^^^^\n ID: ~p\n IP: ~p\n Join time: ~p\nHighest lookup time: ~p\n Average lookup time: ~p\n Average lookup length: ~p\n Number of lookup timeouts: ~p\n FTable last refresh timings: ~p\n\n",
+        [ID, Address, JoinTime, HighLookupTime, AvgLookupTime, AvgLookupLength, LookupDrop, FtableTimings]);
     {lager_only, _} ->
-      lager:info("\n^^^^^ STATS ^^^^^\n ID: ~p\n IP: ~p\n Join time: ~p\nHighest lookup time: ~p\n Number of lookup timeouts: ~p\n FTable last refresh timings: ~p\n\n",
-        [ID, Address, JoinTime, HighLookupTime, LookupDrop, FtableTimings]);
+      lager:info("\n^^^^^ STATS ^^^^^\n ID: ~p\n IP: ~p\n Join time: ~p\nHighest lookup time: ~p\n Average lookup time: ~p\n Average lookup length: ~p\n Number of lookup timeouts: ~p\n FTable last refresh timings: ~p\n\n",
+        [ID, Address, JoinTime, HighLookupTime, AvgLookupTime, AvgLookupLength, LookupDrop, FtableTimings]);
     {lager_off, _} ->
-      io:format("\n^^^^^ STATS ^^^^^\n ID: ~p\n IP: ~p\n Join time: ~p\nHighest lookup time: ~p\n Number of lookup timeouts: ~p\n FTable last refresh timings: ~p\n\n",
-        [ID, Address, JoinTime, HighLookupTime, LookupDrop, FtableTimings]);
+      io:format("\n^^^^^ STATS ^^^^^\n ID: ~p\n IP: ~p\n Join time: ~p\nHighest lookup time: ~p\n Average lookup time: ~p\n Average lookup length: ~p\n Number of lookup timeouts: ~p\n FTable last refresh timings: ~p\n\n",
+        [ID, Address, JoinTime, HighLookupTime, AvgLookupTime, AvgLookupLength, LookupDrop, FtableTimings]);
     _ ->
-      io:format("\n^^^^^ STATS ^^^^^\n ID: ~p\n IP: ~p\n Join time: ~p\nHighest lookup time: ~p\n Number of lookup timeouts: ~p\n FTable last refresh timings: ~p\n\n",
-        [ID, Address, JoinTime, HighLookupTime, LookupDrop, FtableTimings])
+      io:format("\n^^^^^ STATS ^^^^^\n ID: ~p\n IP: ~p\n Join time: ~p\nHighest lookup time: ~p\n Average lookup time: ~p\n Average lookup length: ~p\n Number of lookup timeouts: ~p\n FTable last refresh timings: ~p\n\n",
+        [ID, Address, JoinTime, HighLookupTime, AvgLookupTime, AvgLookupLength, LookupDrop, FtableTimings])
   end,
   {noreply, State};
 
@@ -217,9 +219,17 @@ get_stats(Address, Number, State) ->
       #state{join_time = JT,
         max_lookup_time = MLT,
         lookup_drop = LD,
-        ftable_timing = FT} = State,
-      communication_manager:send_message_async(stats, [{JT, MLT, LD, FT}], Address, no_alias),
+        ftable_timing = FT,
+        lookup_times = LT,
+        lookup_lengths = LL} = State,
+      communication_manager:send_message_async(stats, [{JT, MLT, get_avg_integer(LT), get_avg_float(LL), LD, FT}], Address, no_alias),
       {_, Succ} = stabilizer:get_successor(),
       communication_manager:send_message_async(get_stats, [Number + 1], Succ, Address)
   end,
   {noreply, State}.
+
+get_avg_integer(List) ->
+  (lists:sum(List)) div (length(List)).
+
+get_avg_float(List) ->
+  (lists:sum(List)) / (length(List)).
