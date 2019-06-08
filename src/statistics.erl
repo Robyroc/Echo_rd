@@ -11,7 +11,8 @@
   notify_join_time/1,
   notify_lookup_time/1,
   notify_finger_table_completion/1,
-  get_average_lookup_time/0]).
+  get_average_lookup_time/0,
+  notify_lookup_length/1]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -24,7 +25,7 @@
 -define(SERVER, ?MODULE).
 -define(SIZE, 51).
 
--record(state, {join_time, max_lookup_time, lookup_drop, ftable_timing, lookup_times}).
+-record(state, {join_time, max_lookup_time, lookup_drop, ftable_timing, lookup_times, lookup_lengths}).
 
 %%%===================================================================
 %%% API
@@ -61,6 +62,10 @@ notify_finger_table_completion(Time) ->
 get_average_lookup_time() ->
   PID = naming_handler:get_identity(statistics),
   gen_server:call(PID, avg_lookup_time).
+
+notify_lookup_length(Length) ->
+  PID = naming_handler:get_identity(statistics),
+  gen_server:cast(PID, {lookup_length, Length}).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -133,12 +138,16 @@ handle_cast({lookup_time, timeout}, State) ->
   {noreply, State#state{lookup_drop = State#state.lookup_drop + 1, lookup_times = NewList}};
 
 handle_cast({lookup_time, Time}, State) when Time > State#state.max_lookup_time ->
-  NewList = add_time(Time, State#state.lookup_times),
+  NewList = add_to_list(Time, State#state.lookup_times),
   {noreply, State#state{max_lookup_time = Time, lookup_times = NewList}};
 
 handle_cast({lookup_time, Time}, State) ->
-  NewList = add_time(Time, State#state.lookup_times),
+  NewList = add_to_list(Time, State#state.lookup_times),
   {noreply, State#state{lookup_times = NewList}};
+
+handle_cast({lookup_length, Length}, State) ->
+  NewList = add_to_list(Length, State#state.lookup_lengths),
+  {noreply, State#state{lookup_lengths = NewList}};
 
 handle_cast({finger_completion, Time}, State) ->
   {noreply, State#state{ftable_timing = Time}};
@@ -184,10 +193,10 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
-add_time(Time, List) ->
-  case length([Time | List]) of
-    ?SIZE -> [Time | lists:reverse(tl(lists:reverse(List)))];
-    _ -> [Time | List]
+add_to_list(Elem, List) ->
+  case length([Elem | List]) of
+    ?SIZE -> [Elem | lists:reverse(tl(lists:reverse(List)))];
+    _ -> [Elem | List]
   end.
 
 
