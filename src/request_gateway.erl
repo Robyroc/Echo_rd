@@ -4,7 +4,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, add_request/3, lookup_response/2, notify_lost_node/1]).
+-export([start_link/0, add_request/3, lookup_response/3, notify_lost_node/1]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -30,9 +30,9 @@ add_request(Requested, From, List) ->
   PID = naming_handler:get_identity(request_gateway),
   gen_server:call(PID, {add, Requested, From, List}).
 
-lookup_response(Requested, Address) ->
+lookup_response(Requested, Address, Length) ->
   PID = naming_handler:get_identity(request_gateway),
-  gen_server:cast(PID, {response, Requested, Address}).
+  gen_server:cast(PID, {response, Requested, Address, Length}).
 
 notify_lost_node(Address) ->
   PID = naming_handler:get_identity(request_gateway),
@@ -77,8 +77,8 @@ handle_call(Request, _From, State) ->
   {reply, ok, State}.
 
 
-handle_cast({response, Requested, Address}, State) ->
-  [lookup_request:respond(PID, Address) || {PID, R, _} <- State#state.requests, R =:= Requested],
+handle_cast({response, Requested, Address, Length}, State) ->
+  [lookup_request:respond(PID, Address, Length) || {PID, R, _} <- State#state.requests, R =:= Requested],
   {noreply, State};
 
 handle_cast(Request, State) ->

@@ -87,7 +87,9 @@ handle_call({lookup, Requested}, From, State) ->
   end,
   Next = check_if_next(ActualRequested, State#state.id, SuccID, State#state.nbits),
   case Next of
-    next -> {reply, {found, Succ}, State};
+    next ->
+      statistics:notify_lookup_length(0),
+      {reply, {found, Succ}, State};
     _ ->
       List = lookup(ActualRequested, State#state.id, State#state.finger_table, State#state.nbits),
       request_gateway:add_request(ActualRequested, From, List),
@@ -160,7 +162,7 @@ handle_cast({lookup, Alias, Requested, Hops}, State) ->
   Next = check_if_next(ActualRequested, State#state.id, SuccID, State#state.nbits),
   case Next of
     next ->
-      communication_manager:send_message_async(lookup_response, [ActualRequested, Succ], Alias, no_alias),
+      communication_manager:send_message_async(lookup_response, [ActualRequested, Succ, (2*State#state.nbits) - Hops + 1], Alias, no_alias),
       {noreply, State};
     _ ->
       Destinations = lookup(ActualRequested, State#state.id, State#state.finger_table, State#state.nbits),

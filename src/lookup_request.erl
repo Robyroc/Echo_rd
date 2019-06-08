@@ -4,7 +4,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/4, respond/2, notify_lost_node/2]).
+-export([start_link/4, respond/3, notify_lost_node/2]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -27,8 +27,8 @@
 start_link(Requested, From, List, ListType) ->
   gen_server:start_link(?MODULE, [Requested, From, List, ListType], []).
 
-respond(PID, Address) ->
-  gen_server:cast(PID, {response, Address}).
+respond(PID, Address, Length) ->
+  gen_server:cast(PID, {response, Address, Length}).
 
 notify_lost_node(PID, Address) ->
   gen_server:call(PID, {lost, Address}).
@@ -63,10 +63,11 @@ handle_call(Request, _From, State) ->
   {reply, ok, State}.
 
 
-handle_cast({response, Address}, State) ->
+handle_cast({response, Address, Length}, State) ->
   Time = erlang:timestamp(),
   Diff = timer:now_diff(Time, State#state.time) div 1000,
   statistics:notify_lookup_time(Diff),
+  statistics:notify_lookup_length(Length),
   gen_server:reply(State#state.from, {found, Address}),
   {stop, normal, State};
 

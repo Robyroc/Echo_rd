@@ -229,7 +229,7 @@ back_translate(_) -> badarg.
 
 encode_params(lookup_for_join, [], _NBits) -> [];
 encode_params(lookup_response, _, no_nbits) -> badarg;
-encode_params(lookup_response, [ID, Addr], NBits) -> [link_manager:address_to_binary(Addr), encode_ID(ID, NBits)];
+encode_params(lookup_response, [ID, Addr, Length], NBits) -> [link_manager:address_to_binary(Addr), encode_ID(ID, NBits), <<Length:16/integer>>];
 encode_params(ready_for_info, [], _NBits) -> [];
 encode_params(join_info, [NBits, LS, Res], _NBits) -> [encode_nbits_successor_and_resources([NBits, LS, Res])];
 encode_params(ack_info, [], _NBits) -> [];
@@ -253,7 +253,7 @@ encode_params(_, _, _) -> badarg.
 
 decode_params(lookup_for_join, _, no_nbits) -> badarg;
 decode_params(lookup_for_join, [], NBits) -> [2 * NBits];
-decode_params(lookup_response, [Addr, ID], _NBits) -> [decode_ID(ID), link_manager:binary_to_address(Addr)];
+decode_params(lookup_response, [Addr, ID, Length], _NBits) -> <<Val:16/integer>> = Length, [decode_ID(ID), link_manager:binary_to_address(Addr), Val];
 decode_params(ready_for_info, [], _NBits) -> [];
 decode_params(join_info, [M], _NBits) -> decode_nbits_successor_and_resources(M);
 decode_params(ack_info, [], _NBits) -> [];
@@ -273,7 +273,7 @@ decode_params(stats, [Bin], _NBits) -> <<A:32, B:32, C:32, D:32>> = Bin, [{A, B,
 decode_params(_, _, _) -> badarg.
 
 forward(lookup_for_join, [Hops], From) -> {[router], fun() -> router:lookup_for_join(From, Hops) end};
-forward(lookup_response, [ID, Addr], _From) -> {[request_gateway, join_handler], fun() -> request_gateway:lookup_response(ID, Addr), join_handler:look_response(Addr) end};
+forward(lookup_response, [ID, Addr, Length], _From) -> {[request_gateway, join_handler], fun() -> request_gateway:lookup_response(ID, Addr, Length), join_handler:look_response(Addr) end};
 forward(ready_for_info, [], From) -> {[join_handler], fun() -> join_handler:ready_for_info(From) end};
 forward(join_info, [NBits, LS, R], From) -> {[join_handler], fun() -> join_handler:info(From, R, LS, NBits) end};
 forward(ack_info, [], From) -> {[join_handler], fun() -> join_handler:ack_info(From) end};
