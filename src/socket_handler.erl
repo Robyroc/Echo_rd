@@ -63,7 +63,7 @@ handle_cast({send, {no_alias, Method, Params}}, State) ->
   Size = byte_size(Message),
   case application:get_env(echo_rd, delay) of
     undefined -> ok;
-    Delay -> timer:sleep(Delay)
+    {ok, Delay} -> timer:sleep(Delay)
   end,
   ok = gen_tcp:send(State#state.socket, <<Size:40/integer, Message/binary>>),
   {noreply, State, ?TIMEOUT};
