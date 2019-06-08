@@ -72,23 +72,23 @@ The following table shows the possible configurations (in square brackets defaul
 Messages
 -----
 
-| Message         | Params                          | Created by             | Forwarded to                  | Notes                                                                                            |
-|-----------------|---------------------------------|------------------------|-------------------------------|--------------------------------------------------------------------------------------------------|
-| lookup_for_join |                                 | join_handler           | router                        |                                                                                                  |
-| lookup_response | ID, Address                     | router                 | request_gateway, join_handler | ID contains the requested id, Address will points to the closest   successor of the requested id |
-| ready_for_info  |                                 | join_handler           | join_handler                  |                                                                                                  |
-| join_info       | Nbits, SuccessorList, Resources | join_handler           | join_handler                  | Contains all the info needed for the join                                                        |
-| ack_info        |                                 | join_handler           | join_handler                  | Confirms the reception of join_info                                                              |
-| abort           | Reason                          | join_handler           | join_handler                  | Aborts current join operation                                                                    |
-| ack_join        |                                 | join_handler           | join_handler                  | Ends the join operation                                                                          |
-| leave_info      | Resources                       | join_handler           | join_handler                  | Contains the resources of the leaving node                                                       |
-| ack_leave       |                                 | join_handler           | join_handler                  | Confirms the reception of leave_info                                                             |
-| ask_pred        |                                 | stabilizer             | checker                       |                                                                                                  |
-| pred_reply      | Predecessor, SuccessorList      | checker                | stabilizer                    | Responds to the ask_pred message                                                                 |
-| lookup          | ID, Hops                        | router, lookup_request | router                        | Hops indicates the max number of nodes that can be visited                                       |
-| command         | Address, Command                | application_manager    | application_manager           | Address contains the ip address of the node sending the command                                  |
-| get_stats       | Number                          | statistics             | statistics                    | Number contains the number of already visited nodes                                              |
-| stats           | Statistics                      | statistics             | statistics                    |                                                                                                  |
+| Message         | Params                          | Created by             | Forwarded to                  | Notes                                                                                                                                    |
+|-----------------|---------------------------------|------------------------|-------------------------------|------------------------------------------------------------------------------------------------------------------------------------------|
+| lookup_for_join |                                 | join_handler           | router                        |                                                                                                                                          |
+| lookup_response | ID, Address, Length             | router                 | request_gateway, join_handler | ID contains the requested id, Address will points to the closest successor of the requested id, Length the number of hops for the lookup |
+| ready_for_info  |                                 | join_handler           | join_handler                  |                                                                                                                                          |
+| join_info       | Nbits, SuccessorList, Resources | join_handler           | join_handler                  | Contains all the info needed for the join                                                                                                |
+| ack_info        |                                 | join_handler           | join_handler                  | Confirms the reception of join_info                                                                                                      |
+| abort           | Reason                          | join_handler           | join_handler                  | Aborts current join operation                                                                                                            |
+| ack_join        |                                 | join_handler           | join_handler                  | Ends the join operation                                                                                                                  |
+| leave_info      | Resources                       | join_handler           | join_handler                  | Contains the resources of the leaving node                                                                                               |
+| ack_leave       |                                 | join_handler           | join_handler                  | Confirms the reception of leave_info                                                                                                     |
+| ask_pred        |                                 | stabilizer             | checker                       |                                                                                                                                          |
+| pred_reply      | Predecessor, SuccessorList      | checker                | stabilizer                    | Responds to the ask_pred message                                                                                                         |
+| lookup          | ID, Hops                        | router, lookup_request | router                        | Hops indicates the max number of nodes that can be visited                                                                               |
+| command         | Address, Command                | application_manager    | application_manager           | Address contains the ip address of the node sending the command                                                                          |
+| get_stats       | Number                          | statistics             | statistics                    | Number contains the number of already visited nodes                                                                                      |
+| stats           | Statistics                      | statistics             | statistics                    |                                                                                                                                          |
 
 - 1 is Api (l), Router, Fixer(l)
 - 2 is Api (any) 
