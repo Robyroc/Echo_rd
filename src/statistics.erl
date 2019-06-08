@@ -110,16 +110,16 @@ handle_cast({show_stats, Address, Stats}, State) ->
   ID = hash_f:get_hashed_addr(Address),
   case logging_policies:check_lager_policy(?MODULE) of
     {lager_on, _} ->
-      lager:info("\n^^^^^ STATS ^^^^^\n ID: ~p\n IP: ~p\n Join time: ~p\nHighest lookup time: ~p\n Average lookup time: ~p\n Average lookup length: ~p\n Number of lookup timeouts: ~p\n FTable last refresh timings: ~p\n\n",
+      lager:info("\n^^^^^ STATS ^^^^^\n ID: ~p\n IP: ~p\n Join time: ~p\n Highest lookup time: ~p\n Average lookup time: ~p\n Average lookup length: ~p\n Number of lookup timeouts: ~p\n FTable last refresh timings: ~p\n\n",
         [ID, Address, JoinTime, HighLookupTime, AvgLookupTime, AvgLookupLength, LookupDrop, FtableTimings]);
     {lager_only, _} ->
-      lager:info("\n^^^^^ STATS ^^^^^\n ID: ~p\n IP: ~p\n Join time: ~p\nHighest lookup time: ~p\n Average lookup time: ~p\n Average lookup length: ~p\n Number of lookup timeouts: ~p\n FTable last refresh timings: ~p\n\n",
+      lager:info("\n^^^^^ STATS ^^^^^\n ID: ~p\n IP: ~p\n Join time: ~p\n Highest lookup time: ~p\n Average lookup time: ~p\n Average lookup length: ~p\n Number of lookup timeouts: ~p\n FTable last refresh timings: ~p\n\n",
         [ID, Address, JoinTime, HighLookupTime, AvgLookupTime, AvgLookupLength, LookupDrop, FtableTimings]);
     {lager_off, _} ->
-      io:format("\n^^^^^ STATS ^^^^^\n ID: ~p\n IP: ~p\n Join time: ~p\nHighest lookup time: ~p\n Average lookup time: ~p\n Average lookup length: ~p\n Number of lookup timeouts: ~p\n FTable last refresh timings: ~p\n\n",
+      io:format("\n^^^^^ STATS ^^^^^\n ID: ~p\n IP: ~p\n Join time: ~p\n Highest lookup time: ~p\n Average lookup time: ~p\n Average lookup length: ~p\n Number of lookup timeouts: ~p\n FTable last refresh timings: ~p\n\n",
         [ID, Address, JoinTime, HighLookupTime, AvgLookupTime, AvgLookupLength, LookupDrop, FtableTimings]);
     _ ->
-      io:format("\n^^^^^ STATS ^^^^^\n ID: ~p\n IP: ~p\n Join time: ~p\nHighest lookup time: ~p\n Average lookup time: ~p\n Average lookup length: ~p\n Number of lookup timeouts: ~p\n FTable last refresh timings: ~p\n\n",
+      io:format("\n^^^^^ STATS ^^^^^\n ID: ~p\n IP: ~p\n Join time: ~p\n Highest lookup time: ~p\n Average lookup time: ~p\n Average lookup length: ~p\n Number of lookup timeouts: ~p\n FTable last refresh timings: ~p\n\n",
         [ID, Address, JoinTime, HighLookupTime, AvgLookupTime, AvgLookupLength, LookupDrop, FtableTimings])
   end,
   {noreply, State};
