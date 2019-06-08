@@ -252,7 +252,7 @@ encode_params(lookup, [ID], NBits) -> [encode_ID(ID, NBits), <<(2 * NBits):16/in
 encode_params(command, [Address,C], _NBits) -> [link_manager:address_to_binary(Address), C];
 encode_params(get_stats, _, no_nbits) -> badarg;
 encode_params(get_stats, [Number], NBits) -> [encode_ID(Number, NBits)];
-encode_params(stats, [{A, B, C, D}], _NBits) -> [<<A:32, B:32, C:32, D:32>>];
+encode_params(stats, [{A, B, C, D, E, F}], _NBits) -> [list_to_binary([<<A:32, B:32, C:32, E:32, F:32>>, float_to_binary(D)])];
 encode_params(net_command, _, no_nbits) -> badarg;
 encode_params(net_command, [Number, Command], NBits) -> [encode_ID(Number, NBits), list_to_binary(Command)];
 encode_params(net_command_response, [], _NBits) -> [];
@@ -276,7 +276,7 @@ decode_params(pred_reply, [Pred, SL], NBits) -> [link_manager:binary_to_address(
 decode_params(lookup, [ID, Hops], _NBits) -> <<Val:16/integer>> = Hops, [decode_ID(ID), Val];
 decode_params(command, [A,C], _NBits) -> [link_manager:binary_to_address(A), C];
 decode_params(get_stats, [Number], _NBits) -> [decode_ID(Number)];
-decode_params(stats, [Bin], _NBits) -> <<A:32, B:32, C:32, D:32>> = Bin, [{A, B, C, D}];
+decode_params(stats, [Bin], _NBits) -> <<A:32, B:32, C:32, E:32, F:32, D/binary>> = Bin, [{A, B, C, binary_to_float(D), E, F}];
 decode_params(net_command, [Number, Command], _NBits) -> [decode_ID(Number), binary_to_list(Command)];
 decode_params(net_command_response, [], _NBits) -> [];
 decode_params(_, _, _) -> badarg.
