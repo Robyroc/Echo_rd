@@ -97,7 +97,7 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
-run_command(Command) ->     %TODO this method shall run the commands passed as parameter and return ok
+run_command(_Command) ->     %TODO this method shall run the commands passed as parameter and return ok
   ok.
 
 possible_response(State) when State#state.response_number =:= State#state.number_of_nodes ->
