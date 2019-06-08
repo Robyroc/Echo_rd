@@ -73,7 +73,7 @@ notify_lookup_length(Length) ->
 
 init([]) ->
   self() ! startup,
-  {ok, #state{max_lookup_time = 0, lookup_drop = 0, join_time = 0, ftable_timing = 0, lookup_times = [1000]}}.
+  {ok, #state{max_lookup_time = 0, lookup_drop = 0, join_time = 0, ftable_timing = 0, lookup_times = [1000], lookup_lengths = [0]}}.
 
 
 handle_call(avg_lookup_time, _From, State) ->
