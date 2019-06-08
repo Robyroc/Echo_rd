@@ -15,19 +15,14 @@
   code_change/3]).
 
 -define(SERVER, ?MODULE).
-
+-define(TIMEOUT, 240000).    % 4 minutes
 -record(state, {socket, remaining, acc}).
 
 %%%===================================================================
 %%% API
 %%%===================================================================
 
-%%--------------------------------------------------------------------
-%% @doc
-%% Starts the server
-%%
-%% @end
-%%--------------------------------------------------------------------
+
 start_link(Socket) ->
   gen_server:start_link(?MODULE, [Socket], []).
 
@@ -35,47 +30,20 @@ start(Socket) ->
   gen_server:start(?MODULE, [Socket], []).
 
 send_message(PID, Message) ->
-  gen_server:call(PID, {send, Message})   .        %TODO timeout?
+  gen_server:cast(PID, {send, Message}).
 
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Initializes the server
-%%
-%% @spec init(Args) -> {ok, State} |
-%%                     {ok, State, Timeout} |
-%%                     ignore |
-%%                     {stop, Reason}
-%% @end
-%%--------------------------------------------------------------------
+
 init([Socket]) ->
-  {ok, #state{socket = Socket, remaining = 0, acc = []}};
+  inet:setopts(Socket, [{active, once}]),
+  {ok, #state{socket = Socket, remaining = 0, acc = []}, ?TIMEOUT};
 
 init(_) ->
   {stop, badarg}.
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Handling call messages
-%%
-%% @end
-%%--------------------------------------------------------------------
-handle_call({send, {no_alias, Method, Params}}, _From, State) ->
-  Message = marshall(link_manager:get_own_address(), Method, Params),
-  Size = byte_size(Message),
-  ok = gen_tcp:send(State#state.socket, <<Size:40/integer, Message/binary>>),
-  {reply, ok, State};
-
-handle_call({send, {Alias, Method, Params}}, _From, State) ->
-  Message = marshall(Alias, Method, Params),
-  Size = byte_size(Message),
-  ok = gen_tcp:send(State#state.socket, <<Size:40/integer, Message/binary>>),
-  {reply, ok, State};
 
 handle_call(Request, _From, State) ->
   case logging_policies:check_lager_policy(?MODULE) of
@@ -87,15 +55,29 @@ handle_call(Request, _From, State) ->
       io:format("Handler: Unexpected call message: ~p\n", [Request]);
     _ -> ok
   end,
-  {reply, ok, State}.
+  {reply, ok, State, ?TIMEOUT}.
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Handling cast messages
-%%
-%% @end
-%%--------------------------------------------------------------------
+
+handle_cast({send, {no_alias, Method, Params}}, State) ->
+  Message = marshall(link_manager:get_own_address(), Method, Params),
+  Size = byte_size(Message),
+  case application:get_env(echo_rd, delay) of
+    undefined -> ok;
+    Delay -> timer:sleep(Delay)
+  end,
+  ok = gen_tcp:send(State#state.socket, <<Size:40/integer, Message/binary>>),
+  {noreply, State, ?TIMEOUT};
+
+handle_cast({send, {Alias, Method, Params}}, State) ->
+  Message = marshall(Alias, Method, Params),
+  Size = byte_size(Message),
+  case application:get_env(echo_rd, delay) of
+    undefined -> ok;
+    Delay -> timer:sleep(Delay)
+  end,
+  ok = gen_tcp:send(State#state.socket, <<Size:40/integer, Message/binary>>),
+  {noreply, State, ?TIMEOUT};
+
 handle_cast(Request, State) ->
   case logging_policies:check_lager_policy(?MODULE) of
     {lager_on, _} ->
@@ -106,48 +88,30 @@ handle_cast(Request, State) ->
       io:format("Handler: Unexpected cast message: ~p\n", [Request]);
     _ -> ok
   end,
-  {noreply, State}.
+  {noreply, State, ?TIMEOUT}.
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Handling all non call/cast messages
-%%
-%% @spec handle_info(Info, State) -> {noreply, State} |
-%%                                   {noreply, State, Timeout} |
-%%                                   {stop, Reason, State}
-%% @end
-%%--------------------------------------------------------------------
+
+
+handle_info({tcp, Socket, <<"Not used">>}, State) when Socket =:= State#state.socket ->
+  inet:setopts(Socket, [{active, once}]),
+  exit(self(), unused),
+  {stop, unused_connection, State};
 
 handle_info({tcp, Socket , Bin}, State) when Socket =:= State#state.socket ->
-  case State#state.remaining of
-    0 ->
-      <<Size:40/integer, Message/binary>> = Bin,
-      Received = byte_size(Message),
-      case Size of
-        Received ->
-          {Address, Method, Params} = parse_message(Message),
-          link_manager:notify_incoming_message({Method, Address, Params}),
-          {noreply, State};
-        _ -> {noreply, State#state{remaining = Size - Received, acc = [Message]}}
-      end;
-    _ ->
-      Received = byte_size(Bin),
-      Remaining = State#state.remaining,
-      case Received of
-        Remaining ->
-          Total = list_to_binary(lists:reverse([Bin | State#state.acc])),
-          {Address, Method, Params} = parse_message(Total),
-          link_manager:notify_incoming_message({Method, Address, Params}),
-          {noreply, State#state{remaining = 0, acc = []}};
-        _ -> {noreply, State#state{remaining = Remaining - Received, acc = [Bin | State#state.acc]}}
-      end
-  end;
+  Result = message_framer(Bin, State),
+  inet:setopts(Socket, [{active, once}]),
+  Result;
 
 handle_info({tcp_closed, Socket}, State) when Socket =:= State#state.socket ->
   gen_tcp:close(Socket),
   exit(self(), tcp_closed),
   {stop, closed_connection, State};
+
+handle_info(timeout, State) ->
+  gen_tcp:send(State#state.socket, <<"Not used">>),
+  timer:sleep(10000),
+  exit(self(), unused),
+  {stop, unused_connection, State};
 
 handle_info(Info, State) ->
   case logging_policies:check_lager_policy(?MODULE) of
@@ -159,30 +123,13 @@ handle_info(Info, State) ->
       io:format("Handler: Unexpected ! message: ~p\n", [Info]);
     _ -> ok
   end,
-  {noreply, State}.
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% This function is called by a gen_server when it is about to
-%% terminate. It should be the opposite of Module:init/1 and do any
-%% necessary cleaning up. When it returns, the gen_server terminates
-%% with Reason. The return value is ignored.
-%%
-%% @spec terminate(Reason, State) -> void()
-%% @end
-%%--------------------------------------------------------------------
-terminate(_Reason, State) ->
-  gen_tcp:close(State#state.socket),
+  {noreply, State, ?TIMEOUT}.
+
+
+terminate(_Reason, _State) ->
   ok.
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Convert process state when code is changed
-%%
-%% @spec code_change(OldVsn, State, Extra) -> {ok, NewState}
-%% @end
-%%--------------------------------------------------------------------
+
 code_change(_OldVsn, State, _Extra) ->
   {ok, State}.
 
@@ -222,3 +169,43 @@ parse_message(Bin) ->
   {ListParams, LastParam} = ParamsParsed,
   Parameters = lists:reverse([LastParam | ListParams]),
   parse_cleaner({{Port, {IpA, IpB, IpC, IpD}}, Method, Parameters}).
+
+message_framer(Bin, State) when ((byte_size(Bin) < 6) and (State#state.remaining =:= 0)) ->
+  {noreply, State#state{remaining = header, acc = [Bin]}, ?TIMEOUT};
+
+message_framer(Bin, State) when State#state.remaining =:= 0 ->
+  <<Size:40/integer, Message/binary>> = Bin,
+  Received = byte_size(Message),
+  case Size of
+    Received ->
+      {Address, Method, Params} = parse_message(Message),
+      link_manager:notify_incoming_message({Method, Address, Params}),
+      {noreply, State, ?TIMEOUT};
+    _ when Received > Size ->
+      TotalDimensionOfFirst = Size + 5,
+      <<First:TotalDimensionOfFirst/binary, Second/binary>> = Bin,
+      {noreply, NewState, _} = message_framer(First, State),
+      message_framer(Second, NewState);
+    _ ->
+      {noreply, State#state{remaining = Size - Received, acc = [Message]}, ?TIMEOUT}
+  end;
+
+message_framer(Bin, State) when State#state.remaining =:= header ->
+  message_framer(list_to_binary([State#state.acc, Bin]), State#state{remaining = 0, acc = []});
+
+message_framer(Bin, State) ->
+  Received = byte_size(Bin),
+  Remaining = State#state.remaining,
+  case Received of
+    Remaining ->
+      Total = list_to_binary(lists:reverse([Bin | State#state.acc])),
+      {Address, Method, Params} = parse_message(Total),
+      link_manager:notify_incoming_message({Method, Address, Params}),
+      {noreply, State#state{remaining = 0, acc = []}, ?TIMEOUT};
+    _ when Received > Remaining ->
+      <<First:Remaining/binary, Second/binary>> = Bin,
+      {noreply, NewState, _} = message_framer(First, State),
+      message_framer(Second, NewState);
+    _ ->
+      {noreply, State#state{remaining = Remaining - Received, acc = [Bin | State#state.acc]}, ?TIMEOUT}
+  end.

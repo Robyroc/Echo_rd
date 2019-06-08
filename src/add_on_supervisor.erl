@@ -1,5 +1,5 @@
--module(naming_supervisor).
--author("Giacomo").
+-module(add_on_supervisor).
+-author("robyroc").
 
 -behaviour(supervisor).
 
@@ -15,14 +15,13 @@
 %%% API functions
 %%%===================================================================
 
-
 start_link() ->
   supervisor:start_link({local, ?SERVER}, ?MODULE, []).
+
 
 %%%===================================================================
 %%% Supervisor callbacks
 %%%===================================================================
-
 
 init([]) ->
   RestartStrategy = one_for_one,
@@ -34,8 +33,10 @@ init([]) ->
   Restart = permanent,
   Shutdown = 2000,
 
-  Son1 = {naming_manager, {naming_manager, start_link, [self()]},
-    Restart, Shutdown, worker, [naming_manager]},
+  Son1 = {statistics, {statistics, start_link, []},
+    Restart, Shutdown, worker, [statistics]},
+  Son2 = {lager_sinks_handler, {lager_sinks_handler, start_link, []},
+    Restart, Shutdown, worker, [lager_sinks_handler]},
 
-  {ok, {SupFlags, [Son1]}}.
+  {ok, {SupFlags, [Son1, Son2]}}.
 

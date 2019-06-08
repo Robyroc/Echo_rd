@@ -4,8 +4,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, show_table/0, local_lookup/1, update_finger_table/2, remote_lookup/2, lookup_for_join/1, notify_lost_node/1, show_id/0]).
--export([normalize_id/2, normalize_as_successor/1, normalize_as_predecessor/1]).
+-export([start_link/0, show_table/0, local_lookup/1, update_finger_table/2, remote_lookup/3, lookup_for_join/2, notify_lost_node/1, show_id/0]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -23,30 +22,26 @@
 %%% API
 %%%===================================================================
 
-%%--------------------------------------------------------------------
-%% @doc
-%% Starts the server
-%%
-%% @end
-%%--------------------------------------------------------------------
+
 start_link() ->
   gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
 local_lookup(ID) ->
   PID = naming_handler:get_identity(router),
   Nbits = params_handler:get_param(nbits),
-  gen_server:call(PID, {lookup, ID}, Nbits*2000).                   %TODO tune timeout here accordingly
+  Time = statistics:get_average_lookup_time(),
+  gen_server:call(PID, {lookup, ID}, Nbits*6000 + Time).
 
 update_finger_table(Address, Theoretical) ->
   PID = naming_handler:get_identity(router),
   gen_server:cast(PID, {update, Address, Theoretical}).
 
-remote_lookup(Requested, Alias) ->
+remote_lookup(Requested, Alias, Hops) ->
   PID = naming_handler:get_identity(router),
-  gen_server:cast(PID, {lookup, Alias, Requested}).
+  gen_server:cast(PID, {lookup, Alias, Requested, Hops}).
 
-lookup_for_join(Address) ->
-  remote_lookup(hash_f:get_hashed_addr(Address), Address).
+lookup_for_join(Address, Hops) ->
+  remote_lookup(hash_f:get_hashed_addr(Address), Address, Hops).
 
 show_table() ->
   PID = naming_handler:get_identity(router),
@@ -56,51 +51,20 @@ show_id() ->
   PID = naming_handler:get_identity(router),
   gen_server:call(PID, show_id).
 
-normalize_id(ID, NBits) ->
-  ActualID = ID rem round(math:pow(2, NBits)),
-  case ActualID of
-    _ when ActualID >= 0 -> ActualID;
-    _ when ActualID < 0 -> ActualID + round(math:pow(2, NBits))
-  end.
-
 notify_lost_node(Address) ->
   PID = naming_handler:get_identity(router),
   gen_server:call(PID, {lost, Address}).
-
-normalize_as_successor(ID) ->
-  PID = naming_handler:get_identity(router),
-  gen_server:call(PID, {normalize_succ, ID}).
-
-normalize_as_predecessor(ID) ->
-  PID = naming_handler:get_identity(router),
-  gen_server:call(PID, {normalize_pred, ID}).
 
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Initializes the server
-%%
-%% @spec init(Args) -> {ok, State} |
-%%                     {ok, State, Timeout} |
-%%                     ignore |
-%%                     {stop, Reason}
-%% @end
-%%--------------------------------------------------------------------
+
 init([]) ->
   self() ! startup,
   {ok, #state{}}.
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Handling call messages
-%%
-%% @end
-%%--------------------------------------------------------------------
+
 handle_call(show_table, _From, State) ->
   show_finger_table(State),
   {reply, ok, State};
@@ -109,7 +73,7 @@ handle_call(show_id, _From, State) ->
   {reply, State#state.id, State};
 
 handle_call({lookup, Requested}, From, State) ->
-  ActualRequested = normalize_id(Requested, State#state.nbits),
+  ActualRequested = normalizer:normalize_id(Requested, State#state.nbits),
   {SuccID, Succ} = stabilizer:get_successor(),
   case logging_policies:check_lager_policy(?MODULE) of
     {lager_on, able} ->
@@ -123,7 +87,9 @@ handle_call({lookup, Requested}, From, State) ->
   end,
   Next = check_if_next(ActualRequested, State#state.id, SuccID, State#state.nbits),
   case Next of
-    next -> {reply, {found, Succ}, State};
+    next ->
+      statistics:notify_lookup_length(0),
+      {reply, {found, Succ}, State};
     _ ->
       List = lookup(ActualRequested, State#state.id, State#state.finger_table, State#state.nbits),
       request_gateway:add_request(ActualRequested, From, List),
@@ -143,12 +109,6 @@ handle_call({lost, Address}, _From, State) ->
   Time = erlang:timestamp(),
   {reply, ok, State#state{finger_table = NewTable, time = Time}};
 
-handle_call({normalize_succ, ID}, _From, State) ->
-  {reply, adjust_successor(ID, State#state.id, State#state.nbits), State};
-
-handle_call({normalize_pred, ID}, _From, State) ->
-  {reply, adjust_predecessor(ID, State#state.id, State#state.nbits), State};
-
 handle_call(Request, _From, State) ->
   case logging_policies:check_lager_policy(?MODULE) of
     {lager_on, _} ->
@@ -161,13 +121,6 @@ handle_call(Request, _From, State) ->
   end,
   {reply, ok, State}.
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Handling cast messages
-%%
-%% @end
-%%--------------------------------------------------------------------
 
 handle_cast({update, Address, Theoretical}, State) ->
   #state{id = ID, nbits = NBits, finger_table = Table} = State,
@@ -190,7 +143,10 @@ handle_cast({update, Address, Theoretical}, State) ->
   end,
   {noreply, State#state{finger_table = NewTable, nbits = State#state.nbits, id = State#state.id}};
 
-handle_cast({lookup, Alias, Requested}, State) ->
+handle_cast({lookup, _Alias, _Requested, Hops}, State) when Hops =:= 0 ->
+  {noreply, State};
+
+handle_cast({lookup, Alias, Requested, Hops}, State) ->
   ActualRequested = adjust_successor(Requested, State#state.id, State#state.nbits),
   {SuccID, Succ} = stabilizer:get_successor(),
   case logging_policies:check_lager_policy(?MODULE) of
@@ -206,16 +162,16 @@ handle_cast({lookup, Alias, Requested}, State) ->
   Next = check_if_next(ActualRequested, State#state.id, SuccID, State#state.nbits),
   case Next of
     next ->
-      communication_manager:send_message_async(lookup_response, [ActualRequested, Succ], Alias, no_alias),
+      communication_manager:send_message_async(lookup_response, [ActualRequested, Succ, (2*State#state.nbits) - Hops + 1], Alias, no_alias),
       {noreply, State};
     _ ->
       Destinations = lookup(ActualRequested, State#state.id, State#state.finger_table, State#state.nbits),
       case Destinations of
         [] ->
-          communication_manager:send_message_async(lookup, [ActualRequested], Succ, Alias),
+          communication_manager:send_message_async(lookup, [ActualRequested, Hops - 1], Succ, Alias),
           {noreply, State};
         [X | _] ->
-          communication_manager:send_message_async(lookup, [ActualRequested], X, Alias),
+          communication_manager:send_message_async(lookup, [ActualRequested, Hops - 1], X, Alias),
           {noreply, State}
       end
   end;
@@ -232,18 +188,9 @@ handle_cast(Request, State) ->
   end,
   {noreply, State}.
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Handling all non call/cast messages
-%%
-%% @spec handle_info(Info, State) -> {noreply, State} |
-%%                                   {noreply, State, Timeout} |
-%%                                   {stop, Reason, State}
-%% @end
-%%--------------------------------------------------------------------
+
 handle_info(startup, _State) ->
-  naming_handler:wait_service(stabilizer),
+  naming_handler:wait_service(statistics),
   {SuccId, Succ} = stabilizer:get_successor(),
   ID = hash_f:get_hashed_addr(link_manager:get_own_address()),
   Nbits = params_handler:get_param(nbits),
@@ -264,28 +211,12 @@ handle_info(Info, State) ->
     _ -> ok
   end,
   {noreply, State}.
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% This function is called by a gen_server when it is about to
-%% terminate. It should be the opposite of Module:init/1 and do any
-%% necessary cleaning up. When it returns, the gen_server terminates
-%% with Reason. The return value is ignored.
-%%
-%% @spec terminate(Reason, State) -> void()
-%% @end
-%%--------------------------------------------------------------------
+
+
 terminate(_Reason, _State) ->
   ok.
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Convert process state when code is changed
-%%
-%% @spec code_change(OldVsn, State, Extra) -> {ok, NewState}
-%% @end
-%%--------------------------------------------------------------------
+
 code_change(_OldVsn, State, _Extra) ->
   {ok, State}.
 
@@ -294,24 +225,29 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 
 show_finger_table(State) ->
-  %TODO check policy and lager
   case logging_policies:check_lager_policy(?MODULE) of
-    {lager_on, able} ->
+    {lager_on, _} ->
       lagerConsole:info("Finger Table: \n
       Theo\t| Real\t| Address\n"),
       [lagerConsole:info("~p\t| ~p\t| ~p\n", [T, R, A]) || {T, R, A} <- State#state.finger_table],
       routerLager:info("Finger Table: \n
       Theo\t| Real\t| Address\n"),
       [routerLager:info("~p\t| ~p\t| ~p\n", [T, R, A]) || {T, R, A} <- State#state.finger_table];
-    {lager_only, able} ->
+    {lager_only, _} ->
+      lagerConsole:info("Finger Table: \n
+      Theo\t| Real\t| Address\n"),
+      [lagerConsole:info("~p\t| ~p\t| ~p\n", [T, R, A]) || {T, R, A} <- State#state.finger_table],
       routerLager:info("Finger Table: \n
       Theo\t| Real\t| Address\n"),
       [routerLager:info("~p\t| ~p\t| ~p\n", [T, R, A]) || {T, R, A} <- State#state.finger_table];
-    {lager_off, able} ->
+    {lager_off, _} ->
       io:format("Finger Table: \n
       Theo\t| Real\t| Address\n"),
       [io:format("~p\t| ~p\t| ~p\n", [T, R, A]) || {T, R, A} <- State#state.finger_table];
-    _ -> ok
+    _ ->
+      io:format("Finger Table: \n
+      Theo\t| Real\t| Address\n"),
+      [io:format("~p\t| ~p\t| ~p\n", [T, R, A]) || {T, R, A} <- State#state.finger_table]
   end,
   ok.
 
@@ -333,6 +269,3 @@ check_if_next(_, _, _, _) ->
 
 adjust_successor(ID, OwnId, _NBits) when ID > OwnId -> ID;
 adjust_successor(ID, OwnId, NBits) -> adjust_successor(ID + round(math:pow(2, NBits)), OwnId, NBits).
-
-adjust_predecessor(ID, OwnId, _NBits) when not (ID > OwnId) -> ID;
-adjust_predecessor(ID, OwnId, NBits) -> adjust_predecessor(ID - round(math:pow(2, NBits)), OwnId, NBits).

@@ -13,56 +13,89 @@ Interface
 -----
 
 The library allows to abstract the location of a service and distribute it. All the commands of the service are not changed by Echo_rd, it just routes them to the node handling it correctly.
+The library will need a block service providing an interface compatible with gen_bm.erl file.
 
-The application can send messages to the library with the following atoms: 
-- create, will create a new Chord network. It needs two parameters, i.e. the number of bits of the indexes of the network and the port number. The default port number is 6543.
-- join, will enter a network. Needs also the port number and an address of a node part of the interested network. The default port number is 6543.
-- leave, will leave (softly) the network.
-- service_command, will perform a command on a resource. Needs the index of the resource and the complete command that can be handled by the service. 
+The full list of methods complete with a brief explanation can be seen in the gen_app.erl file.
 
 
 Modules
 -----
 
-- ApplicationManager/API/chord: it will handle the communication with the upper level (application and service manager).
-- RouterManager: it will handle all the routing operations and all the other tasks needed to keep routing consistently.
-- CommunicationManager: it will handle all the messages received from the network.
-- LinkManager: it will handle the communication with the lower level (typically tcp). It's strictly dependent on the 4th level protocol used. In this version we'll use TCP.
+- **application_manager**: it will handle the communication with the upper level (application and block manager);
+- **checker**: it will handle the communication with the predecessor on the network. It will also handle the address (and id) of the predecessor;
+- **communication_manager**: it will encode and decode incoming/outcoming messages and route them properly;
+- **fixer**: it will make lookups in order to update the finger table entries;
+- **hash_f**: it will provide methods for the hashing of addresses and resources;
+- **join_handler**: it will handle the status of the node regarding join/create/leave;
+- **lager_sinks_handler**: it will provide methods for the correct execution of lager logging;
+- **link_manager**: it will create/manage tcp sockets;
+- **logging_policies**: it will handle the filters on the logging based on the chosen policy;
+- **lookup_request**: it will handle a single lookup request waiting for response;
+- **naming_handler**: it will handle all naming operations;
+- **naming_manager**: it will handle the naming table when naming_handler doesn't exist or is restarting;
+- **normalizer**: it will handle all the operations on nodes id;
+- **params_handler**: it will handle values needed for the execution after entering a network;
+- **request_gateway**: it will handle and create all the lookup_request present;
+- **router**: it will handle the finger table and the lookup mechanism;
+- **socket_handler**: it will handle a single tcp connection;
+- **socket_listener**: it will listen for tcp connections;
+- **stabilizer**: it will handle the successor list and handles the communication with the successor;
+- **statistics**: it will provide useful metrics to analyze the network.
 
-Main status
+Configuration
 -----
 
-State diagram on notes 
+Echo_rd can be configured using 
+
+    $ application:set_env(echo_rd, #VAR#, #VAL#).
+    
+The following table shows the possible configurations (in square brackets default values):
+
+| #VAR#     | #VAL#       | Meaning                                                                                 |
+|-----------|-------------|-----------------------------------------------------------------------------------------|
+| ip        | public      | Set this to use public ip address instead of the private one                            |
+| ip        | [private]   | Use private ip address                                                                  |
+| log       | all         | Set this to use the maximum level of logging                                            |
+| log       | logic       | Set this to log only the events strictly related to chord and join mechanisms           |
+| log       | comm_only   | Set this to log only the communication events                                           |
+| log       | chord_only  | Set this to log only the events strictly related to chord                               |
+| log       | joiner_only | Set this to log only the join mechanisms                                                |
+| log       | naming_only | Set this to log only the naming operations                                              |
+| log       | [undefined] | Log only errors                                                                         |
+| lager_log | lager_on    | Logs are written into file and printed on screen (may make it hard to use the terminal) |
+| lager_log | lager_only  | Logs are written only on file                                                           |
+| lager_log | lager_off   | Logs are written only on terminal (may make it hard to use the terminal)                |
+| lager_log | [undefined] | No logging                                                                              |
+| delay     | NUMBER      | Add NUMBER ms of latency to communication                                               |
+| delay     | [undefined] | No artificial delay                                                                     |
 
 Messages
 -----
 
-| message       | From       | To         | Description                                     | Params                  |
-|---------------|------------|------------|-------------------------------------------------|-------------------------|
-| lookup        | 1          | Router     | Request to find successor of index passed       | Sender, index           |
-| checkAlive    | Checker(s) | Stabilizer | Checks if the predecessor is still alive        | Sender                  |
-| imAlive       | Stabilizer | Checker(s) | Notifies checker that the process is alive      | Sender                  |
-| updateTable   | Fixer      | Router     | Tells the router to update the finger table     | Sender, index, newValue |
-| newSucc       | Router     | Stabilizer | Tells the stab that there is a new succ         | Sender, newSucc         |
-| predFind      | Stabilizer | Checker(s) | Asks for the predecessor of the successor       | Sender                  |
-| predTell      | Checker(s) | Stabilizer | Answers the above message                       | Sender, predecessor     |
-| localAdd      | 2          | B. Manager | Adds the data to the storage                    | Sender, data            |
-| localAdded    | B. Manager | many       | Returns the index of the added item             | Sender, index           |
-| localGet      | 2          | B. Manager | Asks for an item in the given position          | Sender, index           |
-| localObtained | B. Manager | many       | Answers the above message                       | Sender, data            |
-| localDelete   | 2          | B. Manager | Ask for the deletion of the item of that index  | Sender, index           |
-| localDeleted  | B. Manager | many       | Answers the above message                       | Sender, index           |
-| getAll        | Api        | B. Manager | Asks for all the blocks stored                  | Sender                  |
-| obtainedAll   | B. Manager | API        | Answers the above message                       | Sender, data            |
-| join          | C.M.(any)  | C.M.       | Ask for the successor in order to join          | Sender                  |
-| leave         | Api        | C.M.       | Tells the CM to stop all incoming conversations | Sender                  |
+| Message         | Params                          | Created by             | Forwarded to                  | Notes                                                                                                                                    |
+|-----------------|---------------------------------|------------------------|-------------------------------|------------------------------------------------------------------------------------------------------------------------------------------|
+| lookup_for_join |                                 | join_handler           | router                        |                                                                                                                                          |
+| lookup_response | ID, Address, Length             | router                 | request_gateway, join_handler | ID contains the requested id, Address will points to the closest successor of the requested id, Length the number of hops for the lookup |
+| ready_for_info  |                                 | join_handler           | join_handler                  |                                                                                                                                          |
+| join_info       | Nbits, SuccessorList, Resources | join_handler           | join_handler                  | Contains all the info needed for the join                                                                                                |
+| ack_info        |                                 | join_handler           | join_handler                  | Confirms the reception of join_info                                                                                                      |
+| abort           | Reason                          | join_handler           | join_handler                  | Aborts current join operation                                                                                                            |
+| ack_join        |                                 | join_handler           | join_handler                  | Ends the join operation                                                                                                                  |
+| leave_info      | Resources                       | join_handler           | join_handler                  | Contains the resources of the leaving node                                                                                               |
+| ack_leave       |                                 | join_handler           | join_handler                  | Confirms the reception of leave_info                                                                                                     |
+| ask_pred        |                                 | stabilizer             | checker                       |                                                                                                                                          |
+| pred_reply      | Predecessor, SuccessorList      | checker                | stabilizer                    | Responds to the ask_pred message                                                                                                         |
+| lookup          | ID, Hops                        | router, lookup_request | router                        | Hops indicates the max number of nodes that can be visited                                                                               |
+| command         | Address, Command                | application_manager    | application_manager           | Address contains the ip address of the node sending the command                                                                          |
+| get_stats       | Number                          | statistics             | statistics                    | Number contains the number of already visited nodes                                                                                      |
+| stats           | Statistics                      | statistics             | statistics                    |                                                                                                                                          |
 
 - 1 is Api (l), Router, Fixer(l)
 - 2 is Api (any) 
 
+
 Truth-Table of the CM's state machine
 -----
-
 
 | ID | Curr_State    | Action         | Re-Action                      | New_State     | 
 |----|---------------|----------------|--------------------------------|---------------| 
@@ -108,5 +141,3 @@ Where:
     * **tj** for the join interval
     * **tl** for the leaving interval
 * For the ready_for_info message we have the IDs i1,i2 and m1,m2 according to the priority of the joiner who has to be served.
-
-TO BE REVISITED HEAVILY

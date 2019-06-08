@@ -1,11 +1,3 @@
-%%%-------------------------------------------------------------------
-%%% @author Antonio
-%%% @copyright (C) 2019, <COMPANY>
-%%% @doc
-%%%
-%%% @end
-%%% Created : 19. mag 2019 16:57
-%%%-------------------------------------------------------------------
 -module(lager_sinks_handler).
 -author("Antonio").
 
@@ -35,14 +27,6 @@
 %%% API
 %%%===================================================================
 
-%%--------------------------------------------------------------------
-%% @doc
-%% Starts the server
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec(start_link() ->
-  {ok, Pid :: pid()} | ignore | {error, Reason :: term()}).
 start_link() ->
   gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
@@ -70,48 +54,21 @@ terminate_if_not_terminated() ->
 %%% gen_server callbacks
 %%%===================================================================
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Initializes the server
-%%
-%% @spec init(Args) -> {ok, State} |
-%%                     {ok, State, Timeout} |
-%%                     ignore |
-%%                     {stop, Reason}
-%% @end
-%%--------------------------------------------------------------------
--spec(init(Args :: term()) ->
-  {ok, State :: #state{}} | {ok, State :: #state{}, timeout() | hibernate} |
-  {stop, Reason :: term()} | ignore).
 init([]) ->
   self() ! startup,
   {ok, #state{path = udefine, started = not_started}}.
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Handling call messages
-%%
-%% @end
-%%--------------------------------------------------------------------
-%%-spec(handle_call(Request :: term(), From :: {pid(), Tag :: term()},
-%%    State :: #state{}) ->
-%%  {reply, Reply :: term(), NewState :: #state{}} |
-%%  {reply, Reply :: term(), NewState :: #state{}, timeout() | hibernate} |
-%%  {noreply, NewState :: #state{}} |
-%%  {noreply, NewState :: #state{}, timeout() | hibernate} |
-%%  {stop, Reason :: term(), Reply :: term(), NewState :: #state{}} |
-%%  {stop, Reason :: term(), NewState :: #state{}}).
+
 handle_call(start_if_not_started, _From, State) when State#state.started =:= not_started ->
   lager:start(),
+  create_chord_sinks(),
   {reply, ok, State#state{started = started}};
 
 handle_call(start_if_not_started, _From, State) ->
   {reply, ok, State};
 
 handle_call(terminate_if_not_terminated, _From, State) when State#state.started =:= started ->
-  lager:stop(),
+  application:stop(lager),
   {reply, ok, State#state{started = not_started}};
 
 handle_call(terminate_if_not_terminated, _From, State) ->
@@ -120,17 +77,6 @@ handle_call(terminate_if_not_terminated, _From, State) ->
 handle_call(_, _, State) ->
   {reply, ok, State}.
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Handling cast messages
-%%
-%% @end
-%%--------------------------------------------------------------------
-%%-spec(handle_cast(Request :: term(), State :: #state{}) ->
-%%  {noreply, NewState :: #state{}} |
-%%  {noreply, NewState :: #state{}, timeout() | hibernate} |
-%%  {stop, Reason :: term(), NewState :: #state{}}).
 
 handle_cast({create_log_sink, Name, Level, FileName}, State) ->
   case check_level(Level) of
@@ -179,68 +125,23 @@ handle_cast(_, State) ->
   {norpely, State}.
 
 
-
-
-
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Handling all non call/cast messages
-%%
-%% @spec handle_info(Info, State) -> {noreply, State} |
-%%                                   {noreply, State, Timeout} |
-%%                                   {stop, Reason, State}
-%% @end
-%%--------------------------------------------------------------------
--spec(handle_info(Info :: timeout() | term(), State :: #state{}) ->
-  {noreply, NewState :: #state{}} |
-  {noreply, NewState :: #state{}, timeout() | hibernate} |
-  {stop, Reason :: term(), NewState :: #state{}}).
 handle_info(startup, _State) ->
+  naming_handler:wait_service(port),
   Port = naming_handler:get_identity(port),
   {ok, Directory} = file:get_cwd(),
   Path = Directory ++ "/log/" ++ integer_to_list(Port) ++ "_logging",
   application:set_env(lager, log_root, Path),
-  application:set_env(echo_rd, lager_log, lager_on),
-  application:set_env(echo_rd, log, all),
-
-  %TODO check if it is useful
-  lager:start(),
 
   naming_handler:notify_identity(self(), lager_sinks_handler),
-  {noreply, #state{path = Path, started = started}};
+  {noreply, #state{path = Path, started = not_started}};
 
 handle_info(_, State) ->
   {noreply, State}.
 
-
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% This function is called by a gen_server when it is about to
-%% terminate. It should be the opposite of Module:init/1 and do any
-%% necessary cleaning up. When it returns, the gen_server terminates
-%% with Reason. The return value is ignored.
-%%
-%% @spec terminate(Reason, State) -> void()
-%% @end
-%%--------------------------------------------------------------------
--spec(terminate(Reason :: (normal | shutdown | {shutdown, term()} | term()),
-    State :: #state{}) -> term()).
 terminate(_Reason, _State) ->
   ok.
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Convert process state when code is changed
-%%
-%% @spec code_change(OldVsn, State, Extra) -> {ok, NewState}
-%% @end
-%%--------------------------------------------------------------------
--spec(code_change(OldVsn :: term() | {down, term()}, State :: #state{},
-    Extra :: term()) ->
-  {ok, NewState :: #state{}} | {error, Reason :: term()}).
+
 code_change(_OldVsn, State, _Extra) ->
   {ok, State}.
 

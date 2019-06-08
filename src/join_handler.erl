@@ -1,11 +1,3 @@
-%%%-------------------------------------------------------------------
-%%% @author Antonio
-%%% @copyright (C) 2019, <COMPANY>
-%%% @doc
-%%%
-%%% @end
-%%% Created : 30. mar 2019 13:10
-%%%-------------------------------------------------------------------
 -module(join_handler).
 -author("Antonio").
 
@@ -41,7 +33,7 @@
   init_joiner/3,
   look/3, pre_join/3, j_ready/3, init_provider/3, not_alone/3, leaving/3]).
 
--define(SLEEP_INTERVAL, 1000).
+-define(SLEEP_INTERVAL, 5000).
 -define(SERVER, ?MODULE).
 -define(INTERVAL, 10000).
 -define(INTERVAL_LEAVING, 20000).
@@ -98,15 +90,7 @@ ack_leave(Address) ->
   gen_statem:cast(PID, {ack_leave, Address}).
 
 
-%%--------------------------------------------------------------------
-%% @doc
-%% Creates a gen_statem process which calls Module:init/1 to
-%% initialize. To ensure a synchronized start-up procedure, this
-%% function does not return until Module:init/1 has returned.
-%%
-%% @spec start_link() -> {ok, Pid} | ignore | {error, Error}
-%% @end
-%%--------------------------------------------------------------------
+
 start_link(Pid) ->
   gen_statem:start_link({local, ?SERVER}, ?MODULE, [Pid], []).
 
@@ -116,19 +100,7 @@ start_link(Pid) ->
 %%% gen_statem callbacks
 %%%===================================================================
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Whenever a gen_statem is started using gen_statem:start/[3,4] or
-%% gen_statem:start_link/[3,4], this function is called by the new
-%% process to initialize.
-%%
-%% @spec init(Args) -> {CallbackMode, StateName, State} |
-%%                     {CallbackMode, StateName, State, Actions} |
-%%                     ignore |
-%%                     {stop, StopReason}
-%% @end
-%%--------------------------------------------------------------------
+
 init([Pid]) ->
   naming_handler:notify_identity(self(), join_handler),
   ok = handle(init,init_joiner),
@@ -139,55 +111,15 @@ init([Pid]) ->
 init(_) -> badarg.
 
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% This function is called by a gen_statem when it needs to find out 
-%% the callback mode of the callback module.
-%%
-%% @spec callback_mode() -> atom().
-%% @end
-%%--------------------------------------------------------------------
 callback_mode() ->
   state_functions.
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Called (1) whenever sys:get_status/1,2 is called by gen_statem or
-%% (2) when gen_statem terminates abnormally.
-%% This callback is optional.
-%%
-%% @spec format_status(Opt, [PDict, StateName, State]) -> term()
-%% @end
-%%--------------------------------------------------------------------
+
 format_status(_Opt, [_PDict, _StateName, _State]) ->
   Status = some_term,
   Status.
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% There should be one instance of this function for each possible
-%% state name.  If callback_mode is statefunctions, one of these
-%% functions is called when gen_statem receives and event from
-%% call/2, cast/2, or as a normal process message.
-%%
-%% @spec state_name(Event, From, State) ->
-%%                   {next_state, NextStateName, NextState} |
-%%                   {next_state, NextStateName, NextState, Actions} |
-%%                   {stop, Reason, NewState} |
-%%    				 stop |
-%%                   {stop, Reason :: term()} |
-%%                   {stop, Reason :: term(), NewData :: data()} |
-%%                   {stop_and_reply, Reason, Replies} |
-%%                   {stop_and_reply, Reason, Replies, NewState} |
-%%                   {keep_state, NewData :: data()} |
-%%                   {keep_state, NewState, Actions} |
-%%                   keep_state_and_data |
-%%                   {keep_state_and_data, Actions}
-%% @end
-%%--------------------------------------------------------------------
+
 init_joiner({call, From}, {join, OwnPort, Address}, Session) ->
   Time = erlang:timestamp(),
   ok = handle(init_joiner, look),
@@ -242,7 +174,7 @@ look(EventType, EventContent, Session) ->
   ok = handle(look, look),
   handle_generic_event({EventType, EventContent, Session}).
 
-pre_join(cast, {info,Address, Res, Succ, Nbits}, Session) ->
+pre_join(cast, {info, Address, Res, Succ, Nbits}, Session) ->
   ok = handle(pre_join, j_ready),
   SuccAddr = Session#session.succ_addr,
   case Address of
@@ -251,6 +183,21 @@ pre_join(cast, {info,Address, Res, Succ, Nbits}, Session) ->
       {next_state, j_ready, Session#session{res = Res, succ_list = Succ, nbits = Nbits}, [{state_timeout, ?INTERVAL_JOIN, hard_stop}]};
     _ -> {keep_state, Session, [{state_timeout, ?INTERVAL, hard_stop}]}
   end;
+
+pre_join(cast, {abort, "Used ID"}, Session) ->
+  ok = handle(pre_join, init_joiner),
+  case logging_policies:check_lager_policy(?MODULE) of
+    {lager_on, _} ->
+      lager:error(" -- JOIN ABORTED -- Reason of abort: Used ID\n");
+    {lager_only, _} ->
+      lager:error(" -- JOIN ABORTED -- Reason of abort: Used ID\n");
+    {lager_off, _} ->
+      io:format(" -- JOIN ABORTED -- Reason of abort: Used ID\n");
+    _ -> ok
+  end,
+  link_shutdown(),
+  gen_statem:reply(Session#session.app_mngr, fail),
+  {next_state, init_joiner, reset_session(Session)};
 
 pre_join(cast, {abort, Reason}, Session) ->
   ok = handle(pre_join, look),
@@ -313,9 +260,15 @@ j_ready(EventType, EventContent, Session) ->
 
 init_provider(cast, {ready_for_info, Address}, Session) ->
   PredecessorID = checker:get_pred_id(),
-  JoinerID = adjust_predecessor(hash_f:get_hashed_addr(Address), hash_f:get_hashed_addr(link_manager:get_own_address()), Session#session.nbits),
+  OwnId = hash_f:get_hashed_addr(link_manager:get_own_address()),
+  JoinerID = adjust_predecessor(hash_f:get_hashed_addr(Address), OwnId, Session#session.nbits),
+  SelfAsPredecessor = adjust_predecessor(OwnId, OwnId, Session#session.nbits),
   case JoinerID of
-    _ when JoinerID =< PredecessorID ->
+    SelfAsPredecessor ->
+      communication_manager:send_message_async(abort, ["Used ID"],Address, no_alias),
+      handle(init_provider, init_provider),
+      {keep_state, Session};
+    _ when JoinerID < PredecessorID ->
       communication_manager:send_message_async(abort, ["Not updated"],Address, no_alias),
       handle(init_provider, init_provider),
       {keep_state, Session};
@@ -351,11 +304,17 @@ init_provider(EventType, EventContent, Session) ->
 not_alone(cast, {ready_for_info, Address}, Session) ->
   ok = handle(not_alone, not_alone),
   CurrID = Session#session.curr_id,
-  JoinerID = hash_f:get_hashed_addr(Address),
+  OwnId = hash_f:get_hashed_addr(link_manager:get_own_address()),
+  JoinerID = adjust_predecessor(hash_f:get_hashed_addr(Address), OwnId, Session#session.nbits),
+  SelfAsPredecessor = adjust_predecessor(OwnId, OwnId, Session#session.nbits),
   case JoinerID of
+    SelfAsPredecessor ->
+      communication_manager:send_message_async(abort, ["Used ID"],Address, no_alias),
+      handle(init_provider, init_provider),
+      {keep_state, Session};
     _ when JoinerID =< CurrID ->
       communication_manager:send_message_async(abort, ["No priority"],Address, no_alias),
-      {keep_state, Session, [{state_timeout, ?INTERVAL_JOIN, hard_stop}]};
+      {keep_state, Session};
     _ when JoinerID > CurrID ->
       CurrAddr = Session#session.curr_addr,
       communication_manager:send_message_async(abort, ["Loss priority"],CurrAddr, no_alias),
@@ -425,56 +384,16 @@ leaving(EventType, EventContent, Session) ->
   handle_generic_event({EventType, EventContent, Session}).
 
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%%
-%% If callback_mode is handle_event_function, then whenever a
-%% gen_statem receives an event from call/2, cast/2, or as a normal
-%% process message, this function is called.
-%%
-%% @spec handle_event(Event, StateName, State) ->
-%%                   {next_state, NextStateName, NextState} |
-%%                   {next_state, NextStateName, NextState, Actions} |
-%%                   {stop, Reason, NewState} |
-%%    				 stop |
-%%                   {stop, Reason :: term()} |
-%%                   {stop, Reason :: term(), NewData :: data()} |
-%%                   {stop_and_reply, Reason, Replies} |
-%%                   {stop_and_reply, Reason, Replies, NewState} |
-%%                   {keep_state, NewData :: data()} |
-%%                   {keep_state, NewState, Actions} |
-%%                   keep_state_and_data |
-%%                   {keep_state_and_data, Actions}
-%% @end
-%%--------------------------------------------------------------------
+
 handle_event(_EventType, _EventContent, _StateName, State) ->
   NextStateName = the_next_state_name,
   {next_state, NextStateName, State}.
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% This function is called by a gen_statem when it is about to
-%% terminate. It should be the opposite of Module:init/1 and do any
-%% necessary cleaning up. When it returns, the gen_statem terminates with
-%% Reason. The return value is ignored.
-%%
-%% @spec terminate(Reason, StateName, State) -> void()
-%% @end
-%%--------------------------------------------------------------------
+
 terminate(_Reason, _StateName, _State) ->
   ok.
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Convert process state when code is changed
-%%
-%% @spec code_change(OldVsn, StateName, State, Extra) ->
-%%                   {ok, StateName, NewState}
-%% @end
-%%--------------------------------------------------------------------
+
 code_change(_OldVsn, StateName, State, _Extra) ->
   {ok, StateName, State}.
 
@@ -548,12 +467,12 @@ stop(Session, Address) ->
   {_, SuccessorAddress} = stabilizer:get_successor(),
   case Address of
     _ when Address =:= SuccessorAddress ->
-      gen_statem:reply(Session#session.app_mngr, ok),
       Stab = naming_handler:get_identity(stabilizer),
       application_manager:drop_many_resources(all_res),
-      exit(naming_handler:get_identity(communication_supervisor), kill),
       stabilizer:turn_off(),
       naming_handler:delete_comm_tree(),
+      exit(naming_handler:get_identity(communication_supervisor), kill),
+      gen_statem:reply(Session#session.app_mngr, ok),
       {next_state, init_joiner, reset_session(Session#session{stabilizer = Stab})};
     _ -> {keep_state, Session, [{state_timeout, ?INTERVAL_LEAVING, hard_stop}]}
   end.
@@ -561,7 +480,7 @@ stop(Session, Address) ->
 link_shutdown() ->
   Pid = naming_handler:get_identity(link_supervisor),
   naming_handler:delete_comm_tree(),
-  exit(Pid, kill).
+  exit(Pid, normal).
 
 adjust_predecessor(ID, OwnId, _NBits) when ID < OwnId -> ID;
 adjust_predecessor(ID, OwnId, NBits) -> adjust_predecessor(ID - round(math:pow(2, NBits)), OwnId, NBits).

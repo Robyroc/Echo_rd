@@ -15,12 +15,7 @@
 %%% API functions
 %%%===================================================================
 
-%%--------------------------------------------------------------------
-%% @doc
-%% Starts the supervisor
-%%
-%% @end
-%%--------------------------------------------------------------------
+
 start_link() ->
   supervisor:start_link({local, ?SERVER}, ?MODULE, []).
 
@@ -28,16 +23,7 @@ start_link() ->
 %%% Supervisor callbacks
 %%%===================================================================
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Whenever a supervisor is started using supervisor:start_link/[2,3],
-%% this function is called by the new process to find out about
-%% restart strategy, maximum restart frequency and child
-%% specifications.
-%%
-%% @end
-%%--------------------------------------------------------------------
+
 init([]) ->
   naming_handler:notify_identity(self(), communication_supervisor),
   RestartStrategy = one_for_one,
@@ -55,11 +41,8 @@ init([]) ->
     Restart, Shutdown, worker, [communication_manager]},
   Son3 = {link_supervisor, {link_supervisor, start_link, []},
     Restart, Shutdown, supervisor, [link_supervisor]},
-  Son4 = {statistics, {statistics, start_link, []},
-    Restart, Shutdown, worker, [statistics]},
+  Son4 = {add_on_supervisor, {add_on_supervisor, start_link, []},
+    Restart, Shutdown, supervisor, [add_on_supervisor]},
 
   {ok, {SupFlags, [Son1, Son2, Son3, Son4]}}.
 
-%%%===================================================================
-%%% Internal functions
-%%%===================================================================

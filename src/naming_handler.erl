@@ -25,7 +25,6 @@
 
 notify_identity(PID, Identity) ->
   try
-    %TODO check lager and policy
     case logging_policies:check_lager_policy(?MODULE) of
       {lager_on, able} ->
         lager:info("=== NEW ENTRY === Name:~p ===\n", [Identity]);
@@ -36,7 +35,7 @@ notify_identity(PID, Identity) ->
       _ -> ok
     end,
     Naming = get_identity(naming_handler),
-    gen_server:call(Naming, {notify, Identity, PID})          %TODO check if timeout is needed
+    gen_server:call(Naming, {notify, Identity, PID})
   of
     A -> A
   catch
@@ -65,14 +64,9 @@ get_maybe_identity(Identity) ->
 
 delete_comm_tree() ->
   Naming = get_identity(naming_handler),
-  gen_server:call(Naming, delete).          %TODO check if timeout is needed
+  gen_server:call(Naming, delete).
 
-%%--------------------------------------------------------------------
-%% @doc
-%% Starts the server
-%%
-%% @end
-%%--------------------------------------------------------------------
+
 start_link() ->
   gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
@@ -80,27 +74,10 @@ start_link() ->
 %%% gen_server callbacks
 %%%===================================================================
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Initializes the server
-%%
-%% @spec init(Args) -> {ok, State} |
-%%                     {ok, State, Timeout} |
-%%                     ignore |
-%%                     {stop, Reason}
-%% @end
-%%--------------------------------------------------------------------
 init([]) ->
   {ok, #state{}}.
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Handling call messages
-%%
-%% @end
-%%--------------------------------------------------------------------
+
 handle_call({notify, Identity, PID}, _From, State) ->
   ets:insert(naming_db, {Identity, PID}),
   {reply, ok, State};
@@ -109,14 +86,15 @@ handle_call(delete, _From, State) ->
   ets:delete(naming_db, params_handler),
   ets:delete(naming_db, hash_f),
   ets:delete(naming_db, stabilizer),
+  ets:delete(naming_db, statistics),
   ets:delete(naming_db, router),
   ets:delete(naming_db, port),
-  ets:delete(naming_db, listener),
+  ets:delete(naming_db, lager_sinks_handler),
   ets:delete(naming_db, link_manager),
+  ets:delete(naming_db, listener),
   {reply, ok, State};
 
 handle_call({reheir, NewManager}, _From, State) ->
-  %TODO check lager and policy
   case logging_policies:check_lager_policy(?MODULE) of
     {lager_on, _} ->
       lager:info("Naming Handler: Changing Heir options\n");
@@ -141,13 +119,7 @@ handle_call(Request, _From, State) ->
   end,
   {reply, ok, State}.
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Handling cast messages
-%%
-%% @end
-%%--------------------------------------------------------------------
+
 handle_cast(Request, State) ->
   case logging_policies:check_lager_policy(?MODULE) of
     {lager_on, _} ->
@@ -160,16 +132,7 @@ handle_cast(Request, State) ->
   end,
   {noreply, State}.
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Handling all non call/cast messages
-%%
-%% @spec handle_info(Info, State) -> {noreply, State} |
-%%                                   {noreply, State, Timeout} |
-%%                                   {stop, Reason, State}
-%% @end
-%%--------------------------------------------------------------------
+
 handle_info({'ETS-TRANSFER', TableId, Pid, _Data}, State) ->
   ets:insert(naming_db, {naming_handler, self()}),
   case logging_policies:check_lager_policy(?MODULE) of
@@ -195,17 +158,7 @@ handle_info(Info, State) ->
   end,
   {noreply, State}.
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% This function is called by a gen_server when it is about to
-%% terminate. It should be the opposite of Module:init/1 and do any
-%% necessary cleaning up. When it returns, the gen_server terminates
-%% with Reason. The return value is ignored.
-%%
-%% @spec terminate(Reason, State) -> void()
-%% @end
-%%--------------------------------------------------------------------
+
 terminate(_Reason, _State) ->
   case logging_policies:check_lager_policy(?MODULE) of
     {lager_on, _} ->
@@ -218,14 +171,7 @@ terminate(_Reason, _State) ->
   end,
   ok.
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Convert process state when code is changed
-%%
-%% @spec code_change(OldVsn, State, Extra) -> {ok, NewState}
-%% @end
-%%--------------------------------------------------------------------
+
 code_change(_OldVsn, State, _Extra) ->
   {ok, State}.
 

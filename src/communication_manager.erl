@@ -37,13 +37,6 @@
 %%% API
 %%%===================================================================
 
-%%--------------------------------------------------------------------
-%% @doc
-%% Starts the server
-%%
-%% @end
-%%--------------------------------------------------------------------
-
 
 start_link() ->
   gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
@@ -68,19 +61,6 @@ receive_nbits(NBits) ->
 %%% gen_server callbacks
 %%%===================================================================
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Initializes the server
-%%
-%% @spec init(Args) -> {ok, State} |
-%%                     {ok, State, Timeout} |
-%%                     ignore |
-%%                     {stop, Reason}
-%% @end
-%%--------------------------------------------------------------------
-
-
 init([]) ->
   case naming_handler:get_maybe_identity(params_handler) of
     no_name_registered -> NBits = no_nbits;
@@ -89,13 +69,6 @@ init([]) ->
   naming_handler:notify_identity(self(), communication_manager),
   {ok, #state{nbits = NBits}}.
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Handling call messages
-%%
-%% @end
-%%--------------------------------------------------------------------
 
 handle_call({send_msg, Method, Params, Address, Alias}, _From, State) ->
   case logging_policies:check_lager_policy(?MODULE) of
@@ -113,7 +86,7 @@ handle_call({send_msg, Method, Params, Address, Alias}, _From, State) ->
   case Encoded of
     badarg -> {reply, fail, State};
     _ ->
-      {reply,link_manager:send_message(Address, {Alias, Translated, Encoded}),State}
+      {reply,link_manager:send_message_sync(Address, {Alias, Translated, Encoded}),State}
   end;
 
 handle_call({get_nbits, NBits}, _From, State) ->
@@ -131,19 +104,12 @@ handle_call(Request, _From, State) ->
   end,
   {reply, ok, State}.
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Handling cast messages
-%%
-%% @end
-%%--------------------------------------------------------------------
 
 handle_cast({send_msg, Method, Params, Address, Alias}, State) ->
   case Method of
-    join_info -> ok;
-    leave_info -> ok;
-    command -> ok;
+    join_info -> print_out_only_method_and_address(Method, Address);
+    leave_info -> print_out_only_method_and_address(Method, Address);
+    command -> print_out_only_method_and_address(Method, Address);
     _ ->
       case logging_policies:check_lager_policy(?MODULE) of
         {lager_on, able} ->
@@ -159,9 +125,10 @@ handle_cast({send_msg, Method, Params, Address, Alias}, State) ->
   Translated = translate(Method),
   Encoded = encode_params(Method, Params, State#state.nbits),
   case Encoded of
-    badarg -> {noreply, State};
+    badarg ->
+      {noreply, State};
     _ ->
-      link_manager:send_message(Address, {Alias, Translated, Encoded}),
+      link_manager:send_message_async(Address, {Alias, Translated, Encoded}),
       {noreply,State}
   end;
 
@@ -169,9 +136,9 @@ handle_cast({rcv_msg, Method, Address, Params}, State) ->
   BackTranslated = back_translate(Method),
   DecodedParams = decode_params(back_translate(Method), Params, State#state.nbits),
   case Method of
-    join_info -> ok;
-    leave_info -> ok;
-    command -> ok;
+    join_info -> print_in_only_method_and_address(Method, Address);
+    leave_info -> print_in_only_method_and_address(Method, Address);
+    command -> print_in_only_method_and_address(Method, Address);
     _ ->
       case logging_policies:check_lager_policy(?MODULE) of
         {lager_on, able} ->
@@ -184,7 +151,9 @@ handle_cast({rcv_msg, Method, Address, Params}, State) ->
         _ -> ok
       end
   end,
-  forward(BackTranslated, DecodedParams, Address),
+  {Modules, Call} = forward(BackTranslated, DecodedParams, Address),
+  [naming_handler:wait_service(Service) || Service <- Modules],
+  Call(),
   {noreply,State};
 
 handle_cast(Request, State) ->
@@ -199,16 +168,6 @@ handle_cast(Request, State) ->
   end,
   {noreply, State}.
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Handling all non call/cast messages
-%%
-%% @spec handle_info(Info, State) -> {noreply, State} |
-%%                                   {noreply, State, Timeout} |
-%%                                   {stop, Reason, State}
-%% @end
-%%--------------------------------------------------------------------
 
 handle_info(Info, State) ->
   case logging_policies:check_lager_policy(?MODULE) of
@@ -222,29 +181,9 @@ handle_info(Info, State) ->
   end,
   {noreply, State}.
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% This function is called by a gen_server when it is about to
-%% terminate. It should be the opposite of Module:init/1 and do any
-%% necessary cleaning up. When it returns, the gen_server terminates
-%% with Reason. The return value is ignored.
-%%
-%% @spec terminate(Reason, State) -> void()
-%% @end
-%%--------------------------------------------------------------------
 
 terminate(_Reason, _State) ->
   ok.
-
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Convert process state when code is changed
-%%
-%% @spec code_change(OldVsn, State, Extra) -> {ok, NewState}
-%% @end
-%%--------------------------------------------------------------------
 
 code_change(_OldVsn, State, _Extra) ->
   {ok, State}.
@@ -290,7 +229,7 @@ back_translate(_) -> badarg.
 
 encode_params(lookup_for_join, [], _NBits) -> [];
 encode_params(lookup_response, _, no_nbits) -> badarg;
-encode_params(lookup_response, [ID, Addr], NBits) -> [link_manager:address_to_binary(Addr), encode_ID(ID, NBits)];
+encode_params(lookup_response, [ID, Addr, Length], NBits) -> [link_manager:address_to_binary(Addr), encode_ID(ID, NBits), <<Length:16/integer>>];
 encode_params(ready_for_info, [], _NBits) -> [];
 encode_params(join_info, [NBits, LS, Res], _NBits) -> [encode_nbits_successor_and_resources([NBits, LS, Res])];
 encode_params(ack_info, [], _NBits) -> [];
@@ -304,14 +243,17 @@ encode_params(ask_pred, [], _NBits) -> [];
 encode_params(pred_reply, _, no_nbits) -> badarg;
 encode_params(pred_reply, [Pred, SL], NBits) -> [link_manager:address_to_binary(Pred), encode_successor_list(SL, NBits)];
 encode_params(lookup, _, no_nbits) -> badarg;
-encode_params(lookup, [ID], NBits) -> [encode_ID(ID, NBits)];
+encode_params(lookup, [ID, Hops], NBits) -> [encode_ID(ID, NBits), <<Hops:16/integer>>];
+encode_params(lookup, [ID], NBits) -> [encode_ID(ID, NBits), <<(2 * NBits):16/integer>>];
 encode_params(command, [Address,C], _NBits) -> [link_manager:address_to_binary(Address), C];
-encode_params(get_stats, [], _NBits) -> [];
-encode_params(stats, [{A, B, C, D}], _NBits) -> [<<A:16, B:16, C:16, D:16>>];
+encode_params(get_stats, _, no_nbits) -> badarg;
+encode_params(get_stats, [Number], NBits) -> [encode_ID(Number, NBits)];
+encode_params(stats, [{A, B, C, D}], _NBits) -> [<<A:32, B:32, C:32, D:32>>];
 encode_params(_, _, _) -> badarg.
 
-decode_params(lookup_for_join, [], _NBits) -> [];
-decode_params(lookup_response, [Addr, ID], _NBits) -> [decode_ID(ID), link_manager:binary_to_address(Addr)];
+decode_params(lookup_for_join, _, no_nbits) -> badarg;
+decode_params(lookup_for_join, [], NBits) -> [2 * NBits];
+decode_params(lookup_response, [Addr, ID, Length], _NBits) -> <<Val:16/integer>> = Length, [decode_ID(ID), link_manager:binary_to_address(Addr), Val];
 decode_params(ready_for_info, [], _NBits) -> [];
 decode_params(join_info, [M], _NBits) -> decode_nbits_successor_and_resources(M);
 decode_params(ack_info, [], _NBits) -> [];
@@ -324,34 +266,34 @@ decode_params(ack_leave, [], _NBits) -> [];
 decode_params(ask_pred, [], _NBits) -> [];
 decode_params(pred_reply, _, no_nbits) -> badarg;
 decode_params(pred_reply, [Pred, SL], NBits) -> [link_manager:binary_to_address(Pred), decode_successor_list(SL, NBits)];
-decode_params(lookup, [ID], _NBits) -> [decode_ID(ID)];
+decode_params(lookup, [ID, Hops], _NBits) -> <<Val:16/integer>> = Hops, [decode_ID(ID), Val];
 decode_params(command, [A,C], _NBits) -> [link_manager:binary_to_address(A), C];
-decode_params(get_stats, [], _NBits) -> [];
-decode_params(stats, [Bin], _NBits) -> <<A:16, B:16, C:16, D:16>> = Bin, [{A, B, C, D}];
+decode_params(get_stats, [Number], _NBits) -> [decode_ID(Number)];
+decode_params(stats, [Bin], _NBits) -> <<A:32, B:32, C:32, D:32>> = Bin, [{A, B, C, D}];
 decode_params(_, _, _) -> badarg.
 
-forward(lookup_for_join, [], From) -> router:lookup_for_join(From);
-forward(lookup_response, [ID, Addr], _From) -> request_gateway:lookup_response(ID, Addr), join_handler:look_response(Addr);
-forward(ready_for_info, [], From) -> join_handler:ready_for_info(From);
-forward(join_info, [NBits, LS, R], From) -> join_handler:info(From, R, LS, NBits);
-forward(ack_info, [], From) -> join_handler:ack_info(From);
-forward(abort, [S], _From) -> join_handler:abort(S);
-forward(ack_join, [], From) -> join_handler:ack_join(From);
-forward(leave_info, [], From) -> join_handler:leave_info([], From);
-forward(leave_info, [Res], From) -> join_handler:leave_info(Res, From);
-forward(ack_leave, [], From) -> join_handler:ack_leave(From);
-forward(ask_pred, [], From) -> checker:get_pred(From);
-forward(pred_reply, [Pred, SL], _From) -> stabilizer:notify_successor(Pred, SL);
-forward(lookup, [ID], From) -> router:remote_lookup(ID, From);
-forward(command, [A,C], _From) -> application_manager:receive_command(A,C);
-forward(get_stats, [], From) -> statistics:get_statistics(From);
-forward(stats, [S], From) -> statistics:incoming_statistics(From, S);
-forward(_, _, _) -> badarg.
+forward(lookup_for_join, [Hops], From) -> {[router], fun() -> router:lookup_for_join(From, Hops) end};
+forward(lookup_response, [ID, Addr, Length], _From) -> {[request_gateway, join_handler], fun() -> request_gateway:lookup_response(ID, Addr, Length), join_handler:look_response(Addr) end};
+forward(ready_for_info, [], From) -> {[join_handler], fun() -> join_handler:ready_for_info(From) end};
+forward(join_info, [NBits, LS, R], From) -> {[join_handler], fun() -> join_handler:info(From, R, LS, NBits) end};
+forward(ack_info, [], From) -> {[join_handler], fun() -> join_handler:ack_info(From) end};
+forward(abort, [S], _From) -> {[join_handler], fun() -> join_handler:abort(S) end};
+forward(ack_join, [], From) -> {[join_handler], fun() -> join_handler:ack_join(From) end};
+forward(leave_info, [], From) -> {[join_handler], fun() -> join_handler:leave_info([], From) end};
+forward(leave_info, [Res], From) -> {[join_handler], fun() -> join_handler:leave_info(Res, From) end};
+forward(ack_leave, [], From) -> {[join_handler], fun() -> join_handler:ack_leave(From) end};
+forward(ask_pred, [], From) -> {[checker], fun() -> checker:get_pred(From) end};
+forward(pred_reply, [Pred, SL], _From) -> {[stabilizer], fun() -> stabilizer:notify_successor(Pred, SL) end};
+forward(lookup, [ID, Hops], From) -> {[router], fun() -> router:remote_lookup(ID, From, Hops) end};
+forward(command, [A,C], _From) -> {[application_manager], fun() -> application_manager:receive_command(A,C) end};
+forward(get_stats, [Number], From) -> {[statistics], fun() -> statistics:get_statistics(From, Number) end};
+forward(stats, [S], From) -> {[statistics], fun() -> statistics:incoming_statistics(From, S) end};
+forward(_, _, _) -> {[], fun() -> ok end}.
 
 
 encode_ID(ID, NBits) ->
   NBytes = ceil(NBits / 8),
-  ActualID = router:normalize_id(ID, NBits),
+  ActualID = normalizer:normalize_id(ID, NBits),
   <<ActualID:(NBytes * 8)/integer>>.
 
 decode_ID(Bin) -> decode_ID(Bin, 0).
@@ -465,3 +407,27 @@ extract_names(N, Rest, Acc) ->
 
 unpad([0 | X]) -> unpad(X);
 unpad(X) -> X.
+
+print_out_only_method_and_address(Method, Address) ->
+  case logging_policies:check_lager_policy(?MODULE) of
+    {lager_on, able} ->
+      lagerConsole:info("### OUT ###: Method:~p | Address:~p\n", [Method, Address]),
+      inout:info("### OUT ###: Method:~p | Address:~p\n", [Method, Address]);
+    {lager_only, able} ->
+      inout:info("### OUT ###: Method:~p | Address:~p\n", [Method, Address]);
+    {lager_off, able} ->
+      io:format("### OUT ###: Method:~p | Address:~p\n", [Method, Address]);
+    _ -> ok
+  end.
+
+print_in_only_method_and_address(Method, Address) ->
+  case logging_policies:check_lager_policy(?MODULE) of
+    {lager_on, able} ->
+      lagerConsole:info("### IN ###: Method:~p | Address:~p\n", [Method, Address]),
+      inout:info("### IN ###: Method:~p | Address:~p\n", [Method, Address]);
+    {lager_only, able} ->
+      inout:info("### IN ###: Method:~p | Address:~p\n", [Method, Address]);
+    {lager_off, able} ->
+      io:format("### IN ###: Method:~p | Address:~p\n", [Method, Address]);
+    _ -> ok
+  end.
