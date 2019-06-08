@@ -35,8 +35,10 @@ init([]) ->
 
   Son1 = {statistics, {statistics, start_link, []},
     Restart, Shutdown, worker, [statistics]},
-  Son2 = {lager_sinks_handler, {lager_sinks_handler, start_link, []},
+  Son2 = {network_control, {network_control, start_link, []},
+    Restart, Shutdown, worker, [network_control]},
+  Son3 = {lager_sinks_handler, {lager_sinks_handler, start_link, []},
     Restart, Shutdown, worker, [lager_sinks_handler]},
 
-  {ok, {SupFlags, [Son1, Son2]}}.
+  {ok, {SupFlags, [Son1, Son2, Son3]}}.
 
