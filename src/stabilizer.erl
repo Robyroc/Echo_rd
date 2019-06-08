@@ -61,7 +61,7 @@ turn_on(PID) ->
 
 init([]) ->
   self() ! startup,
-  {ok, #state{op = no_operating, times = [1000]}}.
+  {ok, #state{op = no_operating, times = [0]}}.
 
 
 handle_call(get_succ, _From, State) ->
