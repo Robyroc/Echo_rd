@@ -143,9 +143,13 @@ handle_cast(Request, State) ->
 handle_info({'DOWN', Monitor, process, _PID, tcp_closed}, State) ->
   Present = [X || {_, X, M} <- State#state.connections, M =:= Monitor],
   Address = hd(Present),
-  checker:notify_lost_node(Address),
-  stabilizer:notify_lost_node(Address),
-  router:notify_lost_node(Address),
+  case application:get_env(echo_rd, fail_detection) of
+    {ok, off} -> ok;
+    _ ->
+      checker:notify_lost_node(Address),
+      stabilizer:notify_lost_node(Address),
+      router:notify_lost_node(Address)
+  end,
   {noreply, State#state{connections = [{Pid, Addr, Mon} || {Pid, Addr, Mon} <- State#state.connections, Mon =/= Monitor]}};
 
 handle_info({'DOWN', Monitor, process, _PID, unused}, State) ->

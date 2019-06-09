@@ -174,10 +174,16 @@ handle_info(stabilize, State) ->
     not_sent ->
       Successor = hd([Addr || {_, Addr} <- State#state.succ_list]),
       communication_manager:send_message_async(ask_pred, [], Successor, no_alias),
-      erlang:send_after(get_timing(State), self(), stabilize),
+      case application:get_env(echo_rd, stabilize) of
+        {ok, off} -> ok;
+        _ -> erlang:send_after(get_timing(State), self(), stabilize)
+      end,
       {noreply, State#state{last_sent = erlang:timestamp()}};
     _ ->
-      erlang:send_after(get_timing(State), self(), stabilize),
+      case application:get_env(echo_rd, stabilize) of
+        {ok, off} -> ok;
+        _ -> erlang:send_after(get_timing(State), self(), stabilize)
+      end,
       {noreply, State#state{fail_counter = State#state.fail_counter + 1}}
   end;
 
