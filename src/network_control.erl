@@ -4,7 +4,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, command/1, command_response/0, command_incoming/3]).
+-export([start_link/0, command/1, command_response/0, command_incoming/3, run_command/1]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -97,7 +97,16 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
-run_command(_Command) ->     %TODO this method shall run the commands passed as parameter and return ok
+run_command(Commands) ->
+  CommandsList = re:split(Commands, "[.]", [{return,list}]),
+  LineSep = io_lib:nl(),
+  AdjustedCommandsList = [string:join(CommandsList, "." ++ LineSep) ++ "."],
+  {ok, Directory} = file:get_cwd(),
+  Port = naming_handler:get_identity(port),
+  Path = Directory ++ "/" ++ integer_to_list(Port) ++ "_temp.tmp",
+  file:write_file(Path, AdjustedCommandsList),
+  file:script(Path),
+  file:delete(Path),
   ok.
 
 possible_response(State) when State#state.response_number =:= State#state.number_of_nodes ->
