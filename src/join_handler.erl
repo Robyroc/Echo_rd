@@ -196,7 +196,7 @@ pre_join(cast, {abort, "Used ID"}, Session) ->
     _ -> ok
   end,
   link_shutdown(),
-  gen_statem:reply(Session#session.app_mngr, fail),
+  gen_statem:reply(Session#session.app_mngr, used_id),
   {next_state, init_joiner, reset_session(Session)};
 
 pre_join(cast, {abort, Reason}, Session) ->
@@ -480,7 +480,7 @@ stop(Session, Address) ->
 link_shutdown() ->
   Pid = naming_handler:get_identity(link_supervisor),
   naming_handler:delete_comm_tree(),
-  exit(Pid, normal).
+  exit(Pid, kill).
 
 adjust_predecessor(ID, OwnId, _NBits) when ID < OwnId -> ID;
 adjust_predecessor(ID, OwnId, NBits) -> adjust_predecessor(ID - round(math:pow(2, NBits)), OwnId, NBits).

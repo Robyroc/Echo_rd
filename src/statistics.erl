@@ -73,7 +73,7 @@ notify_lookup_length(Length) ->
 
 init([]) ->
   self() ! startup,
-  {ok, #state{max_lookup_time = 0, lookup_drop = 0, join_time = 0, ftable_timing = 0, lookup_times = [0], lookup_lengths = [0]}}.
+  {ok, #state{max_lookup_time = 0, lookup_drop = 0, join_time = 0, ftable_timing = 0, lookup_times = [1000], lookup_lengths = [0]}}.
 
 
 handle_call(avg_lookup_time, _From, State) ->
@@ -222,11 +222,19 @@ get_stats(Address, Number, State) ->
         ftable_timing = FT,
         lookup_times = LT,
         lookup_lengths = LL} = State,
-      communication_manager:send_message_async(stats, [{JT, MLT, get_avg_integer(LT), get_avg_float(LL), LD, FT}], Address, no_alias),
+      communication_manager:send_message_async(stats, [{JT, MLT, get_avg_for_statistics(LT), get_avg_float(LL), LD, FT}], Address, no_alias),
       {_, Succ} = stabilizer:get_successor(),
       communication_manager:send_message_async(get_stats, [Number + 1], Succ, Address)
   end,
   {noreply, State}.
+
+get_avg_for_statistics(TimeList) ->
+  case length(TimeList) of
+    Length when Length < ?SIZE - 1 ->
+      get_avg_integer(tl(lists:reverse(TimeList)));
+    _ ->
+      get_avg_integer(TimeList)
+  end.
 
 get_avg_integer(List) ->
   (lists:sum(List)) div (length(List)).
