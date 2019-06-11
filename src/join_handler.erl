@@ -478,6 +478,7 @@ stop(Session, Address) ->
   end.
 
 link_shutdown() ->
+  io:format(" LINK SHUTDOWN \n"),
   Pid = naming_handler:get_identity(link_supervisor),
   naming_handler:delete_comm_tree(),
   exit(Pid, kill).
