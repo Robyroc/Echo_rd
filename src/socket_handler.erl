@@ -64,8 +64,8 @@ handle_cast({send, {no_alias, Method, Params}}, State) ->
   case application:get_env(echo_rd, delay) of
     undefined -> ok;
     {ok, {constant, Delay}} -> timer:sleep(Delay);
-    {ok, {exponential, Mean}} ->
-      Delay = ceil(rand:normal(Mean, Mean)),
+    {ok, {normal, Mean, Var}} ->
+      Delay = ceil(rand:normal(Mean, Var)),
       timer:sleep(Delay)
   end,
   ok = gen_tcp:send(State#state.socket, <<Size:40/integer, Message/binary>>),
