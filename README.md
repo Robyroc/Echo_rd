@@ -66,6 +66,7 @@ The following table shows the possible configurations (in square brackets defaul
 | lager_log      | lager_only          | Logs are written only on file                                                               |
 | lager_log      | lager_off           | Logs are written only on terminal (may make it hard to use the terminal)                    |
 | lager_log      | [undefined]         | No logging                                                                                  |
+| connect        | NUMBER ([7000])     | Maximum amount of time that can be waited during a tcp_connect without giving timeout       |
 | delay          | {constant, NUMBER}  | Add NUMBER ms of latency to communication                                                   |
 | delay          | {normal, MEAN, VAR} | Add latency to communication based on a normal distribution with mean MEAN and variance VAR |
 | delay          | [undefined]         | No artificial delay                                                                         |

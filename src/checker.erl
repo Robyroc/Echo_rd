@@ -58,17 +58,17 @@ init([]) ->
 
 
 handle_call({pred_find, local_address}, _From, State) ->
-  {reply, State#state.pred , State, ?INTERVAL};
+  {reply, State#state.pred , State, get_timeout()};
 
 handle_call({lost, Address}, _From, State) ->
   Pred = State#state.pred,
   case Address of
-    Pred -> {reply, ok , State#state{pred = nil, pred_id = nil}, ?INTERVAL};
-    _ -> {reply, ok, State, ?INTERVAL}
+    Pred -> {reply, ok , State#state{pred = nil, pred_id = nil}, get_timeout()};
+    _ -> {reply, ok, State, get_timeout()}
   end;
 
 handle_call(pred_id, _From, State) ->
-  {reply, State#state.pred_id , State, ?INTERVAL};
+  {reply, State#state.pred_id , State, get_timeout()};
 
 handle_call({set_pred, Address}, _From, State) ->
   ID = normalizer:normalize_as_predecessor(hash_f:get_hashed_addr(Address)),
@@ -95,11 +95,11 @@ handle_cast({pred_find, Address}, State) ->
       case Index of
         _ when Index < State#state.own_id ->
           communication_manager:send_message_async(pred_reply, [Address, SuccList], Address, no_alias),
-          {noreply, State#state{pred = Address, pred_id = Index}, ?INTERVAL};
+          {noreply, State#state{pred = Address, pred_id = Index}, get_timeout()};
         _ when Index >= State#state.own_id ->
           CorrectIndex = Index - round(math:pow(2, State#state.n_bits)),
           communication_manager:send_message_async(pred_reply, [Address, SuccList], Address, no_alias),
-          {noreply, State#state{pred = Address, pred_id = CorrectIndex}, ?INTERVAL}
+          {noreply, State#state{pred = Address, pred_id = CorrectIndex}, get_timeout()}
       end;
     Predecessor ->
       Index = hash_f:get_hashed_addr(Address),
@@ -118,12 +118,12 @@ handle_cast({pred_find, Address}, State) ->
         _ when Index < OwnID ->
           {Addr, PredecessorID} = predecessor_chooser(Address, Index, Predecessor, PredID),
           communication_manager:send_message_async(pred_reply, [Addr, SuccList], Address, no_alias),
-          {noreply, State#state{pred = Addr, pred_id = PredecessorID}, ?INTERVAL};
+          {noreply, State#state{pred = Addr, pred_id = PredecessorID}, get_timeout()};
         _ when Index >= OwnID ->
           CorrectIndex = Index - round(math:pow(2, NBits)),
           {Addr, PredecessorID} = predecessor_chooser(Address, CorrectIndex, Predecessor, PredID),
           communication_manager:send_message_async(pred_reply, [Addr, SuccList], Address, no_alias),
-          {noreply, State#state{pred = Addr, pred_id = PredecessorID}, ?INTERVAL}
+          {noreply, State#state{pred = Addr, pred_id = PredecessorID}, get_timeout()}
       end
   end;
 
@@ -183,3 +183,6 @@ predecessor_chooser(Address, AddressID, Predecessor, PredecessorID) ->
     _ when AddressID =< PredecessorID ->
       {Predecessor, PredecessorID}
   end.
+
+get_timeout() ->
+  rand:normal(?INTERVAL, 250000).

@@ -185,7 +185,6 @@ message_framer(Bin, State) when State#state.remaining =:= 0 ->
   case Size of
     Received ->
       {Address, Method, Params} = parse_message(Message),
-      io:format("~p\n", [ets:match_object(naming_db, {'$0', '$1'})]),
       link_manager:notify_incoming_message({Method, Address, Params}),
       {noreply, State, ?TIMEOUT};
     _ when Received > Size ->
@@ -207,7 +206,6 @@ message_framer(Bin, State) ->
     Remaining ->
       Total = list_to_binary(lists:reverse([Bin | State#state.acc])),
       {Address, Method, Params} = parse_message(Total),
-      io:format("~p\n", [ets:match_object(naming_db, {'$0', '$1'})]),
       link_manager:notify_incoming_message({Method, Address, Params}),
       {noreply, State#state{remaining = 0, acc = []}, ?TIMEOUT};
     _ when Received > Remaining ->

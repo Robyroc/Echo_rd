@@ -24,7 +24,6 @@
   terminate/2,
   code_change/3]).
 
--define(INTERVAL, 4000).
 -define(SERVER, ?MODULE).
 -record(state, {connections, port}).
 
@@ -211,7 +210,8 @@ send_async(Port, IP, Message, State, Size) when Size < 8000 ->
   Present = [X || {X, Addr, _} <- State#state.connections, Addr == {Port, IP}],
   case Present of
     [] ->
-      case gen_tcp:connect(IP, Port, [binary, {packet, 0}], ?INTERVAL) of
+      {ok, Timeout} = application:get_env(echo_rd, connect),
+      case gen_tcp:connect(IP, Port, [binary, {packet, 0}], Timeout) of
         {ok, RequestSocket} ->
           Sup = naming_handler:get_identity(handler_supervisor),
           Ret = supervisor:start_child(Sup, [RequestSocket]),
@@ -236,7 +236,8 @@ send_async(Port, IP, Message, State, Size) when Size < 8000 ->
   end;
 
 send_async(Port, IP, Message, State, _Size) ->
-  case gen_tcp:connect(IP, Port, [binary, {packet, 0}], ?INTERVAL) of
+  {ok, Timeout} = application:get_env(echo_rd, connect),
+  case gen_tcp:connect(IP, Port, [binary, {packet, 0}], Timeout) of
     {ok, RequestSocket} ->
       Sup = naming_handler:get_identity(handler_supervisor),
       Ret = supervisor:start_child(Sup, [RequestSocket]),
@@ -255,7 +256,8 @@ send_async(Port, IP, Message, State, _Size) ->
   end.
 
 send(Port, IP, Message, State, _Size) ->
-  case gen_tcp:connect(IP, Port, [binary, {packet, 0}], ?INTERVAL) of
+  {ok, Timeout} = application:get_env(echo_rd, connect),
+  case gen_tcp:connect(IP, Port, [binary, {packet, 0}], Timeout) of
     {ok, RequestSocket} ->
       Sup = naming_handler:get_identity(handler_supervisor),
       Ret = supervisor:start_child(Sup, [RequestSocket]),
