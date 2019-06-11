@@ -25,7 +25,8 @@
   show_finger_table/0,
   get_predecessor/0,
   get_own_id/0,
-  statistics_gather/0]).
+  statistics_gather/0,
+  get_average_lookup_time/0]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -122,6 +123,9 @@ send_response(Message, Address) ->
 
 statistics_gather() ->
   statistics:gather().
+
+get_average_lookup_time() ->
+  statistics:get_average_lookup_time().
 
 %%%===================================================================
 %%% gen_server callbacks

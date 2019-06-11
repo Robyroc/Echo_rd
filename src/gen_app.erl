@@ -23,4 +23,5 @@
 -callback get_own_id() -> integer().
 -callback statistics_gather() -> ok.
 -callback connect(Name :: atom()) -> ok.
+-callback get_average_lookup_time() -> integer().
 
