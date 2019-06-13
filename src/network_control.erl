@@ -4,7 +4,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, command/1, command_response/0, command_incoming/3, run_command/1]).
+-export([start_link/0, command/1, command_response/0, command_incoming/3]).
 
 %% gen_server callbacks
 -export([init/1,

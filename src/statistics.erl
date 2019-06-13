@@ -122,6 +122,14 @@ handle_cast({show_stats, Address, Stats}, State) ->
       io:format("\n^^^^^ STATS ^^^^^\n ID: ~p\n IP: ~p\n Join time: ~p\n Highest lookup time: ~p\n Average lookup time: ~p\n Average lookup length: ~p\n Number of lookup timeouts: ~p\n FTable last refresh timings: ~p\n\n",
         [ID, Address, JoinTime, HighLookupTime, AvgLookupTime, AvgLookupLength, LookupDrop, FtableTimings])
   end,
+  {Port, {IPA, IPB, IPC, IPD}} = Address,
+  Ip = integer_to_list(IPA)++"."++integer_to_list(IPB)++"."++integer_to_list(IPC)++"."++
+    integer_to_list(IPD),
+  {ok, Directory} = file:get_cwd(),
+  Path = Directory ++ "/Useful files/stats.csv",
+  Line = integer_to_list(ID)++","++Ip++","++integer_to_list(Port)++","++integer_to_list(JoinTime)++","++integer_to_list(HighLookupTime)
+    ++","++integer_to_list(AvgLookupTime)++","++io_lib:format("~.2f",[AvgLookupLength])++","++integer_to_list(LookupDrop)++","++integer_to_list(FtableTimings)++io_lib:nl(),
+  file:write_file(Path, Line, [append]),
   {noreply, State};
 
 handle_cast({get_stats, Address, Number}, State) ->
