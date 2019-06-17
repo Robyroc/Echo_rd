@@ -131,8 +131,8 @@ init_joiner({call, From}, {join, OwnPort, Address}, Session) ->
       case Answer of
         ok ->
           {next_state, look, Session#session{app_mngr = From, provider_addr = Address, time = Time},
-            {ok, Time} = application:get_env(echo_rd, connect),
-            [{state_timeout, Time * ?JOINING_MULT, hard_stop}]};
+            {ok, ConnectionTime} = application:get_env(echo_rd, connect),
+            [{state_timeout, ConnectionTime * ?JOINING_MULT, hard_stop}]};
         Error ->
           link_shutdown(),
           {keep_state, Session, [{reply, From, Error}]}
