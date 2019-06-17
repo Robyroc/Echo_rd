@@ -130,8 +130,8 @@ init_joiner({call, From}, {join, OwnPort, Address}, Session) ->
       Answer = communication_manager:send_message_sync(lookup_for_join, [], Address, no_alias),
       case Answer of
         ok ->
+          {ok, ConnectionTime} = application:get_env(echo_rd, connect),
           {next_state, look, Session#session{app_mngr = From, provider_addr = Address, time = Time},
-            {ok, ConnectionTime} = application:get_env(echo_rd, connect),
             [{state_timeout, ConnectionTime * ?JOINING_MULT, hard_stop}]};
         Error ->
           link_shutdown(),
