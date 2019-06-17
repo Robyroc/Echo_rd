@@ -185,4 +185,8 @@ predecessor_chooser(Address, AddressID, Predecessor, PredecessorID) ->
   end.
 
 get_timeout() ->
-  rand:normal(?INTERVAL, 250000).
+  Delay = ceil(rand:normal(?INTERVAL, 250000)),
+  case Delay of
+    _ when Delay < 0 -> 0;
+    _ -> Delay
+  end.

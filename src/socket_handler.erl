@@ -66,7 +66,10 @@ handle_cast({send, {no_alias, Method, Params}}, State) ->
     {ok, {constant, Delay}} -> timer:sleep(Delay);
     {ok, {normal, Mean, Var}} ->
       Delay = ceil(rand:normal(Mean, Var)),
-      timer:sleep(Delay)
+      case Delay of
+        _ when Delay < 0 -> ok;
+        _ -> timer:sleep(Delay)
+      end
   end,
   ok = gen_tcp:send(State#state.socket, <<Size:40/integer, Message/binary>>),
   {noreply, State, ?TIMEOUT};
