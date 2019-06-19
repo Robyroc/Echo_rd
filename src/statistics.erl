@@ -126,7 +126,7 @@ handle_cast({show_stats, Address, Stats}, State) ->
   Ip = integer_to_list(IPA)++"."++integer_to_list(IPB)++"."++integer_to_list(IPC)++"."++
     integer_to_list(IPD),
   {ok, Directory} = file:get_cwd(),
-  Path = Directory ++ "/Useful files/stats.csv",
+  Path = Directory ++ "/stats.csv",
   Line = integer_to_list(ID)++","++Ip++","++integer_to_list(Port)++","++integer_to_list(JoinTime)++","++integer_to_list(HighLookupTime)
     ++","++integer_to_list(AvgLookupTime)++","++io_lib:format("~.2f",[AvgLookupLength])++","++integer_to_list(LookupDrop)++","++integer_to_list(FtableTimings)++io_lib:nl(),
   file:write_file(Path, Line, [append]),
