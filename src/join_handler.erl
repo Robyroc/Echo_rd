@@ -134,7 +134,7 @@ init_joiner({call, From}, {join, OwnPort, Address}, Session) ->
           {next_state, look, Session#session{app_mngr = From, provider_addr = Address, time = Time},
             [{state_timeout, ConnectionTime * ?JOINING_MULT, hard_stop}]};
         Error ->
-          link_shutdown(),
+          link_brutal_shutdown(),
           {keep_state, Session, [{reply, From, Error}]}
       end;
     Error ->
@@ -168,7 +168,7 @@ look(cast, {look_resp,Address}, Session) ->
 
 look(state_timeout, hard_stop, Session) ->
   ok = handle(look, init_joiner),
-  link_shutdown(),
+  link_brutal_shutdown(),
   gen_statem:reply(Session#session.app_mngr, fail),
   {next_state, init_joiner, reset_session(Session)};
 
@@ -200,7 +200,7 @@ pre_join(cast, {abort, "Used ID"}, Session) ->
       io:format(" -- JOIN ABORTED -- Reason of abort: Used ID\n");
     _ -> ok
   end,
-  link_shutdown(),
+  link_normal_shutdown(),
   gen_statem:reply(Session#session.app_mngr, used_id),
   {next_state, init_joiner, reset_session(Session)};
 
@@ -223,7 +223,7 @@ pre_join(cast, {abort, Reason}, Session) ->
 
 pre_join(state_timeout, hard_stop, Session) ->
   ok = handle(pre_join, init_joiner),
-  link_shutdown(),
+  link_brutal_shutdown(),
   gen_statem:reply(Session#session.app_mngr, fail),
   {next_state, init_joiner, reset_session(Session)};
 
@@ -256,7 +256,7 @@ j_ready(cast, {abort, Reason}, Session) ->
 
 j_ready(state_timeout, hard_stop, Session) ->
   ok = handle(j_ready, init_joiner),
-  link_shutdown(),
+  link_brutal_shutdown(),
   gen_statem:reply(Session#session.app_mngr, fail),
   {next_state, init_joiner, reset_session(Session)};
 
@@ -492,7 +492,12 @@ stop(Session, Address) ->
       {keep_state, Session, [{state_timeout, Time * ?LEAVING_MULT, hard_stop}]}
   end.
 
-link_shutdown() ->
+link_brutal_shutdown() ->
+  Pid = naming_handler:get_identity(link_supervisor),
+  naming_handler:delete_comm_tree(),
+  exit(Pid, kill).
+
+link_normal_shutdown() ->
   Pid = naming_handler:get_identity(link_supervisor),
   naming_handler:delete_comm_tree(),
   exit(Pid, normal).

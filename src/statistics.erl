@@ -238,6 +238,7 @@ get_stats(Address, Number, State) ->
 
 get_avg_for_statistics(TimeList) ->
   case length(TimeList) of
+    1 -> 0;
     Length when Length < ?SIZE - 1 ->
       get_avg_integer(tl(lists:reverse(TimeList)));
     _ ->
