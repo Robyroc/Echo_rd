@@ -7,7 +7,7 @@
    [kernel,
     stdlib
    ]},
-  {env,[{ip, private}, {connect, 7000}]},
+  {env,[{ip, private}, {connect, 7000}, {size, 50}]},
   {modules, []},
 
   {licenses, ["Apache 2.0"]},

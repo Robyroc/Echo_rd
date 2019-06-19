@@ -23,7 +23,6 @@
   code_change/3]).
 
 -define(SERVER, ?MODULE).
--define(SIZE, 51).
 
 -record(state, {join_time, max_lookup_time, lookup_drop, ftable_timing, lookup_times, lookup_lengths}).
 
@@ -204,8 +203,9 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 
 add_to_list(Elem, List) ->
+  Size = application:get_env(echo_rd, size) + 1,
   case length([Elem | List]) of
-    ?SIZE -> [Elem | lists:reverse(tl(lists:reverse(List)))];
+    Size -> [Elem | lists:reverse(tl(lists:reverse(List)))];
     _ -> [Elem | List]
   end.
 
@@ -237,9 +237,10 @@ get_stats(Address, Number, State) ->
   {noreply, State}.
 
 get_avg_for_statistics(TimeList) ->
+  Size = application:get_env(echo_rd, size),
   case length(TimeList) of
     1 -> 0;
-    Length when Length < ?SIZE - 1 ->
+    Length when Length < Size ->
       get_avg_integer(tl(lists:reverse(TimeList)));
     _ ->
       get_avg_integer(TimeList)

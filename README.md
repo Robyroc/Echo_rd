@@ -76,6 +76,7 @@ The following table shows the possible configurations (in square brackets defaul
 | stabilize      | [undefined]         | Stabilize as normal                                                                         |
 | fail_detection | off                 | Stops the fail detection system (Needs also the stabilize off option for proper use)        |
 | fail_detection | [undefined]         | Fail detection as normal                                                                    |
+| size           | NUMBER ([50])       | Dimension of the buffers for statistics                                                     |
 
 Messages
 -----
