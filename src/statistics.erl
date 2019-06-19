@@ -203,9 +203,10 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 
 add_to_list(Elem, List) ->
-  Size = application:get_env(echo_rd, size) + 1,
+  {ok, Size} = application:get_env(echo_rd, size),
+  AdjustedSize = Size + 1,
   case length([Elem | List]) of
-    Size -> [Elem | lists:reverse(tl(lists:reverse(List)))];
+    AdjustedSize -> [Elem | lists:reverse(tl(lists:reverse(List)))];
     _ -> [Elem | List]
   end.
 
@@ -237,7 +238,7 @@ get_stats(Address, Number, State) ->
   {noreply, State}.
 
 get_avg_for_statistics(TimeList) ->
-  Size = application:get_env(echo_rd, size),
+  {ok, Size} = application:get_env(echo_rd, size),
   case length(TimeList) of
     1 -> 0;
     Length when Length < Size ->
