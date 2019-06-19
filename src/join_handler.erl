@@ -275,7 +275,7 @@ init_provider(cast, {ready_for_info, Address}, Session) ->
       communication_manager:send_message_async(abort, ["Used ID"],Address, no_alias),
       handle(init_provider, init_provider),
       {keep_state, Session};
-    _ when JoinerID < PredecessorID ->
+    _ when JoinerID =< PredecessorID ->
       communication_manager:send_message_async(abort, ["Not updated"],Address, no_alias),
       handle(init_provider, init_provider),
       {keep_state, Session};
