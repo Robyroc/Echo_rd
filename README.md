@@ -15,8 +15,10 @@ Interface
 The library allows to abstract the location of a service and distribute it. All the commands of the service are not changed by Echo_rd, it just routes them to the node handling it correctly.
 The library will need a block service providing an interface compatible with [gen_bm.erl](src/gen_bm.erl) file.
 
-The full list of methods complete with a brief explanation can be seen in the [gen_app.erl](src/gen_app.erl) file.
+An example of an implemented block service can be seen here: https://github.com/GiacomoZiffer/Eblock_rd
 
+The full list of methods complete with a brief explanation can be seen in the [gen_app.erl](src/gen_app.erl) file.
+ 
 
 Modules
 -----
