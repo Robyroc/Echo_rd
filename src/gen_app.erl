@@ -14,11 +14,20 @@
 %%      Address: is the address of a node already present in the Chord network
 %% return
 %%       ok -> when it successfully joins the network
-%%       fail -> when it encounters some problem in entering in the network
+%%       fail -> when it encounters some problem in the communication during the join in the network
+%%       used_id -> when the node's id is already present in the network
+%%       {error, econnrefused} -> when the connection is refused
+%%       {error, timeout} -> when the address is wrong or it doesn't belong to a Chord node
+%%       Error -> when it encounters some problem in entering in the network
 %%
 %% @end
 %%--------------------------------------------------------------------
--callback join(Address :: address()) -> ok | fail.
+-callback join(Address :: address()) -> ok |
+                                        fail |
+                                        used_id |
+                                        {error, econnrefused} |
+                                        {error, timeout} |
+                                        Error :: term().
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -28,11 +37,20 @@
 %%      Address: is the address of a node already present in the Chord network
 %% return
 %%       ok -> when it successfully joins the network
-%%       fail -> when it encounters some problem in entering in the network
+%%       fail -> when it encounters some problem in the communication during the join in the network
+%%       used_id -> when the node's id is already present in the network
+%%       {error, econnrefused} -> when the connection is refused
+%%       {error, timeout} -> when the address is wrong or it doesn't belong to a Chord node
+%%       Error -> when it encounters some problem in entering in the network
 %%
 %% @end
 %%--------------------------------------------------------------------
--callback join_p(Port :: ip_port(), Address :: address()) -> ok | fail.
+-callback join_p(Port :: ip_port(), Address :: address()) ->  ok |
+                                                              fail |
+                                                              used_id |
+                                                              {error, econnrefused} |
+                                                              {error, timeout} |
+                                                              Error :: term().
 
 %%--------------------------------------------------------------------
 %% @doc
