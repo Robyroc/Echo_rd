@@ -18,7 +18,7 @@
 %%       used_id -> when the node's id is already present in the network
 %%       {error, econnrefused} -> when the connection is refused
 %%       {error, timeout} -> when the address is wrong or it doesn't belong to a Chord node
-%%       Error -> when it encounters some problem in entering in the network
+%%       term() -> when it encounters some problem in entering in the network
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -27,7 +27,7 @@
                                         used_id |
                                         {error, econnrefused} |
                                         {error, timeout} |
-                                        Error :: term().
+                                         term().
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -41,7 +41,7 @@
 %%       used_id -> when the node's id is already present in the network
 %%       {error, econnrefused} -> when the connection is refused
 %%       {error, timeout} -> when the address is wrong or it doesn't belong to a Chord node
-%%       Error -> when it encounters some problem in entering in the network
+%%       term() -> when it encounters some problem in entering in the network
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -50,7 +50,7 @@
                                                               used_id |
                                                               {error, econnrefused} |
                                                               {error, timeout} |
-                                                              Error :: term().
+                                                              term().
 
 %%--------------------------------------------------------------------
 %% @doc
