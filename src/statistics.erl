@@ -143,7 +143,8 @@ handle_cast({join_time, Time}, State) ->
   {noreply, State#state{join_time = Time}};
 
 handle_cast({lookup_time, timeout}, State) ->
-  NewList = lists:map(fun(X) -> X * 2 end, State#state.lookup_times),
+  {ok, Coeff} = application:get_env(echo_rd, timing_increase),
+  NewList = lists:map(fun(X) -> ceil(X * Coeff) end, State#state.lookup_times),
   {noreply, State#state{lookup_drop = State#state.lookup_drop + 1, lookup_times = NewList}};
 
 handle_cast({lookup_time, Time}, State) when Time > State#state.max_lookup_time ->
