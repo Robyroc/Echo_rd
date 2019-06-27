@@ -114,30 +114,25 @@ Truth-Table of the CM's state machine
 | a  | init_joiner   | join           | lookup_for_join                | look          | 
 | b  | init_joiner   | create         | start                          | init_provider | 
 | c  | look          | look_resp      | ready_for_info                 | pre_join      |
-| d  | look          | join           |                                | look          | 
 | ti | look          | timeout        | hard_stop                      | init_joiner   | 
-| e  | pre_join      | info           | ack_info                       | j_ready       | 
-| f  | pre_join      | abort          | lookup_for_join                | look          | 
+| d  | pre_join      | info           | ack_info                       | j_ready       | 
+| e  | pre_join      | abort          | lookup_for_join                | look          | 
 | ti | pre_join      | timeout        | hard_stop                      | init_joiner   | 
-| g  | j_ready       | ack_join       | start                          | init_provider | 
-| h  | j_ready       | abort          | lookup_for_join                | look          | 
+| f  | j_ready       | ack_join       | start                          | init_provider | 
+| g  | j_ready       | abort          | lookup_for_join                | look          | 
 | ti | j_ready       | timeout        | hard_stop                      | init_joiner   | 
-| i1 | init_provider | ready_for_info | join_info                      | not_alone     |
-| i2 | init_provider | ready_for_info | abort                          | init_provider |  
-| j  | init_provider | leave_info     | ack_leave                      | init_provider |
-| k  | init_provider | look_resp      |                                | init_provider | 
-| l  | init_provider | leave          | leave_info                     | leaving       | 
-| m1 | not_alone     | ready_for_info | abort                          | not_alone     | 
-| m2 | not_alone     | ready_for_info | abort(curr), join_info(joiner) | not_alone     | 
-| n  | not_alone     | ack_info       | ack_join, drop_many_resources  | init_provider | 
-| o  | not_alone     | leave          | abort(curr), leave_info        | leaving       |
-| p  | not_alone     | leave_info     | abort(curr), ack_leave         | init_provider | 
-| q  | not_alone     | look_resp      |                                | not_alone     |
+| h1 | init_provider | ready_for_info | join_info                      | not_alone     |
+| h2 | init_provider | ready_for_info | abort                          | init_provider |  
+| i  | init_provider | leave_info     | ack_leave                      | init_provider |
+| j  | init_provider | leave          | leave_info                     | leaving       | 
+| l1 | not_alone     | ready_for_info | abort(joiner)                  | not_alone     | 
+| l2 | not_alone     | ready_for_info | abort(curr), join_info(joiner) | not_alone     | 
+| m  | not_alone     | ack_info       | ack_join, drop_many_resources  | init_provider | 
+| n  | not_alone     | leave          | abort(curr), leave_info        | leaving       |
+| o  | not_alone     | leave_info     | abort(curr), ack_leave         | init_provider | 
 | tj | not_alone     | timeout        | hard_stop                      | init_provider | 
-| r  | leaving       | ack_leave      | stop                           | init_joiner   |
-| s  | leaving       | leave          |                                | init_joiner   |
-| u  | leaving       | look_resp      |                                | leaving       |
-| v  | leaving       | ready_for_info | abort                          | leaving       |
+| p  | leaving       | ack_leave      | stop                           | init_joiner   |
+| q  | leaving       | ready_for_info | abort                          | leaving       |
 | tl | leaving       | timeout        | hard_stop                      | init_joiner   |
 
 Where:
@@ -152,4 +147,4 @@ Where:
     * **ti** for the default interval
     * **tj** for the join interval
     * **tl** for the leaving interval
-* For the ready_for_info message we have the IDs i1,i2 and m1,m2 according to the priority of the joiner who has to be served.
+* For the ready_for_info message we have the IDs h1,h2 and l1,l2 according to the priority of the joiner who has to be served.
