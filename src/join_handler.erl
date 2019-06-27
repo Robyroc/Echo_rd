@@ -35,9 +35,9 @@
 
 -define(SLEEP_INTERVAL, 5000).
 -define(SERVER, ?MODULE).
--define(INTERVAL, 10000).
--define(INTERVAL_LEAVING, 20000).
--define(INTERVAL_JOIN, 20000).
+-define(JOINING_MULT, 2).
+-define(LEAVING_MULT, 3).
+-define(PROVIDER_MULT, 3).
 
 -record(session, {provider_addr, succ_addr, res, succ_list, nbits, app_mngr, curr_addr, curr_id, superv, stabilizer, time}).
 
@@ -130,10 +130,11 @@ init_joiner({call, From}, {join, OwnPort, Address}, Session) ->
       Answer = communication_manager:send_message_sync(lookup_for_join, [], Address, no_alias),
       case Answer of
         ok ->
+          {ok, ConnectionTime} = application:get_env(echo_rd, connect),
           {next_state, look, Session#session{app_mngr = From, provider_addr = Address, time = Time},
-            [{state_timeout, ?INTERVAL, hard_stop}]};
+            [{state_timeout, ConnectionTime * ?JOINING_MULT, hard_stop}]};
         Error ->
-          link_shutdown(),
+          link_brutal_shutdown(),
           {keep_state, Session, [{reply, From, Error}]}
       end;
     Error ->
@@ -162,11 +163,12 @@ init_joiner(EventType, EventContent, Session) ->
 look(cast, {look_resp,Address}, Session) ->
   ok = handle(look, pre_join),
   communication_manager:send_message_async(ready_for_info, [], Address, no_alias),
-  {next_state, pre_join, Session#session{succ_addr = Address}, [{state_timeout, ?INTERVAL, hard_stop}]};
+  {ok, Time} = application:get_env(echo_rd, connect),
+  {next_state, pre_join, Session#session{succ_addr = Address}, [{state_timeout, Time * ?JOINING_MULT, hard_stop}]};
 
 look(state_timeout, hard_stop, Session) ->
   ok = handle(look, init_joiner),
-  link_shutdown(),
+  link_brutal_shutdown(),
   gen_statem:reply(Session#session.app_mngr, fail),
   {next_state, init_joiner, reset_session(Session)};
 
@@ -180,8 +182,11 @@ pre_join(cast, {info, Address, Res, Succ, Nbits}, Session) ->
   case Address of
     _ when Address =:= SuccAddr ->
       communication_manager:send_message_async(ack_info, [], Address, no_alias),
-      {next_state, j_ready, Session#session{res = Res, succ_list = Succ, nbits = Nbits}, [{state_timeout, ?INTERVAL_JOIN, hard_stop}]};
-    _ -> {keep_state, Session, [{state_timeout, ?INTERVAL, hard_stop}]}
+      {ok, Time} = application:get_env(echo_rd, connect),
+      {next_state, j_ready, Session#session{res = Res, succ_list = Succ, nbits = Nbits}, [{state_timeout, Time * ?PROVIDER_MULT, hard_stop}]};
+    _ ->
+      {ok, Time} = application:get_env(echo_rd, connect),
+      {keep_state, Session, [{state_timeout, Time * ?JOINING_MULT, hard_stop}]}
   end;
 
 pre_join(cast, {abort, "Used ID"}, Session) ->
@@ -195,8 +200,8 @@ pre_join(cast, {abort, "Used ID"}, Session) ->
       io:format(" -- JOIN ABORTED -- Reason of abort: Used ID\n");
     _ -> ok
   end,
-  link_shutdown(),
-  gen_statem:reply(Session#session.app_mngr, fail),
+  link_normal_shutdown(),
+  gen_statem:reply(Session#session.app_mngr, used_id),
   {next_state, init_joiner, reset_session(Session)};
 
 pre_join(cast, {abort, Reason}, Session) ->
@@ -213,11 +218,12 @@ pre_join(cast, {abort, Reason}, Session) ->
   ProviderAddr = Session#session.provider_addr,
   timer:sleep(?SLEEP_INTERVAL),
   communication_manager:send_message_async(lookup_for_join, [], ProviderAddr, no_alias),
-  {next_state, look, soft_reset_session(Session), [{state_timeout, ?INTERVAL, hard_stop}]};
+  {ok, Time} = application:get_env(echo_rd, connect),
+  {next_state, look, soft_reset_session(Session), [{state_timeout, Time * ?JOINING_MULT, hard_stop}]};
 
 pre_join(state_timeout, hard_stop, Session) ->
   ok = handle(pre_join, init_joiner),
-  link_shutdown(),
+  link_brutal_shutdown(),
   gen_statem:reply(Session#session.app_mngr, fail),
   {next_state, init_joiner, reset_session(Session)};
 
@@ -245,11 +251,12 @@ j_ready(cast, {abort, Reason}, Session) ->
   ProviderAddr = Session#session.provider_addr,
   timer:sleep(?SLEEP_INTERVAL),
   communication_manager:send_message_async(lookup_for_join, [], ProviderAddr, no_alias),
-  {next_state, look, soft_reset_session(Session), [{state_timeout, ?INTERVAL, hard_stop}]};
+  {ok, Time} = application:get_env(echo_rd, connect),
+  {next_state, look, soft_reset_session(Session), [{state_timeout, Time * ?JOINING_MULT, hard_stop}]};
 
 j_ready(state_timeout, hard_stop, Session) ->
   ok = handle(j_ready, init_joiner),
-  link_shutdown(),
+  link_brutal_shutdown(),
   gen_statem:reply(Session#session.app_mngr, fail),
   {next_state, init_joiner, reset_session(Session)};
 
@@ -268,7 +275,7 @@ init_provider(cast, {ready_for_info, Address}, Session) ->
       communication_manager:send_message_async(abort, ["Used ID"],Address, no_alias),
       handle(init_provider, init_provider),
       {keep_state, Session};
-    _ when JoinerID < PredecessorID ->
+    _ when JoinerID =< PredecessorID ->
       communication_manager:send_message_async(abort, ["Not updated"],Address, no_alias),
       handle(init_provider, init_provider),
       {keep_state, Session};
@@ -277,7 +284,8 @@ init_provider(cast, {ready_for_info, Address}, Session) ->
         application_manager:get_local_resources(JoinerID)],
       communication_manager:send_message_async(join_info,DataInfo,Address,no_alias),
       handle(init_provider, not_alone),
-      {next_state, not_alone, Session#session{curr_id = JoinerID, curr_addr = Address}, [{state_timeout, ?INTERVAL_JOIN, hard_stop}]}
+      {ok, Time} = application:get_env(echo_rd, connect),
+      {next_state, not_alone, Session#session{curr_id = JoinerID, curr_addr = Address}, [{state_timeout, Time * ?PROVIDER_MULT, hard_stop}]}
   end;
 
 init_provider(cast, {leave_info,Resources, Address}, Session) ->
@@ -291,7 +299,8 @@ init_provider({call,From}, leave, Session) ->
   Res = application_manager:get_local_resources(all_res),
   {_, Successor} = stabilizer:get_successor(),
   communication_manager:send_message_async(leave_info, Res, Successor, no_alias),
-  {next_state, leaving, Session#session{app_mngr = From}, [{state_timeout, ?INTERVAL_LEAVING, hard_stop}]};
+  {ok, Time} = application:get_env(echo_rd, connect),
+  {next_state, leaving, Session#session{app_mngr = From}, [{state_timeout, Time * ?LEAVING_MULT, hard_stop}]};
 
 init_provider(cast, {look_resp,_Address}, Session) ->
   {keep_state, Session};
@@ -320,7 +329,8 @@ not_alone(cast, {ready_for_info, Address}, Session) ->
       communication_manager:send_message_async(abort, ["Loss priority"],CurrAddr, no_alias),
       DataInfo = [Session#session.nbits, stabilizer:get_successor_list(), Session#session.res],
       communication_manager:send_message_async(join_info, DataInfo, Address, no_alias),
-      {keep_state, Session#session{curr_addr = Address, curr_id = JoinerID}, [{state_timeout, ?INTERVAL_JOIN, hard_stop}]}
+      {ok, Time} = application:get_env(echo_rd, connect),
+      {keep_state, Session#session{curr_addr = Address, curr_id = JoinerID}, [{state_timeout, Time * ?PROVIDER_MULT, hard_stop}]}
   end;
 
 
@@ -329,7 +339,8 @@ not_alone({call,From}, leave, Session) ->
   communication_manager:send_message_async(abort, ["Successor is leaving"], Session#session.curr_addr, no_alias),
   {_, Successor} = stabilizer:get_successor(),
   communication_manager:send_message_async(leave_info, application_manager:get_local_resources(all_res), Successor, no_alias),
-  {next_state, leaving, Session#session{app_mngr = From}, [{state_timeout, ?INTERVAL_LEAVING, hard_stop}]};
+  {ok, Time} = application:get_env(echo_rd, connect),
+  {next_state, leaving, Session#session{app_mngr = From}, [{state_timeout, Time * ?LEAVING_MULT, hard_stop}]};
 
 not_alone(cast, {ack_info,Address}, Session) when Address =:= Session#session.curr_addr ->
   ok = handle(not_alone, init_provider),
@@ -347,7 +358,9 @@ not_alone(cast, {leave_info,Resources, Address}, Session) ->
       communication_manager:send_message_async(ack_leave,[], Address, no_alias),
       application_manager:add_many_resources(Resources),
       {next_state, init_provider, reset_provider_session(Session)};
-    _ -> {keep_state, Session, [{state_timeout, ?INTERVAL_JOIN, hard_stop}]}
+    _ ->
+      {ok, Time} = application:get_env(echo_rd, connect),
+      {keep_state, Session, [{state_timeout, Time * ?PROVIDER_MULT, hard_stop}]}
   end;
 
 not_alone(state_timeout, hard_stop, Session) ->
@@ -474,10 +487,17 @@ stop(Session, Address) ->
       exit(naming_handler:get_identity(communication_supervisor), kill),
       gen_statem:reply(Session#session.app_mngr, ok),
       {next_state, init_joiner, reset_session(Session#session{stabilizer = Stab})};
-    _ -> {keep_state, Session, [{state_timeout, ?INTERVAL_LEAVING, hard_stop}]}
+    _ ->
+      {ok, Time} = application:get_env(echo_rd, connect),
+      {keep_state, Session, [{state_timeout, Time * ?LEAVING_MULT, hard_stop}]}
   end.
 
-link_shutdown() ->
+link_brutal_shutdown() ->
+  Pid = naming_handler:get_identity(link_supervisor),
+  naming_handler:delete_comm_tree(),
+  exit(Pid, kill).
+
+link_normal_shutdown() ->
   Pid = naming_handler:get_identity(link_supervisor),
   naming_handler:delete_comm_tree(),
   exit(Pid, normal).

@@ -208,6 +208,8 @@ translate(lookup) -> 12;
 translate(command) -> 13;
 translate(get_stats) -> 14;
 translate(stats) -> 15;
+translate(net_command) -> 16;
+translate(net_command_response) -> 17;
 translate(_) -> badarg.
 
 back_translate(1) -> lookup_for_join;
@@ -225,6 +227,8 @@ back_translate(12) -> lookup;
 back_translate(13) -> command;
 back_translate(14) -> get_stats;
 back_translate(15) -> stats;
+back_translate(16) -> net_command;
+back_translate(17) -> net_command_response;
 back_translate(_) -> badarg.
 
 encode_params(lookup_for_join, [], _NBits) -> [];
@@ -248,7 +252,10 @@ encode_params(lookup, [ID], NBits) -> [encode_ID(ID, NBits), <<(2 * NBits):16/in
 encode_params(command, [Address,C], _NBits) -> [link_manager:address_to_binary(Address), C];
 encode_params(get_stats, _, no_nbits) -> badarg;
 encode_params(get_stats, [Number], NBits) -> [encode_ID(Number, NBits)];
-encode_params(stats, [{A, B, C, D}], _NBits) -> [<<A:32, B:32, C:32, D:32>>];
+encode_params(stats, [{A, B, C, D, E, F}], _NBits) -> [list_to_binary([<<A:32, B:32, C:32, E:32, F:32>>, float_to_binary(D)])];
+encode_params(net_command, _, no_nbits) -> badarg;
+encode_params(net_command, [Number, Command], NBits) -> [encode_ID(Number, NBits), list_to_binary(Command)];
+encode_params(net_command_response, [], _NBits) -> [];
 encode_params(_, _, _) -> badarg.
 
 decode_params(lookup_for_join, _, no_nbits) -> badarg;
@@ -269,7 +276,9 @@ decode_params(pred_reply, [Pred, SL], NBits) -> [link_manager:binary_to_address(
 decode_params(lookup, [ID, Hops], _NBits) -> <<Val:16/integer>> = Hops, [decode_ID(ID), Val];
 decode_params(command, [A,C], _NBits) -> [link_manager:binary_to_address(A), C];
 decode_params(get_stats, [Number], _NBits) -> [decode_ID(Number)];
-decode_params(stats, [Bin], _NBits) -> <<A:32, B:32, C:32, D:32>> = Bin, [{A, B, C, D}];
+decode_params(stats, [Bin], _NBits) -> <<A:32, B:32, C:32, E:32, F:32, D/binary>> = Bin, [{A, B, C, binary_to_float(D), E, F}];
+decode_params(net_command, [Number, Command], _NBits) -> [decode_ID(Number), binary_to_list(Command)];
+decode_params(net_command_response, [], _NBits) -> [];
 decode_params(_, _, _) -> badarg.
 
 forward(lookup_for_join, [Hops], From) -> {[router], fun() -> router:lookup_for_join(From, Hops) end};
@@ -288,6 +297,8 @@ forward(lookup, [ID, Hops], From) -> {[router], fun() -> router:remote_lookup(ID
 forward(command, [A,C], _From) -> {[application_manager], fun() -> application_manager:receive_command(A,C) end};
 forward(get_stats, [Number], From) -> {[statistics], fun() -> statistics:get_statistics(From, Number) end};
 forward(stats, [S], From) -> {[statistics], fun() -> statistics:incoming_statistics(From, S) end};
+forward(net_command, [Number, Command], From) -> {[network_control], fun() -> network_control:command_incoming(From, Command, Number) end};
+forward(net_command_response, [], _From) -> {[network_control], fun() -> network_control:command_response() end};
 forward(_, _, _) -> {[], fun() -> ok end}.
 
 

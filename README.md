@@ -13,10 +13,12 @@ Interface
 -----
 
 The library allows to abstract the location of a service and distribute it. All the commands of the service are not changed by Echo_rd, it just routes them to the node handling it correctly.
-The library will need a block service providing an interface compatible with gen_bm.erl file.
+The library will need a block service providing an interface compatible with [gen_bm.erl](src/gen_bm.erl) file.
 
-The full list of methods complete with a brief explanation can be seen in the gen_app.erl file.
+An example of an implemented block service can be seen here: https://github.com/GiacomoZiffer/Eblock_rd
 
+The full list of methods complete with a brief explanation can be seen in the [gen_app.erl](src/gen_app.erl) file.
+ 
 
 Modules
 -----
@@ -51,23 +53,33 @@ Echo_rd can be configured using
     
 The following table shows the possible configurations (in square brackets default values):
 
-| #VAR#     | #VAL#       | Meaning                                                                                 |
-|-----------|-------------|-----------------------------------------------------------------------------------------|
-| ip        | public      | Set this to use public ip address instead of the private one                            |
-| ip        | [private]   | Use private ip address                                                                  |
-| log       | all         | Set this to use the maximum level of logging                                            |
-| log       | logic       | Set this to log only the events strictly related to chord and join mechanisms           |
-| log       | comm_only   | Set this to log only the communication events                                           |
-| log       | chord_only  | Set this to log only the events strictly related to chord                               |
-| log       | joiner_only | Set this to log only the join mechanisms                                                |
-| log       | naming_only | Set this to log only the naming operations                                              |
-| log       | [undefined] | Log only errors                                                                         |
-| lager_log | lager_on    | Logs are written into file and printed on screen (may make it hard to use the terminal) |
-| lager_log | lager_only  | Logs are written only on file                                                           |
-| lager_log | lager_off   | Logs are written only on terminal (may make it hard to use the terminal)                |
-| lager_log | [undefined] | No logging                                                                              |
-| delay     | NUMBER      | Add NUMBER ms of latency to communication                                               |
-| delay     | [undefined] | No artificial delay                                                                     |
+| #VAR#           | #VAL#               | Meaning                                                                                     |
+|-----------------|---------------------|---------------------------------------------------------------------------------------------|
+| ip              | public              | Set this to use public ip address instead of the private one                                |
+| ip              | [private]           | Use private ip address                                                                      |
+| log             | all                 | Set this to use the maximum level of logging                                                |
+| log             | logic               | Set this to log only the events strictly related to chord and join mechanisms               |
+| log             | comm_only           | Set this to log only the communication events                                               |
+| log             | chord_only          | Set this to log only the events strictly related to chord                                   |
+| log             | joiner_only         | Set this to log only the join mechanisms                                                    |
+| log             | naming_only         | Set this to log only the naming operations                                                  |
+| log             | [undefined]         | Log only errors                                                                             |
+| lager_log       | lager_on            | Logs are written into file and printed on screen (may make it hard to use the terminal)     |
+| lager_log       | lager_only          | Logs are written only on file                                                               |
+| lager_log       | lager_off           | Logs are written only on terminal (may make it hard to use the terminal)                    |
+| lager_log       | [undefined]         | No logging                                                                                  |
+| connect         | NUMBER ([7000])     | Maximum amount of time that can be waited during a tcp_connect without giving timeout       |
+| delay           | {constant, NUMBER}  | Add NUMBER ms of latency to communication                                                   |
+| delay           | {normal, MEAN, VAR} | Add latency to communication based on a normal distribution with mean MEAN and variance VAR |
+| delay           | [undefined]         | No artificial delay                                                                         |
+| fix             | off                 | Stops the fix process (cannot be restarted)                                                 |
+| fix             | [undefined]         | Fix as normal                                                                               |
+| stabilize       | off                 | Stops the stabilize process (cannot be restarted)                                           |
+| stabilize       | [undefined]         | Stabilize as normal                                                                         |
+| fail_detection  | off                 | Stops the fail detection system (Needs also the stabilize off option for proper use)        |
+| fail_detection  | [undefined]         | Fail detection as normal                                                                    |
+| size            | NUMBER ([50])       | Dimension of the buffers for statistics                                                     |
+| timing_increase | NUMBER ([2])        | After each failed lookup, average timing is multiplied by this number                       |
 
 Messages
 -----
